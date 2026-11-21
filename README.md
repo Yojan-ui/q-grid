@@ -56,6 +56,7 @@ make test                      # pytest
 make demo                      # frontend (+ live backend on :8000); frontend alone works offline
 make data && make qaoa && make bench && make replay   # full pipeline (~20 min on a MacBook)
 make verify                    # recompute headline numbers, PASS/FAIL vs results/manifest.json
+node frontend/scripts/capture.mjs --url http://localhost:5173 --out shots   # screenshots of every story step (headless Chrome)
 bash scripts/refresh_all.sh    # after adding the PENDING files
 python scripts/new_campus.py --name "<campus>" --lat <lat> --lon <lon>   # another campus
 ```
@@ -70,7 +71,7 @@ python scripts/new_campus.py --name "<campus>" --lat <lat> --lon <lon>   # anoth
 | 4 | QAOA → QIEA → SA → exact tiers, C-QIEA, baselines B0–B5, benchmark both price scenarios | ✅ |
 | 5 | plain-English operator rules (guarded) + deterministic explanations | ✅ |
 | 6 | replay export | ✅ |
-| 7 | 3D demo: story (6 chapters), judge/review, what-if sandbox, honesty strip, recording | ✅ |
+| 7 | 3D demo: light step-by-step explainer (7 steps, one continuous 3D thread: campus → decisions → qubits → QAOA circuit → measurement → decoded plan → ADMM → storage → results), Verify and Try it tabs, honesty strip | ✅ |
 | 8 | new_campus.py, manifest + make verify, CI | ✅ |
 | 9 | report, why-quantum, viva Q&A, pitch, data request | ✅ |
 

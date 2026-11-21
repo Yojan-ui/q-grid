@@ -62,7 +62,7 @@ export async function missingReplayFiles(names: string[]): Promise<string[]> {
 export async function getCSV(name: string): Promise<Record<string, string>[]> {
   const r = await fetch(`${base}replay/${name}`)
   if (!r.ok || (r.headers.get('content-type') ?? '').includes('html')) return []
-  const [head, ...rows] = (await r.text()).trim().split('\n')
+  const [head, ...rows] = (await r.text()).trim().split(/\r?\n/)
   const cols = head.split(',')
   return rows.map(l => Object.fromEntries(l.split(',').map((v, i) => [cols[i], v])))
 }

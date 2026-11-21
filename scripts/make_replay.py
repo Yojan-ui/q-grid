@@ -235,7 +235,7 @@ def main():
                                    "replay_matches_benchmark": o["replay_matches_benchmark"]})
         print(f"{k}: replay matches benchmark: {o['replay_matches_benchmark']}")
     for f in ["benchmark_summary.csv", "headline.json", "economics.json", "search_space.json", "robustness.csv",
-              "qaoa_scaling.csv"]:
+              "qaoa_scaling.csv", "problem_day.json"]:
         p = ROOT / "results" / f
         if p.exists():
             index.setdefault("files", []).append(f)
