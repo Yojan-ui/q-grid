@@ -18,7 +18,7 @@ See [docs/BRIEF.md](docs/BRIEF.md) for the design.
 |---|---|---|
 | 0 | Scaffold (layout, pyproject, Makefile, CI, Vite+R3F frontend) | ✅ done |
 | 1 | Real data pipeline, test days, problem-day analysis | ✅ done — NASA POWER + Ausgrid REAL; tariff A, IEX, CEA **PENDING** (labelled stand-ins, see data/SOURCES.md) |
-| 2 | Building model, safety layer, local QUBO | — |
+| 2 | Building model, safety layer, local QUBO (≤15 qubits), penalty auto-tuning | ✅ done — see docs/qubo.md |
 | 3 | Solvers: QAOA / annealing / exact, tiered fallback | — |
 | 4 | Decentralised consensus-ADMM (in-process + networked) | — |
 | 5 | Baselines B0–B5 + benchmark | — |
