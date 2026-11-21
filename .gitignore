@@ -10,6 +10,10 @@ __pycache__/
 .ipynb_checkpoints/
 # large raw data downloads are cached locally; SOURCES.md documents how to refetch
 data/raw/*
+!data/raw/lab_schedule.csv
+!data/raw/rvce_calendar.csv
+!data/raw/osm_*.geojson
+!data/raw/osm_*.json
 !data/raw/.gitkeep
 !data/raw/SOURCES.md
 data/processed/*.parquet

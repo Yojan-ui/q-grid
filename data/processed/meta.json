@@ -1,5 +1,7 @@
 {
   "year": 2023,
+  "campus": "RVCE",
+  "osm_sha256": "04dfc10996581ef4ce9e27e3b1e660c4e2b8f8f47d31e4e9ec6fbc5a9ae36e76",
   "co2": {
     "status": "PENDING",
     "tco2_per_mwh": 0.727,
@@ -8,7 +10,7 @@
   "prices": {
     "A": {
       "status": "PENDING",
-      "source": "KERC tariff order (BESCOM HT-2(b) educational, ToD) + KERC solar export rate",
+      "source": "KERC tariff order: BESCOM HT educational institutions (ToD) import; KERC solar net-metering/feed-in rate export",
       "note": "STAND-IN placeholder rates, NOT taken from a KERC/BESCOM document"
     },
     "B": {
@@ -18,9 +20,47 @@
     }
   },
   "days": {
-    "sunny": "2023-04-13",
-    "monsoon_cloudy": "2023-07-25",
-    "high_price": "2023-01-10",
+    "scenarios": {
+      "teaching": {
+        "date": "2023-09-13",
+        "day_type": "teaching",
+        "note": "PLACEHOLDER teaching Wednesday (PENDING calendar)",
+        "outage": null
+      },
+      "exam_week": {
+        "date": "2023-07-12",
+        "day_type": "exam",
+        "note": "PLACEHOLDER exam-week Wednesday (PENDING calendar)",
+        "outage": null
+      },
+      "vacation": {
+        "date": "2023-08-09",
+        "day_type": "vacation",
+        "note": "PLACEHOLDER vacation Wednesday (PENDING calendar)",
+        "outage": null
+      },
+      "fest": {
+        "date": "2023-06-14",
+        "day_type": "fest",
+        "note": "8th Mile fest day 2 (RVCE report)",
+        "outage": null
+      },
+      "monsoon": {
+        "date": "2023-07-25",
+        "day_type": "vacation",
+        "note": "lowest campus PV day Jun-Sep 2023 (NASA POWER)",
+        "outage": null
+      },
+      "outage_fest": {
+        "date": "2023-06-15",
+        "day_type": "fest",
+        "note": "HEADLINE stress test: BESCOM outage 18:00-21:00 during fest evening peak (ASSUMED outage window)",
+        "outage": [
+          "18:00",
+          "21:00"
+        ]
+      }
+    },
     "eval_days": [
       "2023-01-07",
       "2023-01-19",
@@ -35,7 +75,7 @@
       "2023-05-08",
       "2023-05-20",
       "2023-06-02",
-      "2023-06-14",
+      "2023-06-16",
       "2023-06-26",
       "2023-07-08",
       "2023-07-20",
@@ -53,37 +93,92 @@
       "2023-12-13",
       "2023-12-25"
     ],
-    "criteria": {
-      "sunny": "max campus daily PV energy in the year",
-      "monsoon_cloudy": "min campus daily PV energy in Jun-Sep",
-      "high_price": "PENDING IEX: stand-in criterion = max campus evening (18-22h) net load",
-      "eval_days": "30 days evenly spaced across the year"
-    }
+    "eval_criteria": "30 days evenly spaced across the year"
   },
-  "load_mapping": {
-    "n_customers": 300,
-    "cluster_sizes": {
-      "lab_block": 146,
-      "admin": 78,
-      "library": 17,
-      "canteen": 49,
-      "hostel": 10
+  "loads": {
+    "zones": {
+      "academic": {
+        "annual_kwh": 5758178,
+        "peak_kw": 1877.5,
+        "floor_m2": 95871,
+        "epi_kwh_m2_yr": 60,
+        "profile": "academic"
+      },
+      "heavy_labs": {
+        "annual_kwh": 2419282,
+        "peak_kw": 1088.7,
+        "floor_m2": 26664,
+        "epi_kwh_m2_yr": 90,
+        "profile": "labs"
+      },
+      "hostels": {
+        "annual_kwh": 451349,
+        "peak_kw": 195.8,
+        "floor_m2": 10030,
+        "epi_kwh_m2_yr": 45,
+        "profile": "hostel"
+      },
+      "library": {
+        "annual_kwh": 780477,
+        "peak_kw": 196.4,
+        "floor_m2": 11150,
+        "epi_kwh_m2_yr": 70,
+        "profile": "library"
+      },
+      "canteen": {
+        "annual_kwh": 1289584,
+        "peak_kw": 386.9,
+        "floor_m2": 5158,
+        "epi_kwh_m2_yr": 250,
+        "profile": "canteen"
+      },
+      "admin": {
+        "annual_kwh": 452731,
+        "peak_kw": 145.5,
+        "floor_m2": 5659,
+        "epi_kwh_m2_yr": 80,
+        "profile": "office"
+      },
+      "server_room": {
+        "annual_kwh": 1547376,
+        "peak_kw": 176.6,
+        "floor_m2": 1289,
+        "epi_kwh_m2_yr": 1200,
+        "profile": "flat"
+      },
+      "health_centre": {
+        "annual_kwh": 105975,
+        "peak_kw": 15.5,
+        "floor_m2": 706,
+        "epi_kwh_m2_yr": 150,
+        "profile": "health"
+      },
+      "pumping_station": {
+        "annual_kwh": 0,
+        "peak_kw": 0.0,
+        "floor_m2": 60,
+        "epi_kwh_m2_yr": null,
+        "profile": "none"
+      },
+      "_scaling": "PENDING RVCE DATA: floor area x EPI (ASSUMPTION)"
     },
-    "cluster_daytime_share": {
-      "lab_block": 0.34,
-      "admin": 0.291,
-      "library": 0.232,
-      "canteen": 0.219,
-      "hostel": 0.181
-    },
-    "date_mapping": "same month/day from Jul-2012..Jun-2013, shifted <=3 days to match weekday",
-    "scaling": "cluster-mean household kW scaled so annual p99 = building peak_kw"
+    "day_types": {
+      "teaching": 187,
+      "holiday": 81,
+      "vacation": 48,
+      "exam": 46,
+      "fest": 3
+    }
   },
   "data_status": {
     "nasa_power": "REAL",
-    "ausgrid": "REAL",
+    "ausgrid_hostel_shape": "REAL",
+    "osm_layout": "REAL",
     "iex": "PENDING",
     "tariff_A": "PENDING",
-    "cea": "PENDING"
+    "cea": "PENDING",
+    "calendar": "PENDING",
+    "campus_loads": "PENDING RVCE DATA",
+    "lab_schedule": "TEMPLATE"
   }
 }

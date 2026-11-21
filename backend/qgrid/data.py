@@ -150,41 +150,123 @@ def map_dates(target_year: int, src_start: str = "2012-07-01", src_end: str = "2
     return out
 
 
-def build_loads(cfg: dict) -> tuple[pd.DataFrame, dict]:
-    year = cfg["site"]["year"]
+def ausgrid_daily_shape(target_year: int) -> pd.Series:
+    """Real residential shape: mean kW over all 300 Ausgrid homes, per 2023 date mapped (weekday-aligned)
+    from Jul-2012..Jun-2013, at 15-min resolution, normalised to a mean of 1 over the year."""
     cust = ausgrid_customer_loads(_read_ausgrid_csv())
-    ids, labels, centroids = cluster_profiles(cust, k=len(cfg["buildings"]))
-    shares = [daytime_share(c) for c in centroids]
-    order = np.argsort(shares)[::-1]  # highest daytime share first
-    mapping = {}
-    for bname, ci in zip(cfg["load_mapping_order"], order):
-        mapping[bname] = int(ci)
+    mean = cust.mean(axis=1)
+    mean = mean.reindex(pd.date_range(mean.index[0], mean.index[-1] + pd.Timedelta("15min"), freq=SLOT)).ffill()
+    idx = year_index(target_year)
+    out = np.empty(len(idx))
+    fallback = mean.groupby(mean.index.time).mean().to_numpy()
+    for i, (d, src) in enumerate(map_dates(target_year).items()):
+        day = mean.loc[src: src + pd.Timedelta(hours=23, minutes=45)].to_numpy()
+        out[i * SLOTS_PER_DAY:(i + 1) * SLOTS_PER_DAY] = day if len(day) == SLOTS_PER_DAY and not np.isnan(day).any() else fallback
+    return pd.Series(out / out.mean(), index=idx)
 
-    dmap = map_dates(year)
+
+def _ranges(spec) -> list[tuple[pd.Timestamp, pd.Timestamp]]:
+    return [(pd.Timestamp(a), pd.Timestamp(b)) for a, b in spec]
+
+
+def day_types(cfg: dict) -> pd.Series:
+    """Day type per date: fest / exam / vacation / holiday (Sat, Sun) / teaching.
+    An optional data/raw/rvce_calendar.csv (date, day_type) overrides the config windows."""
+    year = cfg["site"]["year"]
+    days = pd.date_range(f"{year}-01-01", f"{year}-12-31", freq="D")
+    cal = cfg["calendar"]
+    out = pd.Series("teaching", index=days)
+    out[days.weekday >= 5] = "holiday"
+    for key, label in (("vacation", "vacation"), ("exams", "exam"), ("fest", "fest")):
+        for a, b in _ranges(cal.get(key, [])):
+            out[(days >= a) & (days <= b)] = label
+    f = RAW / "rvce_calendar.csv"
+    if f.exists():
+        c = pd.read_csv(f, comment="#", parse_dates=["date"])
+        out.loc[c["date"]] = c["day_type"].to_numpy()
+    return out
+
+
+def load_profiles() -> dict:
+    return yaml.safe_load((ROOT / "configs" / "profiles.yaml").read_text())
+
+
+def lab_schedule() -> pd.DataFrame:
+    f = RAW / "lab_schedule.csv"
+    return pd.read_csv(f, comment="#") if f.exists() else pd.DataFrame(
+        columns=["zone", "day", "start", "end", "kw", "critical", "name"])
+
+
+def build_zone_loads(cfg: dict, layout: dict) -> tuple[pd.DataFrame, pd.DataFrame, pd.Series, dict]:
+    """Per-zone load and critical load (kW, 15-min, full year) and campus water demand (m3/slot).
+    Annual kWh = floor area x EPI (ASSUMPTION, PENDING RVCE bills); shape = timetable template by day type
+    (hostels: real Ausgrid residential shape). If data/raw/rvce_bills.csv exists, totals are scaled to it."""
+    year = cfg["site"]["year"]
     idx = year_index(year)
-    loads = {}
-    for bname, ci in mapping.items():
-        members = ids[labels == ci]
-        mean_kw = cust[members].mean(axis=1)  # cluster-average household kW, half-hourly
-        mean_kw = mean_kw.reindex(pd.date_range(mean_kw.index[0], mean_kw.index[-1] + pd.Timedelta("15min"), freq=SLOT)).ffill()
-        series = np.empty(len(idx))
-        for i, d in enumerate(pd.date_range(f"{year}-01-01", periods=len(idx) // SLOTS_PER_DAY, freq="D")):
-            src = dmap[d]
-            day = mean_kw.loc[src: src + pd.Timedelta(hours=23, minutes=45)].to_numpy()
-            if len(day) != SLOTS_PER_DAY or np.isnan(day).any():
-                day = mean_kw.groupby(mean_kw.index.time).mean().to_numpy()  # fallback: mean day
-            series[i * SLOTS_PER_DAY:(i + 1) * SLOTS_PER_DAY] = day
-        s = pd.Series(series, index=idx)
-        scale = cfg["buildings"][bname]["peak_kw"] / s.quantile(0.99)
-        loads[bname] = s * scale
-    info = {
-        "n_customers": int(len(ids)),
-        "cluster_sizes": {b: int((labels == c).sum()) for b, c in mapping.items()},
-        "cluster_daytime_share": {b: round(shares[c], 3) for b, c in mapping.items()},
-        "date_mapping": "same month/day from Jul-2012..Jun-2013, shifted <=3 days to match weekday",
-        "scaling": "cluster-mean household kW scaled so annual p99 = building peak_kw",
-    }
-    return pd.DataFrame(loads), info
+    prof = load_profiles()
+    dtypes = day_types(cfg)
+    dt_slot = dtypes.reindex(idx.normalize()).to_numpy()
+    hours = idx.hour.to_numpy()
+    zc = cfg["campus"]["zones"]
+    hostel_shape = None
+    loads, crits, info = {}, {}, {}
+    sched = lab_schedule()
+    dow = np.array(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"])[idx.weekday]
+    for z, spec in zc.items():
+        ptype = spec.get("profile", "flat")
+        if ptype == "hostel":
+            if hostel_shape is None:
+                hostel_shape = ausgrid_daily_shape(year).to_numpy()
+            mult = np.array([prof["hostel"].get(d, 1.0) for d in dt_slot])
+            shape = hostel_shape * mult
+        else:
+            tmpl = prof[ptype]
+            shape = np.empty(len(idx))
+            for d in set(dt_slot):
+                arr = np.array(tmpl.get(d, tmpl["teaching"]), float)
+                m = dt_slot == d
+                shape[m] = arr[hours[m]]
+        floor = layout["zones"][z]["floor_m2"]
+        annual = floor * float(spec.get("epi_kwh_m2_yr", 0.0))
+        tot = shape.sum() * 0.25
+        load = shape * (annual / tot) if tot > 0 else np.zeros(len(idx))
+        crit = load * float(spec.get("critical_frac", 0.0))
+        # lab schedule (TEMPLATE until faculty provide it): teaching days only
+        for _, r in sched[sched.zone == z].iterrows():
+            m = (dow == r["day"]) & (dt_slot == "teaching") & _window_mask(idx, r["start"], r["end"])
+            load = load + m * float(r["kw"])
+            if str(r["critical"]).strip().lower().startswith("y"):
+                crit = crit + m * float(r["kw"])
+        if "fest_load" in spec:
+            fl = spec["fest_load"]
+            m = (dt_slot == "fest") & _window_mask(idx, fl["start"], fl["end"])
+            load = load + m * float(fl["kw"])
+        loads[z], crits[z] = load, np.minimum(crit, load)
+        info[z] = {"annual_kwh": round(float(load.sum() * 0.25)), "peak_kw": round(float(load.max()), 1),
+                   "floor_m2": round(floor), "epi_kwh_m2_yr": spec.get("epi_kwh_m2_yr"), "profile": ptype}
+    load_df, crit_df = pd.DataFrame(loads, index=idx), pd.DataFrame(crits, index=idx)
+    bills = RAW / "rvce_bills.csv"
+    if bills.exists():   # columns: month (YYYY-MM), kwh ; scale campus total month by month
+        b = pd.read_csv(bills, comment="#")
+        for _, r in b.iterrows():
+            m = load_df.index.strftime("%Y-%m") == r["month"]
+            cur = load_df[m].to_numpy().sum() * 0.25
+            if cur > 0:
+                load_df.loc[m] *= float(r["kwh"]) / cur
+                crit_df.loc[m] *= float(r["kwh"]) / cur
+        info["_scaling"] = "scaled month by month to data/raw/rvce_bills.csv"
+    else:
+        info["_scaling"] = "PENDING RVCE DATA: floor area x EPI (ASSUMPTION)"
+    wd = prof["water_demand"]
+    shape = np.array(wd["shape"], float)[hours] * np.array([wd["multipliers"].get(d, 1.0) for d in dt_slot])
+    water = np.zeros(len(idx))
+    for z, spec in zc.items():
+        if "tank" in spec:
+            t = spec["tank"]
+            daily = shape.reshape(-1, SLOTS_PER_DAY).sum(1, keepdims=True)
+            base = np.array(wd["shape"], float)[np.arange(24)].sum() * 4
+            water = (shape * t["daily_demand_m3"] / base).ravel()
+    return load_df, crit_df, pd.Series(water, index=idx), {"zones": info, "day_types": dtypes.value_counts().to_dict()}
 
 
 # ----------------------------------------------------------------------------- IEX
@@ -295,53 +377,57 @@ def load_co2_factor(cfg: dict) -> dict:
     return {"status": "PENDING", "tco2_per_mwh": float(c["standin_tco2_per_mwh"]), "note": c["standin_note"]}
 
 
-# ----------------------------------------------------------------------------- test days
-def pick_days(pv_total: pd.Series, load_total: pd.Series, price: pd.Series | None, n_eval: int) -> dict:
-    daily_pv = pv_total.resample("D").sum() / 4.0  # kWh
+# ----------------------------------------------------------------------------- scenarios & eval days
+def pick_scenarios(cfg: dict, pv_total: pd.Series, dtypes: pd.Series) -> dict:
+    daily_pv = pv_total.resample("D").sum() / 4.0
     monsoon = daily_pv[(daily_pv.index.month >= 6) & (daily_pv.index.month <= 9)]
+    out = {}
+    for k, v in cfg["scenarios"].items():
+        d = str(monsoon.idxmin().date()) if v["date"] == "auto" else v["date"]
+        out[k] = {"date": d, "day_type": dtypes.get(pd.Timestamp(d), "teaching"), "note": v["note"],
+                  "outage": v.get("outage")}
     days = pd.Series(daily_pv.index)
-    step = len(days) / n_eval
-    eval_days = [str(days.iloc[int(step * i + step / 2)].date()) for i in range(n_eval)]
-    if price is not None:
-        hp = price.between_time("18:00", "21:45").resample("D").mean().idxmax()
-        hp_crit = "max mean IEX DAM price 18:00-22:00"
-    else:  # stand-in prices have no day-to-day variation -> use highest evening net import
-        net = (load_total - pv_total).between_time("18:00", "21:45").resample("D").sum()
-        hp = net.idxmax()
-        hp_crit = "PENDING IEX: stand-in criterion = max campus evening (18-22h) net load"
-    return {
-        "sunny": str(daily_pv.idxmax().date()),
-        "monsoon_cloudy": str(monsoon.idxmin().date()),
-        "high_price": str(hp.date()),
-        "eval_days": eval_days,
-        "criteria": {
-            "sunny": "max campus daily PV energy in the year",
-            "monsoon_cloudy": "min campus daily PV energy in Jun-Sep",
-            "high_price": hp_crit,
-            "eval_days": f"{n_eval} days evenly spaced across the year",
-        },
-    }
+    n = cfg["test_days"]["n_eval_days"]
+    step = len(days) / n
+    used = {v["date"] for v in out.values()}
+    ev = []
+    for i in range(n):
+        d = days.iloc[int(step * i + step / 2)]
+        while str(d.date()) in used:
+            d += pd.Timedelta(days=1)
+        ev.append(str(d.date()))
+    return {"scenarios": out, "eval_days": ev, "eval_criteria": f"{n} days evenly spaced across the year"}
 
 
 # ----------------------------------------------------------------------------- main
 def build_all(cfg: dict | None = None) -> dict:
+    from .campus import build_layout
+
     cfg = cfg or load_config()
     PROC.mkdir(parents=True, exist_ok=True)
     year = cfg["site"]["year"]
+    layout = build_layout(cfg)
     weather = load_weather(year)
     weather.to_parquet(PROC / "weather.parquet")
-    pv = pd.DataFrame({b: pv_output_kw(weather, s["pv_kwp"], cfg["pv_model"]) for b, s in cfg["buildings"].items()})
+    pv = pd.DataFrame({z: pv_output_kw(weather, layout["zones"][z]["pv_kwp"], cfg["pv_model"])
+                       for z in cfg["campus"]["zones"]})
     pv.to_parquet(PROC / "pv.parquet")
-    loads, load_info = build_loads(cfg)
+    loads, crit, water, load_info = build_zone_loads(cfg, layout)
     loads.to_parquet(PROC / "load.parquet")
+    crit.to_parquet(PROC / "crit.parquet")
+    water.to_frame("m3").to_parquet(PROC / "water.parquet")
     prices, price_status = build_prices(cfg)
     prices.to_parquet(PROC / "price.parquet")
     co2 = load_co2_factor(cfg)
-    real_iex = prices["B_import"] if price_status["B"]["status"] == "REAL" else None
-    days = pick_days(pv.sum(axis=1), loads.sum(axis=1), real_iex, cfg["test_days"]["n_eval_days"])
-    meta = {"year": year, "co2": co2, "prices": price_status, "days": days, "load_mapping": load_info,
-            "data_status": {"nasa_power": "REAL", "ausgrid": "REAL", "iex": price_status["B"]["status"],
-                            "tariff_A": price_status["A"]["status"], "cea": co2["status"]}}
+    dtypes = day_types(cfg)
+    days = pick_scenarios(cfg, pv.sum(axis=1), dtypes)
+    meta = {"year": year, "campus": layout["campus"], "osm_sha256": layout["osm_sha256"], "co2": co2,
+            "prices": price_status, "days": days, "loads": load_info,
+            "data_status": {"nasa_power": "REAL", "ausgrid_hostel_shape": "REAL", "osm_layout": "REAL",
+                            "iex": price_status["B"]["status"], "tariff_A": price_status["A"]["status"],
+                            "cea": co2["status"], "calendar": cfg["calendar"]["status"],
+                            "campus_loads": "PENDING RVCE DATA" if not (RAW / "rvce_bills.csv").exists() else "SCALED TO BILLS",
+                            "lab_schedule": "TEMPLATE" if "TEMPLATE" in (RAW / "lab_schedule.csv").read_text() else "REAL"}}
     (PROC / "meta.json").write_text(json.dumps(meta, indent=2, default=str))
     return meta
 
@@ -350,6 +436,9 @@ def load_processed() -> dict:
     return {
         "pv": pd.read_parquet(PROC / "pv.parquet"),
         "load": pd.read_parquet(PROC / "load.parquet"),
+        "crit": pd.read_parquet(PROC / "crit.parquet"),
+        "water": pd.read_parquet(PROC / "water.parquet")["m3"],
+        "campus": json.loads((PROC / "campus.json").read_text()),
         "price": pd.read_parquet(PROC / "price.parquet"),
         "weather": pd.read_parquet(PROC / "weather.parquet"),
         "meta": json.loads((PROC / "meta.json").read_text()),

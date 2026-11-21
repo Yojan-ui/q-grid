@@ -1,41 +1,151 @@
-# Q-Grid campus configuration.
-# Capacities, flexible loads and tie-line ratings are DESIGN ASSUMPTIONS for a representative
-# Indian engineering campus (not measured data). Time series (irradiance, temperature, load
-# shapes, prices, CO2 factor) come from real datasets; see data/SOURCES.md for status.
+# Q-Grid configuration — RVCE campus (Mysuru Road, Bengaluru).
+# Labels: ASSUMPTION = engineering assumption (not measured); PENDING = awaiting an official/RVCE source.
+# Real data: NASA POWER (irradiance/temperature), Ausgrid Solar Home (hostel load shape), OSM (layout).
 
 site:
-  name: "Bengaluru campus (12.92N, 77.50E)"
-  lat: 12.92
-  lon: 77.50
+  name: "RV College of Engineering, Mysuru Road, Bengaluru"
+  lat: 12.9232
+  lon: 77.5006
   year: 2023
   slot_minutes: 15
 
-pv_model:              # PVWatts-style derating
-  noct_c: 45.0
-  gamma_per_c: -0.004
-  system_derate: 0.86
+campus:
+  display_name: "RVCE"
+  osm_name: "R. V. College of Engineering"
+  slug: rvce
+  pv: {usable_roof_frac: 0.45, kwp_per_m2: 0.18}      # ASSUMPTION: 45 % of roof usable, 180 Wp/m2 modules
+  tie_lines: {max_degree: 3, extra_links: 2, step_kw: 120}   # ASSUMPTION: flow levels {-120, 0, +120} kW
+  # first matching rule wins (regex on OSM name / tags); exclude=true drops the feature
+  zone_rules:
+    - {exclude: true, tags: {building: "construction|roof|garage"}}
+    - {exclude: true, tags: {leisure: "."}}
+    - {exclude: true, tags: {amenity: "parking|motorcycle_parking"}}
+    - {zone: server_room, name_regex: "computing hub|data ?cent|server"}
+    - {zone: health_centre, tags: {amenity: "hospital|clinic|doctors"}}
+    - {zone: health_centre, name_regex: "medical|health"}
+    - {zone: hostels, name_regex: "hostel|quarters"}
+    - {zone: library, tags: {amenity: "library"}}
+    - {zone: library, name_regex: "library"}
+    - {zone: canteen, tags: {amenity: "fast_food|restaurant|cafe|food_court"}}
+    - {zone: canteen, name_regex: "food|canteen|mingos"}
+    - {zone: admin, name_regex: "admin"}
+    - {zone: heavy_labs, name_regex: "mechanical|workshop|industrial|civil|chemical|aerospace|pg lab|kriya"}
+    - {zone: academic, tags: {building: "."}}
+  # per-zone ASSUMPTIONS: levels (if OSM has no building:levels), EPI kWh/m2/yr of floor area,
+  # critical share of load, battery, diesel generator, flexible loads
+  zones:
+    academic:
+      levels: 3
+      epi_kwh_m2_yr: 60
+      profile: academic
+      critical_frac: 0.05
+      battery: {kwh: 400, kw: 200}
+      flex:
+        - {name: ev_charging, kw: 44, slots: 12, earliest: "08:00", latest: "15:00", default: "09:00"}
+        - {name: auditorium_precool, kw: 60, slots: 4, earliest: "11:00", latest: "16:00", default: "16:00"}
+      fest_load: {kw: 150, start: "17:00", end: "22:30"}   # ASSUMPTION: stage, lighting, sound
+    heavy_labs:
+      levels: 2
+      epi_kwh_m2_yr: 90
+      profile: labs
+      critical_frac: 0.05
+      battery: {kwh: 200, kw: 100}
+      flex:
+        - {name: heavy_lab_machines, kw: 60, slots: 8, earliest: "09:00", latest: "14:00", default: "10:00"}
+    hostels:
+      levels: 4
+      epi_kwh_m2_yr: 45
+      profile: hostel          # Ausgrid residential shape (real data), scaled
+      critical_frac: 0.10
+      battery: {kwh: 300, kw: 150}
+      dg: {kw: 100, min_load_frac: 0.3, min_on_slots: 4}
+      flex:
+        - {name: water_heaters, kw: 60, slots: 8, earliest: "01:00", latest: "04:00", default: "04:00"}
+        - {name: laundry, kw: 25, slots: 8, earliest: "08:00", latest: "18:00", default: "18:00"}
+    library:
+      levels: 3
+      epi_kwh_m2_yr: 70
+      profile: library
+      critical_frac: 0.05
+      battery: {kwh: 150, kw: 75}
+      flex:
+        - {name: hvac_precool, kw: 25, slots: 4, earliest: "08:00", latest: "15:00", default: "15:00"}
+    canteen:
+      levels: 1
+      epi_kwh_m2_yr: 150
+      profile: canteen
+      critical_frac: 0.15
+      battery: {kwh: 100, kw: 50}
+      flex:
+        - {name: cold_storage_cycle, kw: 15, slots: 6, earliest: "00:00", latest: "16:00", default: "16:00"}
+    admin:
+      levels: 3
+      epi_kwh_m2_yr: 80
+      profile: office
+      critical_frac: 0.10
+      battery: {kwh: 150, kw: 75}
+      dg: {kw: 200, min_load_frac: 0.3, min_on_slots: 4}
+    server_room:
+      levels: 2
+      epi_kwh_m2_yr: 1200
+      profile: flat
+      critical_frac: 1.0
+      battery: {kwh: 120, kw: 60}         # UPS bank
+      pv_roof: 1.0
+    health_centre:
+      levels: 1
+      epi_kwh_m2_yr: 150
+      profile: health
+      critical_frac: 0.8
+      battery: {kwh: 40, kw: 20}
+    pumping_station:
+      profile: none
+      critical_frac: 0.0
+      pv_roof: 0.0
+      virtual: {x_m: 180.0, y_m: 120.0, floor_m2: 60}   # ASSUMPTION: pump house not mapped in OSM
+      tank: {capacity_m3: 300, level0_frac: 0.6, min_frac: 0.15, max_frac: 0.98,
+             pump_kw: 30, pump_m3_per_slot: 8.0, daily_demand_m3: 320}   # ASSUMPTIONS
+
+pv_model: {noct_c: 45.0, gamma_per_c: -0.004, system_derate: 0.86}
+
+battery_defaults: {soc_min: 0.20, soc_max: 0.95, soc0: 0.50, eta_ch: 0.95, eta_dis: 0.95}
+
+diesel:                       # ASSUMPTIONS (generic linear fuel curve; replace with RVCE DG logs)
+  price_rs_per_l: 90.0
+  fuel_l_per_kwh_rated: 0.08  # L/h per kW rated (no-load intercept)
+  fuel_l_per_kwh_out: 0.25    # L per kWh delivered
+  co2_kg_per_l: 2.68
+
+outage_costs:                 # ASSUMPTIONS: value of lost load used only inside optimisation objectives
+  voll_noncritical_rs_kwh: 40
+  voll_critical_rs_kwh: 1000
+
+economics:                    # ASSUMPTIONS for payback / per-semester figures
+  battery_capex_rs_per_kwh: 25000
+  semester_days: 120
 
 # ----------------------------------------------------------------------------- prices
-# Scenario A (headline once real): BESCOM HT educational tariff with ToD + KERC solar export rate.
-# Scenario B: IEX day-ahead MCP, both import and export.
 prices:
   scenarios: [A, B]
   A:
-    status: PENDING        # PENDING -> values below are STAND-INS, never headline results
-    source: "KERC tariff order (BESCOM HT-2(b) educational, ToD) + KERC solar export rate"
+    status: PENDING
+    role: headline
+    source: "KERC tariff order: BESCOM HT educational institutions (ToD) import; KERC solar net-metering/feed-in rate export"
     standin_note: "STAND-IN placeholder rates, NOT taken from a KERC/BESCOM document"
-    import_base_rs_kwh: 8.00          # STAND-IN
-    tod:                              # STAND-IN adders (Rs/kWh) by hour window [start, end)
+    import_base_rs_kwh: 8.00
+    tod:
       - {start: "06:00", end: "10:00", adder: 1.00}
       - {start: "18:00", end: "22:00", adder: 1.00}
       - {start: "22:00", end: "06:00", adder: -1.00}
-    export_rs_kwh: 3.00               # STAND-IN
+    export_rs_kwh: 3.00
+    pages: {}                 # fill with page numbers of the KERC PDFs when REAL
   B:
-    status: PENDING        # becomes REAL when data/raw/iex/ covers the year
+    status: PENDING
+    role: sensitivity
     source: "IEX DAM 15-min MCP (all-India), import and export at MCP"
     export_price_factor: 1.0
     standin_note: "SYNTHETIC STAND-IN daily price shape (IEX files missing)"
-    standin_profile_rs_kwh:           # STAND-IN hour-window price levels
+    standin_profile_rs_kwh:
       - {start: "00:00", end: "06:00", price: 4.50}
       - {start: "06:00", end: "09:00", price: 6.00}
       - {start: "09:00", end: "16:00", price: 3.00}
@@ -44,77 +154,48 @@ prices:
       - {start: "23:00", end: "24:00", price: 6.00}
 
 co2:
-  status: PENDING          # verify against CEA PDF (data/raw/cea/)
+  status: PENDING
   standin_tco2_per_mwh: 0.727
   standin_note: >-
     CEA CO2 Baseline Database v20.0 weighted average (FY2023-24) as quoted by secondary sources
     (Climatiq; Saur Energy); not yet verified against the CEA PDF.
-  lambda_rs_per_kg: 0.0    # carbon shadow price in the objective (0 = cost only; CO2 still reported)
+  lambda_rs_per_kg: 0.0
 
-# ----------------------------------------------------------------------------- buildings
-battery_defaults: {soc_min: 0.20, soc_max: 0.95, soc0: 0.50, eta_ch: 0.95, eta_dis: 0.95}
+# ----------------------------------------------------------------------------- calendar & scenarios
+calendar:                     # PENDING RVCE academic calendar (rvce.edu.in blocks scripted download)
+  status: PENDING
+  note: "Teaching/exam/vacation windows are PLACEHOLDERS; fest dates from RVCE cultural activities report."
+  fest: [["2023-06-13", "2023-06-15"]]            # sourced: RVCE reports (8th Mile, 13-15 June 2023)
+  exams: [["2023-03-27", "2023-04-08"], ["2023-07-03", "2023-07-22"], ["2023-12-11", "2023-12-23"]]
+  vacation: [["2023-07-24", "2023-09-01"], ["2023-12-24", "2023-12-31"]]
+  # everything else on weekdays = teaching; Sat/Sun = holiday profile
 
-buildings:
-  # peak_kw: load scaled so its annual 99th percentile equals this value
-  # critical_frac: share of load that must always be served
-  # flex: deferrable jobs that run once per day: power kW, duration slots, window [earliest, latest start],
-  #       default = status-quo start time
-  hostel:
-    pv_kwp: 200
-    peak_kw: 150
-    critical_frac: 0.30
-    battery: {kwh: 200, kw: 100}
-    flex: [{name: water_pumps, kw: 20, slots: 8, earliest: "06:00", latest: "20:00", default: "18:00"}]
-  lab_block:
-    pv_kwp: 150
-    peak_kw: 250
-    critical_frac: 0.45
-    battery: {kwh: 250, kw: 125}
-    flex: [{name: chiller_precool, kw: 40, slots: 4, earliest: "08:00", latest: "15:00", default: "14:00"}]
-  library:
-    pv_kwp: 120
-    peak_kw: 110
-    critical_frac: 0.25
-    battery: {kwh: 150, kw: 75}
-    flex: [{name: hvac_precool, kw: 20, slots: 4, earliest: "08:00", latest: "16:00", default: "15:00"}]
-  canteen:
-    pv_kwp: 80
-    peak_kw: 90
-    critical_frac: 0.35
-    battery: {kwh: 100, kw: 50}
-    flex: [{name: cold_storage_cycle, kw: 15, slots: 6, earliest: "00:00", latest: "18:00", default: "17:00"}]
-  admin:
-    pv_kwp: 100
-    peak_kw: 100
-    critical_frac: 0.30
-    battery: {kwh: 120, kw: 60}
-    flex: [{name: ev_chargers, kw: 30, slots: 8, earliest: "08:00", latest: "18:00", default: "17:30"}]
-
-# ring + one cross-link; flow step F (kW): tie-line flow in {-F, 0, +F}
-tie_lines:
-  step_kw: 40
-  lines:
-    - [hostel, lab_block]
-    - [lab_block, library]
-    - [library, canteen]
-    - [canteen, admin]
-    - [admin, hostel]
-    - [lab_block, canteen]   # cross-link
-
-load_mapping_order: [lab_block, admin, library, canteen, hostel]
+scenarios:
+  teaching:     {date: "2023-09-13", note: "PLACEHOLDER teaching Wednesday (PENDING calendar)"}
+  exam_week:    {date: "2023-07-12", note: "PLACEHOLDER exam-week Wednesday (PENDING calendar)"}
+  vacation:     {date: "2023-08-09", note: "PLACEHOLDER vacation Wednesday (PENDING calendar)"}
+  fest:         {date: "2023-06-14", note: "8th Mile fest day 2 (RVCE report)"}
+  monsoon:      {date: auto, note: "lowest campus PV day Jun-Sep 2023 (NASA POWER)"}
+  outage_fest:  {date: "2023-06-15", outage: ["18:00", "21:00"],
+                 note: "HEADLINE stress test: BESCOM outage 18:00-21:00 during fest evening peak (ASSUMED outage window)"}
+headline_scenario: outage_fest
 
 test_days:
   n_eval_days: 30
 
 admm:
-  rho: 0.25               # rho0 = rho * mean import price * dt / F  (tuned on training days only)
-  rho_growth: 1.2         # rho_k = rho0 * growth^k (forces agreement of discrete proposals)
+  rho: 0.25
+  rho_growth: 1.2
+  relax: 1.0                  # over-relaxation of z (1.0 = none); damping < 1
   max_iter: 15
-  tol_kw: 1.0
   neighbour_timeout_s: 3.0
-  horizon_slots: 4
+  horizon_slots: 3
+  bilateral_resolution: true  # disagreeing lines: each end reports its cost at the 3 levels; pick the min sum
 
 qaoa:
   p: 2
   shots: 256
   seed: 1234
+  warm_start_iters: 6         # COBYLA refinement steps from the zone's previous parameters
+
+rules_dir: rules

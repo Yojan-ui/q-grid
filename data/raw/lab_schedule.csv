@@ -1,0 +1,7 @@
+# TEMPLATE lab schedule (PENDING faculty input). Columns: zone, day, start, end, kw, critical (yes/no), name
+zone,day,start,end,kw,critical,name
+heavy_labs,Mon,09:00,12:00,40,yes,Thermal lab compressor (TEMPLATE)
+heavy_labs,Tue,14:00,16:00,40,yes,Thermal lab compressor (TEMPLATE)
+heavy_labs,Wed,09:00,13:00,55,no,Machine shop CNC (TEMPLATE)
+heavy_labs,Thu,14:00,17:00,35,yes,Materials testing UTM (TEMPLATE)
+academic,Fri,10:00,13:00,30,yes,VLSI lab workstations (TEMPLATE)
