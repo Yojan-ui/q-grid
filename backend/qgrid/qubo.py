@@ -1,42 +1,65 @@
-"""Local per-building QUBO (see docs/qubo.md for the derivation).
+"""Local per-zone QUBO (derivation: docs/qubo.md).
 
-Binary variables for building i at slot t, horizon H <= 4 slots (1 h):
-  c_k, d_k      battery charge / discharge quantum in slot k                    (2H bits)
-                (net-load-matched: charge absorbs the forecast surplus, discharge covers the
-                 forecast deficit, capped at rated power; rated power when there is none)
-  p_l, n_l      tie-line flow on each free incident line: f_l = F (p_l - n_l)   (2 bits per line)
-  s             start the pending flexible job now                              (0 or 1 bit)
-At most 8 + 2*3 + 1 = 15 qubits.
+Binary variables for zone i at slot t, horizon H (default 3 slots):
+  c_k, d_k   battery charge / discharge quantum in slot k              (2H bits, if the zone has a battery)
+  g          diesel generator on for the horizon                       (1 bit, if DG present and not forced)
+  w          borewell pump on for the horizon                          (1 bit, if tank present and not forced)
+  s:<job>    start flexible job now                                    (1 bit per pending job in its window)
+  p_l, n_l   tie-line flow f_l = F (p_l - n_l) on each free line       (2 bits per line)
+A qubit budget (<= 16) is enforced by dropping the job bits with the latest deadlines.
 
-Energy  E(x) = objective(x) + A_x * P_excl(x) + A_s * P_soc(x), all written as const + x^T M x.
-  objective = sum_k dt*(alpha_k r_k + beta_k r_k^2)          grid cost surrogate (fitted, convex)
-            + V_{t+H}(e_H) quadratic fit                      battery cost-to-go (local DP)
-            + s*tail_cost + (1-s)*defer_cost                  flexible-load timing
-            + sum_l rho/2 (f_l - v_l)^2                       ADMM consensus term, v_l = z_l - u_l
-  P_excl    = sum_k c_k d_k + sum_l p_l n_l                   one action per slot / unique flow code
-  P_soc     = sum_{k tight} ((e_k - e_now)/q)^2               soft push into SoC bounds
-Feasibility (hard, checked exactly by evaluate/feasible_mask): exclusivity, encoding, and
-SoC within [e_min, e_max] after every slot of the horizon.
+E(x) = sum_groups objective_g(x) + A_x P_excl(x) + A_s P_soft(x), each as const + x^T M x.
+Groups: grid (tariff / VOLL surrogate), battery_ctg, water_value, dg_fuel, flex_timing, admm, rule:<id>.
+Hard feasibility (exact, checked by feasible_mask): one battery action per slot, unique flow code,
+SoC and tank level within bounds over the horizon.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from functools import lru_cache
 
+import warnings
+
 import numpy as np
 
-from .model import DT, Battery
+from .model import DT, Battery, slot_cost
+
+MAX_QUBITS = 16
 
 
 @dataclass
 class FlexState:
+    name: str
     kw: float
     slots: int
-    can_start: bool        # bit s exists
-    must_start: bool       # start forced now (s fixed to 1, no bit)
-    tail_cost: float = 0.0  # cost of the job's slots beyond the horizon if started now
-    defer_cost: float = 0.0  # estimated cost if deferred (best later start)
-    now_cost: float | None = None  # marginal-price cost of the job's in-horizon slots (calibration)
+    can_start: bool = True
+    must_start: bool = False
+    tail_cost: float = 0.0
+    defer_cost: float = 0.0
+    now_cost: float | None = None
+    deadline: int = 999
+
+
+@dataclass
+class DGState:
+    q: np.ndarray            # (H,) output quantum when on (kW)
+    fuel_cost: float         # Rs over the horizon if on at q (+ carbon shadow price)
+    forced_on: bool = False  # min on-time
+    allowed: bool = True     # rules may forbid
+
+
+@dataclass
+class TankState:
+    level: float
+    demand: np.ndarray       # (H,) m3 per slot
+    pump_kw: float
+    pump_m3: float
+    l_min: float
+    l_max: float
+    value_per_m3: float
+    forced: int | None = None    # None free, 0 forced off, 1 forced on
+    target: float | None = None  # operator rule: level >= target (soft, weighted)
+    target_weight: float = 0.0
 
 
 @dataclass
@@ -44,62 +67,82 @@ class LocalProblem:
     t: int
     bat: Battery
     e_now: float
-    r0: np.ndarray                     # (H,) kW: inflexible load + running flex - pv
-    pi: np.ndarray                     # (H,) import price used in optimisation
-    pe: np.ndarray                     # (H,) export price
-    lines: list[tuple[int, int]]       # free incident lines (line idx, sign)
+    r0: np.ndarray
+    pi: np.ndarray
+    pe: np.ndarray
+    lines: list[tuple[int, int]]
     F: float
-    fixed_out: float = 0.0             # kW outflow on fixed/islanded lines (constant)
-    v: dict[int, float] = field(default_factory=dict)   # ADMM targets per free line
+    fixed_out: float = 0.0
+    v: dict[int, float] = field(default_factory=dict)
     rho: float = 0.0
-    ctg: tuple[float, float, float] = (0.0, 0.0, 0.0)    # V_{t+H}(e) ~ a2 e^2 + a1 e + a0
-    flex: FlexState | None = None
-    pc: np.ndarray | None = None       # (H,) charge quantum per slot (kW); default rated power
-    pd: np.ndarray | None = None       # (H,) discharge quantum per slot (kW)
+    ctg: tuple[float, float, float] = (0.0, 0.0, 0.0)
+    jobs: list[FlexState] = field(default_factory=list)
+    dg: DGState | None = None
+    tank: TankState | None = None
+    grid: np.ndarray | None = None
+    noncrit: np.ndarray | None = None
+    voll_nc: float = 0.0
+    voll_c: float = 0.0
+    pc: np.ndarray | None = None
+    pd: np.ndarray | None = None
+    rule_terms: list[dict] = field(default_factory=list)   # {"id", "var", "coef"} linear penalties
 
     def __post_init__(self):
+        H = len(self.r0)
         if self.pc is None:
-            self.pc = np.full(len(self.r0), self.bat.kw)
+            self.pc = np.full(H, self.bat.kw)
         if self.pd is None:
-            self.pd = np.full(len(self.r0), self.bat.kw)
-
-    @property
-    def H(self) -> int:
-        return len(self.r0)
-
-    @property
-    def has_s(self) -> bool:
-        return self.flex is not None and self.flex.can_start and not self.flex.must_start
-
-    @property
-    def n(self) -> int:
-        return 2 * self.H + 2 * len(self.lines) + int(self.has_s)
-
-    def var_names(self) -> list[str]:
-        H = self.H
-        names = [f"c{k}" for k in range(H)] + [f"d{k}" for k in range(H)]
+            self.pd = np.full(H, self.bat.kw)
+        if self.grid is None:
+            self.grid = np.ones(H, bool)
+        if self.noncrit is None:
+            self.noncrit = np.zeros(H)
+        names = []
+        if self.bat.present:
+            names += [f"c{k}" for k in range(H)] + [f"d{k}" for k in range(H)]
         for l, _ in self.lines:
             names += [f"p{l}", f"n{l}"]
-        if self.has_s:
-            names.append("s")
-        return names
+        if self.dg is not None and not self.dg.forced_on and self.dg.allowed:
+            names.append("g")
+        if self.tank is not None and self.tank.forced is None:
+            names.append("w")
+        cand = sorted([j for j in self.jobs if j.can_start and not j.must_start], key=lambda j: j.deadline)
+        self.job_bits = []
+        for j in cand:
+            if len(names) < MAX_QUBITS:
+                names.append(f"s:{j.name}")
+                self.job_bits.append(j.name)
+        self.names = names
+        self.idx = {n: k for k, n in enumerate(names)}
 
-    # index helpers
-    def ic(self, k): return k
-    def id(self, k): return self.H + k
-    def ip(self, j): return 2 * self.H + 2 * j
-    def in_(self, j): return 2 * self.H + 2 * j + 1
-    def is_(self): return self.n - 1
+    @property
+    def H(self) -> int: return len(self.r0)
+    @property
+    def n(self) -> int: return len(self.names)
+    def var_names(self) -> list[str]: return list(self.names)
+    def has(self, v: str) -> bool: return v in self.idx
+
+    def unit(self, v: str, w: float = 1.0) -> np.ndarray:
+        a = np.zeros(self.n)
+        if v in self.idx:
+            a[self.idx[v]] = w
+        return a
+
+    def dg_on_const(self) -> bool:
+        return self.dg is not None and self.dg.forced_on
+
+    def pump_const(self) -> int:
+        return int(self.tank.forced) if self.tank is not None and self.tank.forced is not None else 0
 
 
 @dataclass
 class QUBO:
     const: float
-    M: np.ndarray  # symmetric; E(x) = const + x^T M x (diagonal holds linear terms)
+    M: np.ndarray
 
     def energy(self, X: np.ndarray) -> np.ndarray:
         X = np.atleast_2d(X).astype(float)
-        with np.errstate(all="ignore"):  # macOS Accelerate raises spurious FP flags in matmul
+        with np.errstate(all="ignore"):
             return self.const + ((X @ self.M) * X).sum(axis=1)
 
     def __add__(self, o: "QUBO") -> "QUBO":
@@ -109,13 +152,11 @@ class QUBO:
         return QUBO(self.const * a, self.M * a)
 
     def to_ising(self):
-        """x = (1 - z)/2 -> E = c + sum h_i z_i + sum_{i<j} J_ij z_i z_j (qubit i <-> bit i)."""
         M = (self.M + self.M.T) / 2
-        n = len(M)
         off = M - np.diag(np.diag(M))
         c = self.const + np.trace(M) / 2 + off.sum() / 4
         h = -np.diag(M) / 2 - off.sum(axis=1) / 2
-        J = np.triu(off * 0.5, 1)  # pair i<j: (M_ij + M_ji)/4 = M_ij/2
+        J = np.triu(off * 0.5, 1)
         return c, h, J
 
 
@@ -124,12 +165,11 @@ class _Builder:
         self.const = 0.0
         self.M = np.zeros((n, n))
 
-    def lin(self, a: np.ndarray, w: float = 1.0, c: float = 0.0):
+    def lin(self, a, w=1.0, c=0.0):
         self.M[np.diag_indices_from(self.M)] += w * a
         self.const += w * c
 
-    def sq(self, a: np.ndarray, c: float, w: float):
-        """w * (c + a.x)^2 with x binary."""
+    def sq(self, a, c, w):
         self.M += w * np.outer(a, a)
         self.M[np.diag_indices_from(self.M)] += w * 2 * c * a
         self.const += w * c * c
@@ -142,100 +182,183 @@ class _Builder:
         return QUBO(self.const, (self.M + self.M.T) / 2)
 
 
+# ----------------------------------------------------------------------------- affine pieces
 def residual_affine(lp: LocalProblem, k: int) -> tuple[float, np.ndarray]:
-    """r_k = c0 + a.x (kW)."""
     a = np.zeros(lp.n)
-    a[lp.ic(k)] = lp.pc[k]
-    a[lp.id(k)] = -lp.pd[k]
-    for j, (l, sgn) in enumerate(lp.lines):
-        a[lp.ip(j)] = sgn * lp.F
-        a[lp.in_(j)] = -sgn * lp.F
+    if lp.bat.present:
+        a += lp.unit(f"c{k}", lp.pc[k]) + lp.unit(f"d{k}", -lp.pd[k])
+    for l, sgn in lp.lines:
+        a += lp.unit(f"p{l}", sgn * lp.F) + lp.unit(f"n{l}", -sgn * lp.F)
     c0 = lp.r0[k] + lp.fixed_out
-    if lp.flex is not None and k < lp.flex.slots:
-        if lp.has_s:
-            a[lp.is_()] = lp.flex.kw
-        elif lp.flex.must_start:
-            c0 += lp.flex.kw
+    for j in lp.jobs:
+        if k < j.slots:
+            if j.name in lp.job_bits:
+                a += lp.unit(f"s:{j.name}", j.kw)
+            elif j.must_start:
+                c0 += j.kw
+    if lp.tank is not None:
+        if lp.has("w"):
+            a += lp.unit("w", lp.tank.pump_kw)
+        else:
+            c0 += lp.pump_const() * lp.tank.pump_kw
+    if lp.dg is not None:
+        if lp.has("g"):
+            a += lp.unit("g", -lp.dg.q[k])
+        elif lp.dg_on_const():
+            c0 -= lp.dg.q[k]
     return c0, a
 
 
 def energy_affine(lp: LocalProblem, k: int) -> tuple[float, np.ndarray]:
-    """Battery energy after slot k (inclusive), with rated-power quanta."""
     a = np.zeros(lp.n)
-    for j in range(k + 1):
-        a[lp.ic(j)] = lp.bat.eta_ch * lp.pc[j] * DT
-        a[lp.id(j)] = -lp.pd[j] * DT / lp.bat.eta_dis
+    if lp.bat.present:
+        for j in range(k + 1):
+            a += lp.unit(f"c{j}", lp.bat.eta_ch * lp.pc[j] * DT) + lp.unit(f"d{j}", -lp.pd[j] * DT / lp.bat.eta_dis)
     return lp.e_now, a
 
 
-def fit_cost_surrogate(c0: float, a: np.ndarray, pi: float, pe: float) -> tuple[float, float, float]:
-    """Fit gamma + alpha r + beta r^2 (beta >= 0) to the exact tariff cost over reachable residuals."""
+def tank_affine(lp: LocalProblem, k: int) -> tuple[float, np.ndarray]:
+    tk = lp.tank
+    c0 = tk.level - float(tk.demand[:k + 1].sum())
+    if lp.has("w"):
+        return c0, lp.unit("w", tk.pump_m3 * (k + 1))
+    return c0 + lp.pump_const() * tk.pump_m3 * (k + 1), np.zeros(lp.n)
+
+
+def _reachable(c0: float, a: np.ndarray, cap: int = 4096) -> np.ndarray:
     vals = {0.0}
-    for ai in a[a != 0]:
-        vals = vals | {v + ai for v in vals}
-    r = c0 + np.array(sorted(vals))
-    cost = pi * np.maximum(r, 0) - pe * np.maximum(-r, 0)
+    for ai in a[np.abs(a) > 1e-12]:
+        vals = vals | {round(v + ai, 3) for v in vals}
+        if len(vals) > cap:
+            vals = set(np.round(np.linspace(min(vals), max(vals), cap), 3))
+    return c0 + np.array(sorted(vals))
+
+
+def crit_active(lp: LocalProblem, k: int) -> bool:
+    """Islanded slot where some bitstring can serve all critical load (deficit <= non-critical load)."""
+    if lp.grid[k]:
+        return False
+    c0, a = residual_affine(lp, k)
+    return c0 + a[a < 0].sum() <= lp.noncrit[k] + 1e-6
+
+
+def fit_cost_surrogate(c0, a, pi, pe, grid=True, noncrit=0.0, voll_nc=0.0, voll_c=0.0, rmax=None):
+    """Fit gamma + alpha r + beta r^2 (beta >= 0) to the exact slot cost / DT over reachable residuals
+    (restricted to r <= rmax when the critical-load constraint is active)."""
+    r = _reachable(c0, a)
+    if rmax is not None and (r <= rmax + 1e-6).any():
+        r = r[r <= rmax + 1e-6]
+    cost = slot_cost(r, pi, pe, grid, noncrit, voll_nc, voll_c) / DT
     if np.ptp(r) < 1e-9:
         return float(cost[0]), 0.0, 0.0
-    beta, alpha, gamma = np.polyfit(r, cost, 2)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        beta, alpha, gamma = np.polyfit(r, cost, 2)
     if beta < 0:
         alpha, gamma = np.polyfit(r, cost, 1)
         beta = 0.0
     return float(gamma), float(alpha), float(beta)
 
 
-def build(lp: LocalProblem) -> tuple[QUBO, QUBO, QUBO]:
-    """Return (objective, exclusivity penalty, SoC penalty) QUBOs."""
+# ----------------------------------------------------------------------------- build
+def build_groups(lp: LocalProblem) -> tuple[dict[str, QUBO], QUBO, QUBO]:
     n = lp.n
-    ob = _Builder(n)
+    G: dict[str, _Builder] = {}
+
+    def g(name):
+        if name not in G:
+            G[name] = _Builder(n)
+        return G[name]
+
     for k in range(lp.H):
         c0, a = residual_affine(lp, k)
-        gamma, alpha, beta = fit_cost_surrogate(c0, a, lp.pi[k], lp.pe[k])
-        # dt * (gamma + alpha*r + beta*r^2), r = c0 + a.x
-        ob.const += DT * (gamma + alpha * c0)
-        ob.lin(a, DT * alpha)
-        ob.sq(a, c0, DT * beta)
-    e0, ae = energy_affine(lp, lp.H - 1)
-    a2, a1, a0 = lp.ctg
-    ob.sq(ae, e0, a2)
-    ob.lin(ae, a1, e0)
-    ob.const += a0
-    if lp.flex is not None:
-        if lp.has_s:
-            s = np.zeros(n); s[lp.is_()] = 1
-            if lp.flex.now_cost is not None:
-                # calibrate the start bit's own (x = e_s) cost to the battery-aware marginal-price cost,
-                # keeping its couplings with battery / flow bits from the residual terms
-                ob.lin(s, lp.flex.now_cost - ob.M[lp.is_(), lp.is_()])
-            ob.lin(s, lp.flex.tail_cost - lp.flex.defer_cost)
-            ob.const += lp.flex.defer_cost
-        elif lp.flex.must_start:
-            ob.const += lp.flex.tail_cost
-    for j, (l, _) in enumerate(lp.lines):
-        if lp.rho > 0:
-            a = np.zeros(n); a[lp.ip(j)] = lp.F; a[lp.in_(j)] = -lp.F
-            ob.sq(a, -lp.v.get(l, 0.0), lp.rho / 2)
+        gam, al, be = fit_cost_surrogate(c0, a, lp.pi[k], lp.pe[k], bool(lp.grid[k]), lp.noncrit[k], lp.voll_nc,
+                                         lp.voll_c, rmax=lp.noncrit[k] if crit_active(lp, k) else None)
+        b = g("grid")
+        b.const += DT * (gam + al * c0)
+        b.lin(a, DT * al)
+        b.sq(a, c0, DT * be)
+    if lp.bat.present:
+        e0, ae = energy_affine(lp, lp.H - 1)
+        a2, a1, a0 = lp.ctg
+        b = g("battery_ctg")
+        b.sq(ae, e0, a2)
+        b.lin(ae, a1, e0)
+        b.const += a0
+    if lp.tank is not None:
+        c0, at = tank_affine(lp, lp.H - 1)
+        g("water_value").lin(at, -lp.tank.value_per_m3, c0)
+        if lp.tank.target is not None and lp.tank.target_weight > 0 and c0 < lp.tank.target:
+            m = max(lp.tank.pump_m3, 1e-9)
+            g("rule:tank_target").sq(-at / m, (lp.tank.target - c0) / m, lp.tank.target_weight)
+    if lp.dg is not None:
+        b = g("dg_fuel")
+        if lp.has("g"):
+            b.lin(lp.unit("g"), lp.dg.fuel_cost)
+        elif lp.dg_on_const():
+            b.const += lp.dg.fuel_cost
+    b = g("flex_timing")
+    for j in lp.jobs:
+        if j.name in lp.job_bits:
+            b.lin(lp.unit(f"s:{j.name}"), j.tail_cost - j.defer_cost)
+            b.const += j.defer_cost
+        elif j.must_start:
+            b.const += j.tail_cost
+    if lp.rho > 0:
+        b = g("admm")
+        for l, _ in lp.lines:
+            a = lp.unit(f"p{l}", lp.F) + lp.unit(f"n{l}", -lp.F)
+            b.sq(a, -lp.v.get(l, 0.0), lp.rho / 2)
+    for rt in lp.rule_terms:
+        if lp.has(rt["var"]):
+            g(f"rule:{rt['id']}").lin(lp.unit(rt["var"]), rt["coef"])
+    groups = {k: v.qubo() for k, v in G.items()}
+    # calibrate each job bit's own cost to its battery-aware marginal-price cost (couplings kept)
+    for j in lp.jobs:
+        if j.name in lp.job_bits and j.now_cost is not None:
+            i = lp.idx[f"s:{j.name}"]
+            groups["flex_timing"].M[i, i] += j.now_cost - groups["grid"].M[i, i]
 
     px = _Builder(n)
-    for k in range(lp.H):
-        px.pair(lp.ic(k), lp.id(k), 1.0)
-    for j in range(len(lp.lines)):
-        px.pair(lp.ip(j), lp.in_(j), 1.0)
-
+    if lp.bat.present:
+        for k in range(lp.H):
+            px.pair(lp.idx[f"c{k}"], lp.idx[f"d{k}"], 1.0)
+    for l, _ in lp.lines:
+        px.pair(lp.idx[f"p{l}"], lp.idx[f"n{l}"], 1.0)
     ps = _Builder(n)
-    qd = lp.bat.kw * DT
+    if lp.bat.present:
+        q = max(lp.bat.kw * DT, 1e-9)
+        for k in range(lp.H):
+            e0k, ak = energy_affine(lp, k)
+            hi, lo = e0k + ak[ak > 0].sum(), e0k + ak[ak < 0].sum()
+            if hi > lp.bat.e_max + 1e-9 or lo < lp.bat.e_min - 1e-9:
+                ps.sq(ak / q, 0.0, 1.0)
     for k in range(lp.H):
-        e0k, ak = energy_affine(lp, k)
-        hi, lo = e0k + ak[ak > 0].sum(), e0k + ak[ak < 0].sum()
-        if hi > lp.bat.e_max + 1e-9 or lo < lp.bat.e_min - 1e-9:
-            ps.sq(ak / qd, 0.0, 1.0)
-    return ob.qubo(), px.qubo(), ps.qubo()
+        if crit_active(lp, k):
+            c0, a = residual_affine(lp, k)
+            sc = max(lp.F, 1.0)
+            ps.sq(a / sc, (c0 - lp.noncrit[k]) / sc, 1.0)
+    if lp.tank is not None and lp.has("w"):
+        for k in range(lp.H):
+            c0, at = tank_affine(lp, k)
+            if c0 < lp.tank.l_min:
+                ps.lin(lp.unit("w"), -1.0)
+            if c0 + at.sum() > lp.tank.l_max:
+                ps.lin(lp.unit("w"), 1.0)
+    return groups, px.qubo(), ps.qubo()
+
+
+def build(lp: LocalProblem) -> tuple[QUBO, QUBO, QUBO]:
+    groups, px, ps = build_groups(lp)
+    ob = QUBO(0.0, np.zeros((lp.n, lp.n)))
+    for q in groups.values():
+        ob = ob + q
+    return ob, px, ps
 
 
 # ----------------------------------------------------------------------------- evaluation
 @lru_cache(maxsize=32)
 def all_bitstrings(n: int) -> np.ndarray:
-    """(2^n, n) matrix; row z has bit i = (z >> i) & 1 (Qiskit little-endian ordering)."""
     z = np.arange(2 ** n, dtype=np.int64)
     X = ((z[:, None] >> np.arange(n)[None, :]) & 1).astype(np.float64)
     X.setflags(write=False)
@@ -245,77 +368,84 @@ def all_bitstrings(n: int) -> np.ndarray:
 def feasible_mask(lp: LocalProblem, X: np.ndarray) -> np.ndarray:
     X = np.atleast_2d(X).astype(np.float64)
     ok = np.ones(len(X), dtype=bool)
-    H = lp.H
-    for k in range(H):
-        ok &= ~((X[:, lp.ic(k)] == 1) & (X[:, lp.id(k)] == 1))
-    for j in range(len(lp.lines)):
-        ok &= ~((X[:, lp.ip(j)] == 1) & (X[:, lp.in_(j)] == 1))
-    for k in range(H):
-        e0k, ak = energy_affine(lp, k)
-        with np.errstate(all="ignore"):
-            e = e0k + X @ ak
-        ok &= (e >= lp.bat.e_min - 1e-6) & (e <= lp.bat.e_max + 1e-6)
+    if lp.bat.present:
+        for k in range(lp.H):
+            ok &= ~((X[:, lp.idx[f"c{k}"]] == 1) & (X[:, lp.idx[f"d{k}"]] == 1))
+    for l, _ in lp.lines:
+        ok &= ~((X[:, lp.idx[f"p{l}"]] == 1) & (X[:, lp.idx[f"n{l}"]] == 1))
+    with np.errstate(all="ignore"):
+        if lp.bat.present:
+            for k in range(lp.H):
+                e0k, ak = energy_affine(lp, k)
+                e = e0k + X @ ak
+                ok &= (e >= lp.bat.e_min - 1e-6) & (e <= lp.bat.e_max + 1e-6)
+        if lp.tank is not None:
+            for k in range(lp.H):
+                c0, at = tank_affine(lp, k)
+                lv = c0 + X @ at
+                lo_ok = (lv >= lp.tank.l_min - 1e-6) | (c0 + at.sum() < lp.tank.l_min)
+                hi_ok = (lv <= lp.tank.l_max + 1e-6) | (c0 > lp.tank.l_max)
+                ok &= lo_ok & hi_ok
+        for k in range(lp.H):
+            if crit_active(lp, k):
+                c0, a = residual_affine(lp, k)
+                ok &= (c0 + X @ a) <= lp.noncrit[k] + 1e-6
     return ok
 
 
 def decode(lp: LocalProblem, x: np.ndarray) -> dict:
     x = np.asarray(x).astype(int)
-    H = lp.H
-    c = x[:H]
-    d = x[H:2 * H]
-    flows = {l: lp.F * (x[lp.ip(j)] - x[lp.in_(j)]) for j, (l, _) in enumerate(lp.lines)}
-    start = bool(x[lp.is_()]) if lp.has_s else bool(lp.flex and lp.flex.must_start)
-    mode = int(c[0]) - int(d[0])  # +1 charge, -1 discharge, 0 idle (slot 0 is applied)
-    return {"c": c, "d": d, "flows": flows, "start": start, "mode0": mode}
+    get = lambda v: int(x[lp.idx[v]]) if v in lp.idx else 0  # noqa: E731
+    flows = {l: lp.F * (get(f"p{l}") - get(f"n{l}")) for l, _ in lp.lines}
+    starts = {j.name: (bool(get(f"s:{j.name}")) if j.name in lp.job_bits else bool(j.must_start)) for j in lp.jobs}
+    mode = get("c0") - get("d0") if lp.bat.present else 0
+    dg_on = bool(get("g")) if lp.has("g") else lp.dg_on_const()
+    pump = bool(get("w")) if lp.has("w") else bool(lp.pump_const())
+    return {"flows": flows, "starts": starts, "start": any(starts.values()), "mode0": mode, "dg_on": dg_on,
+            "pump_on": pump}
 
 
 def evaluate(lp: LocalProblem, x: np.ndarray, qubos=None) -> dict:
-    """Objective, penalties, feasibility and exact (piecewise) horizon grid cost of one bitstring."""
     ob, px, ps = qubos or build(lp)
     x = np.asarray(x).astype(float)
     r = np.array([residual_affine(lp, k)[0] + residual_affine(lp, k)[1] @ x for k in range(lp.H)])
-    exact_grid = float(((lp.pi * np.maximum(r, 0) - lp.pe * np.maximum(-r, 0)) * DT).sum())
-    return {
-        "objective": float(ob.energy(x)[0]),
-        "pen_excl": float(px.energy(x)[0]),
-        "pen_soc": float(ps.energy(x)[0]),
-        "feasible": bool(feasible_mask(lp, x)[0]),
-        "residual_kw": r,
-        "exact_grid_cost": exact_grid,
-        **decode(lp, x),
-    }
+    exact = float(sum(slot_cost(r[k], lp.pi[k], lp.pe[k], bool(lp.grid[k]), lp.noncrit[k], lp.voll_nc, lp.voll_c)
+                      for k in range(lp.H)))
+    return {"objective": float(ob.energy(x)[0]), "pen_excl": float(px.energy(x)[0]), "pen_soc": float(ps.energy(x)[0]),
+            "feasible": bool(feasible_mask(lp, x)[0]), "residual_kw": r, "exact_grid_cost": exact, **decode(lp, x)}
 
 
 def coeff_scale(q: QUBO) -> float:
-    """Upper bound on the objective's range: sum of absolute coefficients."""
     M = q.M
     return float(np.abs(np.diag(M)).sum() + np.abs(M - np.diag(np.diag(M))).sum()) + 1e-9
 
 
 def enumerate_all(lp: LocalProblem, qubos=None) -> dict:
-    """Energies of every bitstring under each QUBO part, plus the exact feasibility mask (once per solve)."""
     ob, px, ps = qubos or build(lp)
     X = all_bitstrings(lp.n)
     return {"X": X, "ob": ob.energy(X), "px": px.energy(X), "ps": ps.energy(X), "feas": feasible_mask(lp, X)}
 
 
 def auto_tune(lp: LocalProblem, qubos=None, max_doublings: int = 12, enum: dict | None = None):
-    """Penalty auto-tuning: A_x = coefficient bound of the objective (a violated exclusivity costs
-    more than any objective gain); A_s doubled from 5 % of that bound until the ground state of the
-    full QUBO is feasible (checked exhaustively). Returns (total QUBO, A_x, A_s, ground-state index)."""
+    """A_x = coefficient bound of the objective; A_s doubled from 5 % of it until the exhaustive ground
+    state of the full QUBO is feasible. Returns (total QUBO, A_x, A_s, ground-state index)."""
     qubos = qubos or build(lp)
     ob, px, ps = qubos
     en = enum or enumerate_all(lp, qubos)
-    feas = en["feas"]
     S = coeff_scale(ob)
-    A_x = S
-    A_s = 0.0
+    A_x, A_s, g = S, 0.0, 0
     for _ in range(max_doublings + 1):
         tot = en["ob"] + A_x * en["px"] + A_s * en["ps"]
         g = int(np.argmin(tot))
-        if feas[g]:
+        if en["feas"][g]:
             break
         A_s = 0.05 * S if A_s == 0 else 2 * A_s
     en["total"] = en["ob"] + A_x * en["px"] + A_s * en["ps"]
-    total = ob + px.scale(A_x) + ps.scale(A_s)
-    return total, A_x, A_s, g
+    return ob + px.scale(A_x) + ps.scale(A_s), A_x, A_s, g
+
+
+def penalty_tune_heuristic(qubos):
+    """For instances too large to enumerate (centralised QIEA): A_x = coefficient bound, A_s = 0.5 * bound."""
+    ob, px, ps = qubos
+    S = coeff_scale(ob)
+    return ob + px.scale(S) + ps.scale(0.5 * S), S, 0.5 * S

@@ -5,6 +5,8 @@ V_t(e) = min cost from slot t to the end of the day with battery energy e, using
 """
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
 
 from .model import T, Battery, slot_cost
@@ -43,7 +45,9 @@ class CostToGo:
             return 0.0, 0.0, float(self(t, e_lo)) if self.bat.present else 0.0
         e = np.linspace(e_lo, e_hi, 25)
         v = self(t, e)
-        a2, a1, a0 = np.polyfit(e, v, 2)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            a2, a1, a0 = np.polyfit(e, v, 2)
         if a2 < 0:
             a1, a0 = np.polyfit(e, v, 1)
             a2 = 0.0

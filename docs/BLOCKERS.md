@@ -8,3 +8,5 @@
 | 4 | Ausgrid original source offline | Resolved (mirror) | Using the researcher-hosted archive copy (CC BY 3.0 AU, SHA-256 recorded in SOURCES.md). | — |
 | 5 | Campus load data | Limitation | Residential Ausgrid shapes are a proxy for campus buildings (evening-heavy). Documented in SOURCES.md and results.md. | Replace with campus meter data if available. |
 | 6 | IBM Quantum hardware | Not run (by design) | Needs credentials and may cost money; `run_ibm()` refuses unless `QGRID_ALLOW_IBM=1`. | Ask the team lead before enabling. |
+| 7 | RVCE academic calendar | PENDING | rvce.edu.in returns 403 to scripted PDF downloads (also via the fetch agent). Teaching/exam/vacation scenario dates are placeholders; fest dates are sourced. | Put `data/raw/rvce_calendar.csv` (date, day_type). |
+| 8 | RVCE bills / interval meters | PENDING RVCE DATA | Campus loads are area x EPI estimates. | See docs/data_request.md. |

@@ -1,6 +1,6 @@
-"""B2 metaheuristics (pymoo GA and PSO), per building, no sharing, same day-ahead information.
-Decision vector: 24 hourly battery set-points in [-P, P] (held for 4 slots) + flexible-job start slot.
-Fitness = exact settlement cost (incl. terminal SoC adjustment) after the safety clamp."""
+"""B2 metaheuristics (pymoo GA and PSO), per zone, no sharing, same day-ahead information.
+Decision vector: 24 hourly battery set-points in [-P, P] (held for 4 slots) + one start slot per flexible
+job. Pump and DG schedules follow the B1 rules. Fitness = exact settlement cost + VOLL after the clamp."""
 from __future__ import annotations
 
 import numpy as np
@@ -11,34 +11,39 @@ from pymoo.optimize import minimize
 
 from qgrid.model import T, Campus, DayData, Schedule
 
+from . import b1_rule_based
 from .common import simulate_building
 
 
-class _BuildingProblem(Problem):
-    def __init__(self, b, i, day):
-        self.b, self.i, self.day = b, i, day
-        j = b.flex[0] if b.flex else None
-        lo = np.r_[-np.ones(24) * b.battery.kw, j.earliest if j else 0]
-        hi = np.r_[np.ones(24) * b.battery.kw, j.latest if j else 0]
-        super().__init__(n_var=25, n_obj=1, xl=lo, xu=hi)
+class _ZoneProblem(Problem):
+    def __init__(self, b, i, day, pump_kw, dg_kw):
+        self.b, self.i, self.day, self.pump_kw, self.dg_kw = b, i, day, pump_kw, dg_kw
+        P = max(b.battery.kw, 1e-6)
+        lo = np.r_[-np.ones(24) * P, [j.earliest for j in b.flex]]
+        hi = np.r_[np.ones(24) * P, [j.latest for j in b.flex]]
+        super().__init__(n_var=len(lo), n_obj=1, xl=lo, xu=hi)
 
     def _evaluate(self, X, out, *a, **k):
         p = np.repeat(X[:, :24], T // 24, axis=1)
-        cost, _ = simulate_building(self.b, self.i, self.day, p, X[:, 24])
-        out["F"] = cost
+        out["F"], _ = simulate_building(self.b, self.i, self.day, p, X[:, 24:], self.pump_kw, self.dg_kw)
 
 
-def solve(campus: Campus, day: DayData, algo: str = "GA", pop: int = 40, n_gen: int = 80, seed: int = 1) -> Schedule:
+def solve(campus: Campus, day: DayData, algo: str = "GA", pop: int = 40, n_gen: int = 60, seed: int = 1, rules=None) -> Schedule:
+    base = b1_rule_based.solve(campus, day, rules)
     s = Schedule.empty(campus)
+    s.pump_on, s.dg_kw = base.pump_on.copy(), base.dg_kw.copy()
     for i, b in enumerate(campus.buildings):
-        prob = _BuildingProblem(b, i, day)
+        pump_kw = base.pump_on[i] * (b.tank.pump_kw if b.tank else 0.0)
+        if not b.battery.present and not b.flex:
+            s.flex_start[i] = dict(base.flex_start[i])
+            continue
+        prob = _ZoneProblem(b, i, day, pump_kw, base.dg_kw[i])
         alg = GA(pop_size=pop, eliminate_duplicates=True) if algo == "GA" else PSO(pop_size=pop)
         res = minimize(prob, alg, ("n_gen", n_gen), seed=seed + i, verbose=False)
         x = np.atleast_2d(res.X)[0]
-        p = np.repeat(x[None, :24], T // 24, axis=1)
-        _, p_app = simulate_building(b, i, day, p, np.array([x[24]]))
+        _, p_app = simulate_building(b, i, day, np.repeat(x[None, :24], T // 24, axis=1), x[None, 24:], pump_kw, base.dg_kw[i])
         s.p_bat[i] = p_app[0]
-        for j in b.flex:
-            s.flex_start[i][j.name] = int(np.clip(round(x[24]), j.earliest, j.latest))
+        for k, j in enumerate(b.flex):
+            s.flex_start[i][j.name] = int(np.clip(round(x[24 + k]), j.earliest, j.latest))
     s.info = {"method": f"B2-{algo}"}
     return s

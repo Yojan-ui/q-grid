@@ -126,10 +126,10 @@
         "profile": "library"
       },
       "canteen": {
-        "annual_kwh": 1289584,
-        "peak_kw": 386.9,
+        "annual_kwh": 773750,
+        "peak_kw": 232.2,
         "floor_m2": 5158,
-        "epi_kwh_m2_yr": 250,
+        "epi_kwh_m2_yr": 150,
         "profile": "canteen"
       },
       "admin": {

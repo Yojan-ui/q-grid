@@ -40,3 +40,28 @@ def flex_decision(job: FlexJob, t: int, started: bool, want_start: bool) -> bool
 def critical_served(load_kw: float, critical_frac: float, supply_kw: float) -> bool:
     """Supply available to the building (PV + battery + tie-lines + grid) covers its critical share."""
     return supply_kw + 1e-9 >= critical_frac * load_kw
+
+
+def dg_decision(dg, want_on: bool, run_len: int, allowed: bool) -> bool:
+    """DG on/off after safety: minimum on-time is enforced; a rule ban applies unless min on-time binds."""
+    if run_len > 0 and run_len < dg.min_on_slots:
+        return True
+    return bool(want_on) and allowed
+
+
+def pump_decision(tank, level: float, demand_next: float, want_on: bool) -> bool:
+    """Pump on/off after safety: forced on if the tank would fall below its minimum, off if it would overflow."""
+    if level - demand_next < tank.l_min:
+        return True
+    if level + tank.pump_m3 - demand_next > tank.l_max:
+        return False
+    return bool(want_on)
+
+
+def float_switch(tank, level: float, on_prev: bool, lo_frac: float = 0.35, hi_frac: float = 0.90) -> bool:
+    """Status-quo float switch with hysteresis (used by B0/B1 and safe-default mode)."""
+    if level <= lo_frac * tank.capacity:
+        return True
+    if level >= hi_frac * tank.capacity:
+        return False
+    return on_prev

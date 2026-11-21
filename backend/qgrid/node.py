@@ -41,7 +41,9 @@ class Node:
         cfg = self.campus.cfg
         self.i = self.campus.names.index(building)
         if synthetic:  # unit tests / CI only
-            from .synthetic import synthetic_day
+            from .synthetic import synthetic_campus, synthetic_day
+            self.campus = synthetic_campus()
+            self.i = self.campus.names.index(building)
             proc, dd = None, synthetic_day(self.campus, scenario=scenario)
         else:
             proc = qdata.load_processed()
@@ -191,13 +193,33 @@ class Node:
         for l in sign:
             if l not in lines:
                 flow[l] = 0.0
+        # critical guard (islanded slots): cut my exporting lines that would leave my critical load unserved;
+        # one extra round tells the neighbours, both ends apply the union of cuts
+        cuts = []
+        out = sum(sign[l] * flow[l] for l in sign)
+        while self.agent.critical_shortfall(t, out) > 1e-6:
+            exp_l = [(sign[l] * flow[l], l) for l in sign if sign[l] * flow[l] > 0]
+            if not exp_l:
+                break
+            l = max(exp_l)[1]
+            flow[l] = 0.0
+            cuts.append(l)
+            out = sum(sign[l2] * flow[l2] for l2 in sign)
+        await self._send({"from": self.i, "slot": t, "round": 10_000, "cuts": cuts})
+        got = await self._recv(t, 10_000)
+        for j, m in got.items():
+            for l in m.get("cuts", []):
+                if l in flow:
+                    flow[l] = 0.0
         out = sum(sign[l] * flow[l] for l in sign)
         if dec is None or any(dec["flows"].get(l, 0.0) != flow[l] for l in sign):
             dec, tier = self._solve(t, [], out, {}, 0.0, 99)
             tiers.append(tier)
-        cmd = self.agent.apply(t, dec["mode0"], dec["start"], out)
+        cmd = self.agent.apply(t, dec, out)
         self.prev_flow = {l: flow[l] for l in lines}
         self.record["p_bat"].append(cmd["p_bat"])
+        self.record.setdefault("dg_kw", []).append(cmd["dg_kw"])
+        self.record.setdefault("pump_on", []).append(float(cmd["pump_on"]))
         for l in sign:
             self.record["flows"].setdefault(str(l), []).append(flow[l])
         self.record["slots"].append({"t": t, "rounds": k, "solves": len(tiers), "tiers": tiers,

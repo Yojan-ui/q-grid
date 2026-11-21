@@ -150,13 +150,15 @@ class QAOAResult:
 
 
 def run_qaoa(total: Q.QUBO, p: int = 2, shots: int = 256, seed: int = 0, backend: str = "numpy",
-             params=None, total_energies: np.ndarray | None = None) -> QAOAResult:
+             params=None, total_energies: np.ndarray | None = None, warm_iters: int = 0) -> QAOAResult:
     """total_energies (optional): QUBO energies of all bitstrings; the Ising diagonal is then
     (E - c)/sigma exactly, which avoids recomputing it."""
     c, h, J = total.to_ising()
     sigma = float(np.sqrt((h ** 2).sum() + (J ** 2).sum())) or 1.0
     h, J = h / sigma, J / sigma
     g, b = params if params is not None else load_params(p)
+    if warm_iters > 0 and total_energies is not None:
+        g, b = warm_start_params((total_energies - c) / sigma, (np.asarray(g), np.asarray(b)), warm_iters)
     if backend == "aer":
         probs = probabilities_aer(h, J, g, b, seed=seed)
     else:
@@ -166,3 +168,22 @@ def run_qaoa(total: Q.QUBO, p: int = 2, shots: int = 256, seed: int = 0, backend
     rng = np.random.default_rng(seed)
     idx = rng.choice(len(probs), size=shots, p=probs)
     return QAOAResult(probs, Q.all_bitstrings(len(h))[idx], np.asarray(g), np.asarray(b), sigma)
+
+
+def warm_start_params(E_norm: np.ndarray, params0, iters: int):
+    """Refine (gamma, beta) for this instance with a few COBYLA steps starting from params0 (the zone's
+    previous parameters). E_norm = normalised Ising diagonal of the instance."""
+    if iters <= 0:
+        return params0
+    from scipy.optimize import minimize
+    g0, b0 = params0
+    p = len(g0)
+    n = int(np.log2(len(E_norm)))
+
+    def f(th):
+        pr = np.abs(statevector_numpy(np.zeros(n), np.zeros((n, n)), th[:p], th[p:], energies=E_norm)) ** 2
+        with np.errstate(all="ignore"):
+            return float(pr @ E_norm)
+
+    res = minimize(f, np.concatenate([g0, b0]), method="COBYLA", options={"maxiter": iters, "rhobeg": 0.05})
+    return res.x[:p], res.x[p:]

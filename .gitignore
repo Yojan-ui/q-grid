@@ -17,6 +17,7 @@ data/raw/*
 !data/raw/.gitkeep
 !data/raw/SOURCES.md
 data/processed/*.parquet
+!data/processed/campus.json
 !data/processed/.gitkeep
 # IBM token etc.
 qiskit-ibm.json
