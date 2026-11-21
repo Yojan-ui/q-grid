@@ -107,7 +107,8 @@ test_days:
   n_eval_days: 30
 
 admm:
-  rho: 2.0                # scaled per instance by the QUBO price scale
+  rho: 0.25               # rho0 = rho * mean import price * dt / F  (tuned on training days only)
+  rho_growth: 1.2         # rho_k = rho0 * growth^k (forces agreement of discrete proposals)
   max_iter: 15
   tol_kw: 1.0
   neighbour_timeout_s: 3.0

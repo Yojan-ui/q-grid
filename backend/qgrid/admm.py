@@ -5,7 +5,9 @@ compute the same z = (f_a + f_b)/2 locally and update their own scaled dual u. B
 load, PV or battery data.
 
 Per slot t:
-  1. warm start z_l from the previous slot's agreed flow, u = 0, rho_k = rho0 * growth^k
+  1. neighbours exchange their marginal energy price for the slot (one number, no load/PV data);
+     duals start at the mean price (initial_duals), z_l warm-starts from the previous agreed flow,
+     rho_k = rho0 * growth^k
   2. every live building solves its local QUBO (tiered solver) with targets v_l = z_l - u_l
      (sticky agreement: a building whose lines all agreed last round keeps its proposal)
   3. exchange proposals with neighbours -> z, u update; stop when every line is agreed (both ends
@@ -32,6 +34,15 @@ from .solvers import solve_local
 def consensus_update(f_self: float, f_other: float, u_self: float) -> tuple[float, float]:
     z = 0.5 * (f_self + f_other)
     return z, u_self + f_self - z
+
+
+def initial_duals(mp_a: float, mp_b: float, rho: float, H: int) -> tuple[float, float]:
+    """Price-initialised scaled duals for a line a->b. Neighbours exchange only their marginal energy
+    price for the slot; pi0 = mean. rho*u is the price the local QUBO sees on the flow, held over H slots:
+    the sender (a) earns pi0*dt*H per kW, the receiver (b) pays it."""
+    pi0 = 0.5 * (mp_a + mp_b)
+    u = pi0 * DT * H / rho
+    return -u, u
 
 
 def rho0(campus: Campus, day: DayData) -> float:
@@ -81,9 +92,10 @@ def run_day(campus: Campus, day: DayData, method: str = "qaoa", log: bool = Fals
     sched = Schedule.empty(campus)
     st = DayStats()
     r0 = rho0(campus, day)
-    growth = 1.5
+    growth = float(ac.get("rho_growth", 1.5))
     nL = len(campus.lines)
     prev_flow = np.zeros(nL)
+    all_agreed = []
 
     def solve(ag, t, free, fixed_out, v, rho, k):
         t0 = time.perf_counter()
@@ -104,7 +116,11 @@ def run_day(campus: Campus, day: DayData, method: str = "qaoa", log: bool = Fals
         alive = [i for i in range(campus.n) if i not in dead]
         active = [l for l, (a, b) in enumerate(campus.lines) if a not in dead and b not in dead]
         z = {l: float(prev_flow[l]) for l in active}
-        u = {(l, i): 0.0 for l in active for i in campus.lines[l]}
+        u = {}
+        H = min(ac["horizon_slots"], T - t)
+        for l in active:
+            a, b = campus.lines[l]
+            u[(l, a)], u[(l, b)] = initial_duals(agents[a].mp[t], agents[b].mp[t], r0, H)
         prop = {}
         last = {}
         settled = set()  # sticky agreement: a building whose lines all agree keeps its proposal
@@ -148,6 +164,7 @@ def run_day(campus: Campus, day: DayData, method: str = "qaoa", log: bool = Fals
             if agreed:
                 break
         st.iters.append(k_used)
+        all_agreed.append(bool(all(prop[(l, campus.lines[l][0])] == prop[(l, campus.lines[l][1])] for l in active)))
 
         flow = np.zeros(nL)
         for l in active:
@@ -176,9 +193,12 @@ def run_day(campus: Campus, day: DayData, method: str = "qaoa", log: bool = Fals
             st.slots.append({"t": t, "iters": k_used, "time_s": time.perf_counter() - t_slot,
                              "flows": flow.tolist(), "alive": alive})
         if kill is not None and t == kill[1]:
-            st.kill = {"building": campus.names[kill[0]], "slot": t, "iters_after_kill": k_used,
-                       "reconverged": bool(all(prop[(l, campus.lines[l][0])] == prop[(l, campus.lines[l][1])]
-                                               for l in active)),
-                       "slot_time_s": time.perf_counter() - t_slot}
+            st.kill = {"building": campus.names[kill[0]], "slot": t, "iters_at_kill_slot": k_used,
+                       "agreed_at_kill_slot": all_agreed[-1], "slot_time_s": time.perf_counter() - t_slot}
+    if st.kill is not None:
+        later = [t for t in range(kill[1], T) if all_agreed[t]]
+        st.kill["first_full_agreement_slot"] = later[0] if later else None
+        st.kill["slots_to_reconverge"] = (later[0] - kill[1]) if later else None
+    st.all_agreed = all_agreed
     sched.info = {"method": f"ADMM+{method}", **st.summary()}
     return sched, st

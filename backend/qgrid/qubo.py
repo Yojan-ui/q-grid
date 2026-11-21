@@ -1,7 +1,9 @@
 """Local per-building QUBO (see docs/qubo.md for the derivation).
 
 Binary variables for building i at slot t, horizon H <= 4 slots (1 h):
-  c_k, d_k      battery charge / discharge at rated power in slot k            (2H bits)
+  c_k, d_k      battery charge / discharge quantum in slot k                    (2H bits)
+                (net-load-matched: charge absorbs the forecast surplus, discharge covers the
+                 forecast deficit, capped at rated power; rated power when there is none)
   p_l, n_l      tie-line flow on each free incident line: f_l = F (p_l - n_l)   (2 bits per line)
   s             start the pending flexible job now                              (0 or 1 bit)
 At most 8 + 2*3 + 1 = 15 qubits.
@@ -34,6 +36,7 @@ class FlexState:
     must_start: bool       # start forced now (s fixed to 1, no bit)
     tail_cost: float = 0.0  # cost of the job's slots beyond the horizon if started now
     defer_cost: float = 0.0  # estimated cost if deferred (best later start)
+    now_cost: float | None = None  # marginal-price cost of the job's in-horizon slots (calibration)
 
 
 @dataclass
@@ -51,6 +54,14 @@ class LocalProblem:
     rho: float = 0.0
     ctg: tuple[float, float, float] = (0.0, 0.0, 0.0)    # V_{t+H}(e) ~ a2 e^2 + a1 e + a0
     flex: FlexState | None = None
+    pc: np.ndarray | None = None       # (H,) charge quantum per slot (kW); default rated power
+    pd: np.ndarray | None = None       # (H,) discharge quantum per slot (kW)
+
+    def __post_init__(self):
+        if self.pc is None:
+            self.pc = np.full(len(self.r0), self.bat.kw)
+        if self.pd is None:
+            self.pd = np.full(len(self.r0), self.bat.kw)
 
     @property
     def H(self) -> int:
@@ -134,9 +145,8 @@ class _Builder:
 def residual_affine(lp: LocalProblem, k: int) -> tuple[float, np.ndarray]:
     """r_k = c0 + a.x (kW)."""
     a = np.zeros(lp.n)
-    P = lp.bat.kw
-    a[lp.ic(k)] = P
-    a[lp.id(k)] = -P
+    a[lp.ic(k)] = lp.pc[k]
+    a[lp.id(k)] = -lp.pd[k]
     for j, (l, sgn) in enumerate(lp.lines):
         a[lp.ip(j)] = sgn * lp.F
         a[lp.in_(j)] = -sgn * lp.F
@@ -152,11 +162,9 @@ def residual_affine(lp: LocalProblem, k: int) -> tuple[float, np.ndarray]:
 def energy_affine(lp: LocalProblem, k: int) -> tuple[float, np.ndarray]:
     """Battery energy after slot k (inclusive), with rated-power quanta."""
     a = np.zeros(lp.n)
-    qc = lp.bat.eta_ch * lp.bat.kw * DT
-    qd = lp.bat.kw * DT / lp.bat.eta_dis
     for j in range(k + 1):
-        a[lp.ic(j)] = qc
-        a[lp.id(j)] = -qd
+        a[lp.ic(j)] = lp.bat.eta_ch * lp.pc[j] * DT
+        a[lp.id(j)] = -lp.pd[j] * DT / lp.bat.eta_dis
     return lp.e_now, a
 
 
@@ -195,6 +203,10 @@ def build(lp: LocalProblem) -> tuple[QUBO, QUBO, QUBO]:
     if lp.flex is not None:
         if lp.has_s:
             s = np.zeros(n); s[lp.is_()] = 1
+            if lp.flex.now_cost is not None:
+                # calibrate the start bit's own (x = e_s) cost to the battery-aware marginal-price cost,
+                # keeping its couplings with battery / flow bits from the residual terms
+                ob.lin(s, lp.flex.now_cost - ob.M[lp.is_(), lp.is_()])
             ob.lin(s, lp.flex.tail_cost - lp.flex.defer_cost)
             ob.const += lp.flex.defer_cost
         elif lp.flex.must_start:

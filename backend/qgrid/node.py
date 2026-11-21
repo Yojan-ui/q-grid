@@ -25,7 +25,7 @@ from pathlib import Path
 import websockets
 
 from . import data as qdata
-from .admm import consensus_update, rho0
+from .admm import consensus_update, initial_duals, rho0
 from .agent import BuildingAgent
 from .model import T, load_campus, make_day
 from .qubo import decode
@@ -138,7 +138,17 @@ class Node:
         lines = {self.line_of[j]: j for j in self.alive}
         sign = dict(self.agent.incident)
         z = {l: self.prev_flow.get(l, 0.0) for l in lines}
-        u = {l: 0.0 for l in lines}
+        # round -1: exchange marginal energy prices (one number per building) to initialise the duals
+        await self._send({"from": self.i, "slot": t, "round": -1, "mp": float(self.agent.mp[t])})
+        got = await self._recv(t, -1)
+        lines = {l: j for l, j in lines.items() if j in self.alive}
+        H = min(self.agent.H, T - t)
+        u = {}
+        for l, j in lines.items():
+            a, b = self.campus.lines[l]
+            mp = {self.i: float(self.agent.mp[t]), j: float(got[j]["mp"])}
+            ua, ub = initial_duals(mp[a], mp[b], self.r0, H)
+            u[l] = ua if a == self.i else ub
         prop, nprop = {}, {}
         dec = None
         s = q = 0
@@ -150,7 +160,7 @@ class Node:
             if not stopped and not settled:
                 free = [(l, sign[l]) for l in lines]
                 v = {l: z[l] - u[l] for l in lines}
-                dec, tier = self._solve(t, free, 0.0, v, self.r0 * 1.5 ** min(k, self.max_iter), k)
+                dec, tier = self._solve(t, free, 0.0, v, self.r0 * float(self.campus.cfg["admm"].get("rho_growth", 1.5)) ** min(k, self.max_iter), k)
                 tiers.append(tier)
                 prop = {l: dec["flows"][l] for l in lines}
             await self._send({"from": self.i, "slot": t, "round": k, "flows": {str(l): f for l, f in prop.items()},

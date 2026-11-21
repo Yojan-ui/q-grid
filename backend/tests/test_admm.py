@@ -52,7 +52,7 @@ def test_admm_kill_node_islands_and_stays_feasible(campus):
         if k in (a, b):
             assert np.all(sched.flows[l, 40:] == 0)
     assert np.all(sched.p_bat[k, 40:] == 0)
-    assert st.kill["reconverged"]
+    assert st.kill["slots_to_reconverge"] is not None and st.kill["slots_to_reconverge"] <= 4
 
 
 def test_networked_nodes_with_crash(tmp_path, campus):
