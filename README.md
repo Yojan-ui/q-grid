@@ -20,7 +20,7 @@ See [docs/BRIEF.md](docs/BRIEF.md) for the design.
 | 1 | Real data pipeline, test days, problem-day analysis | ✅ done — NASA POWER + Ausgrid REAL; tariff A, IEX, CEA **PENDING** (labelled stand-ins, see data/SOURCES.md) |
 | 2 | Building model, safety layer, local QUBO (≤15 qubits), penalty auto-tuning | ✅ done — see docs/qubo.md |
 | 3 | Solvers: QAOA (Qiskit; Aer + equivalent numpy statevector) / annealing / exact, verified tiered fallback, scaling study | ✅ done |
-| 4 | Decentralised consensus-ADMM (in-process + networked) | — |
+| 4 | Decentralised consensus-ADMM: in-process + networked (1 process/building, websockets, no coordinator), island mode, kill-node | ✅ done |
 | 5 | Baselines B0–B5 + benchmark | — |
 | 6 | Replay export | — |
 | 7 | 3D cinematic demo | — |
