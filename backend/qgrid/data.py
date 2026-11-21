@@ -231,44 +231,93 @@ def parse_iex_file(path: Path) -> pd.DataFrame:
     return pd.concat(frames)
 
 
-def build_prices(cfg: dict) -> pd.DataFrame:
-    year = cfg["site"]["year"]
-    files = sorted(p for p in (RAW / "iex").iterdir() if p.suffix.lower() in {".xlsx", ".xls", ".csv"})
+def _window_mask(idx: pd.DatetimeIndex, start: str, end: str) -> np.ndarray:
+    """[start, end) by time of day; wraps midnight when end <= start. '24:00' allowed."""
+    mins = idx.hour * 60 + idx.minute
+    a = int(start[:2]) * 60 + int(start[3:])
+    b = int(end[:2]) * 60 + int(end[3:])
+    return (mins >= a) & (mins < b) if a < b else (mins >= a) | (mins < b)
+
+
+def iex_series(year: int) -> pd.Series | None:
+    """Real IEX DAM MCP (Rs/kWh) if data/raw/iex covers the year (<=3 days gap-filled), else None."""
+    d = RAW / "iex"
+    files = sorted(p for p in d.glob("*") if p.suffix.lower() in {".xlsx", ".xls", ".csv"}) if d.exists() else []
+    if not files:
+        return None
     df = pd.concat([parse_iex_file(p) for p in files]).drop_duplicates("ts").set_index("ts").sort_index()
+    s = df["mcp_rs_mwh"].reindex(year_index(year))
+    if s.isna().sum() > 4 * 24 * 3:
+        print(f"[iex] only {int(s.notna().sum())} of {len(s)} slots present -> treating IEX as PENDING")
+        return None
+    return s.interpolate(limit_direction="both") / 1000.0
+
+
+def build_prices(cfg: dict) -> tuple[pd.DataFrame, dict]:
+    """Columns A_import, A_export, B_import, B_export (Rs/kWh). Returns (prices, status)."""
+    year = cfg["site"]["year"]
     idx = year_index(year)
-    s = df["mcp_rs_mwh"].reindex(idx)
-    missing = int(s.isna().sum())
-    if missing > 4 * 24 * 3:
-        raise ValueError(f"IEX prices missing {missing} of {len(idx)} slots for {year}; export more dates")
-    s = s.interpolate(limit_direction="both")
-    return pd.DataFrame({"price_rs_kwh": s / 1000.0, "price_filled": s.index.isin(df.index) == False})  # noqa: E712
+    pc = cfg["prices"]
+    status = {}
+
+    a = pc["A"]
+    imp = np.full(len(idx), float(a["import_base_rs_kwh"]))
+    for w in a["tod"]:
+        imp += w["adder"] * _window_mask(idx, w["start"], w["end"])
+    out = pd.DataFrame({"A_import": imp, "A_export": float(a["export_rs_kwh"])}, index=idx)
+    status["A"] = {"status": a["status"], "source": a["source"],
+                   "note": a["standin_note"] if a["status"] != "REAL" else ""}
+
+    b = pc["B"]
+    real = iex_series(year)
+    if real is not None:
+        out["B_import"] = real.to_numpy()
+        status["B"] = {"status": "REAL", "source": b["source"], "note": ""}
+    else:
+        prof = np.zeros(len(idx))
+        for w in b["standin_profile_rs_kwh"]:
+            prof = np.where(_window_mask(idx, w["start"], w["end"]), w["price"], prof)
+        out["B_import"] = prof
+        status["B"] = {"status": "PENDING", "source": b["source"], "note": b["standin_note"]}
+    out["B_export"] = out["B_import"] * float(b["export_price_factor"])
+    return out, status
 
 
 # ----------------------------------------------------------------------------- CEA
-def load_co2_factor() -> dict:
+def load_co2_factor(cfg: dict) -> dict:
     f = RAW / "cea" / "emission_factor.yaml"
-    d = yaml.safe_load(f.read_text())
-    assert 0.3 < float(d["weighted_average_tco2_per_mwh"]) < 1.5
-    return d
+    if f.exists() and list((RAW / "cea").glob("*.pdf")):
+        d = yaml.safe_load(f.read_text())
+        v = float(d["weighted_average_tco2_per_mwh"])
+        assert 0.3 < v < 1.5
+        return {"status": "REAL", "tco2_per_mwh": v, **d}
+    c = cfg["co2"]
+    return {"status": "PENDING", "tco2_per_mwh": float(c["standin_tco2_per_mwh"]), "note": c["standin_note"]}
 
 
 # ----------------------------------------------------------------------------- test days
-def pick_days(pv_total: pd.Series, price: pd.Series, n_eval: int) -> dict:
+def pick_days(pv_total: pd.Series, load_total: pd.Series, price: pd.Series | None, n_eval: int) -> dict:
     daily_pv = pv_total.resample("D").sum() / 4.0  # kWh
-    evening = price.between_time("18:00", "21:45").resample("D").mean()
     monsoon = daily_pv[(daily_pv.index.month >= 6) & (daily_pv.index.month <= 9)]
     days = pd.Series(daily_pv.index)
     step = len(days) / n_eval
     eval_days = [str(days.iloc[int(step * i + step / 2)].date()) for i in range(n_eval)]
+    if price is not None:
+        hp = price.between_time("18:00", "21:45").resample("D").mean().idxmax()
+        hp_crit = "max mean IEX DAM price 18:00-22:00"
+    else:  # stand-in prices have no day-to-day variation -> use highest evening net import
+        net = (load_total - pv_total).between_time("18:00", "21:45").resample("D").sum()
+        hp = net.idxmax()
+        hp_crit = "PENDING IEX: stand-in criterion = max campus evening (18-22h) net load"
     return {
         "sunny": str(daily_pv.idxmax().date()),
         "monsoon_cloudy": str(monsoon.idxmin().date()),
-        "high_price": str(evening.idxmax().date()),
+        "high_price": str(hp.date()),
         "eval_days": eval_days,
         "criteria": {
             "sunny": "max campus daily PV energy in the year",
             "monsoon_cloudy": "min campus daily PV energy in Jun-Sep",
-            "high_price": "max mean IEX DAM price 18:00-22:00",
+            "high_price": hp_crit,
             "eval_days": f"{n_eval} days evenly spaced across the year",
         },
     }
@@ -285,12 +334,14 @@ def build_all(cfg: dict | None = None) -> dict:
     pv.to_parquet(PROC / "pv.parquet")
     loads, load_info = build_loads(cfg)
     loads.to_parquet(PROC / "load.parquet")
-    prices = build_prices(cfg)
+    prices, price_status = build_prices(cfg)
     prices.to_parquet(PROC / "price.parquet")
-    co2 = load_co2_factor()
-    days = pick_days(pv.sum(axis=1), prices["price_rs_kwh"], cfg["test_days"]["n_eval_days"])
-    meta = {"year": year, "co2": co2, "days": days, "load_mapping": load_info,
-            "price_filled_slots": int(prices["price_filled"].sum())}
+    co2 = load_co2_factor(cfg)
+    real_iex = prices["B_import"] if price_status["B"]["status"] == "REAL" else None
+    days = pick_days(pv.sum(axis=1), loads.sum(axis=1), real_iex, cfg["test_days"]["n_eval_days"])
+    meta = {"year": year, "co2": co2, "prices": price_status, "days": days, "load_mapping": load_info,
+            "data_status": {"nasa_power": "REAL", "ausgrid": "REAL", "iex": price_status["B"]["status"],
+                            "tariff_A": price_status["A"]["status"], "cea": co2["status"]}}
     (PROC / "meta.json").write_text(json.dumps(meta, indent=2, default=str))
     return meta
 

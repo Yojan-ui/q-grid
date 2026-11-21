@@ -73,6 +73,20 @@ IEX Day-Ahead Market (DAM) 15-minute market clearing prices, calendar year {year
   3. Click Export -> Excel. Repeat to cover 01-Jan-{year} .. 31-Dec-{year}.
   4. Put all exported files in data/raw/iex/  (any filenames).""",
     ),
+    "tariff": dict(
+        dir=RAW / "tariff",
+        patterns=["*.pdf"],
+        instructions="""\
+KERC tariff order (scenario A, headline): BESCOM HT educational-institution tariff with ToD,
+and the KERC solar/rooftop export tariff order.
+  1. Open https://kerc.karnataka.gov.in/  -> Tariff -> Tariff Orders -> the order
+     applicable to FY2023-24 (BESCOM), and the KERC order on solar rooftop/export tariff.
+     (BESCOM also mirrors tariff orders at https://bescom.karnataka.gov.in/ -> Tariff.)
+  2. Save as data/raw/tariff/KERC_tariff_order_BESCOM_FY2023-24.pdf and
+     data/raw/tariff/KERC_solar_export_tariff.pdf
+  3. Copy the HT educational energy charge, ToD adders and export rate into config.yaml
+     prices.A (with page numbers in data/SOURCES.md) and set prices.A.status: REAL.""",
+    ),
     "cea": dict(
         dir=RAW / "cea",
         patterns=["*.pdf"],

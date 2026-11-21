@@ -1,0 +1,89 @@
+{
+  "year": 2023,
+  "co2": {
+    "status": "PENDING",
+    "tco2_per_mwh": 0.727,
+    "note": "CEA CO2 Baseline Database v20.0 weighted average (FY2023-24) as quoted by secondary sources (Climatiq; Saur Energy); not yet verified against the CEA PDF."
+  },
+  "prices": {
+    "A": {
+      "status": "PENDING",
+      "source": "KERC tariff order (BESCOM HT-2(b) educational, ToD) + KERC solar export rate",
+      "note": "STAND-IN placeholder rates, NOT taken from a KERC/BESCOM document"
+    },
+    "B": {
+      "status": "PENDING",
+      "source": "IEX DAM 15-min MCP (all-India), import and export at MCP",
+      "note": "SYNTHETIC STAND-IN daily price shape (IEX files missing)"
+    }
+  },
+  "days": {
+    "sunny": "2023-04-13",
+    "monsoon_cloudy": "2023-07-25",
+    "high_price": "2023-01-10",
+    "eval_days": [
+      "2023-01-07",
+      "2023-01-19",
+      "2023-01-31",
+      "2023-02-12",
+      "2023-02-24",
+      "2023-03-08",
+      "2023-03-21",
+      "2023-04-02",
+      "2023-04-14",
+      "2023-04-26",
+      "2023-05-08",
+      "2023-05-20",
+      "2023-06-02",
+      "2023-06-14",
+      "2023-06-26",
+      "2023-07-08",
+      "2023-07-20",
+      "2023-08-01",
+      "2023-08-14",
+      "2023-08-26",
+      "2023-09-07",
+      "2023-09-19",
+      "2023-10-01",
+      "2023-10-13",
+      "2023-10-26",
+      "2023-11-07",
+      "2023-11-19",
+      "2023-12-01",
+      "2023-12-13",
+      "2023-12-25"
+    ],
+    "criteria": {
+      "sunny": "max campus daily PV energy in the year",
+      "monsoon_cloudy": "min campus daily PV energy in Jun-Sep",
+      "high_price": "PENDING IEX: stand-in criterion = max campus evening (18-22h) net load",
+      "eval_days": "30 days evenly spaced across the year"
+    }
+  },
+  "load_mapping": {
+    "n_customers": 300,
+    "cluster_sizes": {
+      "lab_block": 146,
+      "admin": 78,
+      "library": 17,
+      "canteen": 49,
+      "hostel": 10
+    },
+    "cluster_daytime_share": {
+      "lab_block": 0.34,
+      "admin": 0.291,
+      "library": 0.232,
+      "canteen": 0.219,
+      "hostel": 0.181
+    },
+    "date_mapping": "same month/day from Jul-2012..Jun-2013, shifted <=3 days to match weekday",
+    "scaling": "cluster-mean household kW scaled so annual p99 = building peak_kw"
+  },
+  "data_status": {
+    "nasa_power": "REAL",
+    "ausgrid": "REAL",
+    "iex": "PENDING",
+    "tariff_A": "PENDING",
+    "cea": "PENDING"
+  }
+}

@@ -1,7 +1,7 @@
 # Q-Grid campus configuration.
-# Capacities below are DESIGN ASSUMPTIONS for a representative Indian engineering campus
-# (not measured data). Time-series inputs (irradiance, temperature, load shapes, prices,
-# CO2 factor) come from real datasets; see data/SOURCES.md.
+# Capacities, flexible loads and tie-line ratings are DESIGN ASSUMPTIONS for a representative
+# Indian engineering campus (not measured data). Time series (irradiance, temperature, load
+# shapes, prices, CO2 factor) come from real datasets; see data/SOURCES.md for status.
 
 site:
   name: "Bengaluru campus (12.92N, 77.50E)"
@@ -10,27 +10,110 @@ site:
   year: 2023
   slot_minutes: 15
 
-pv_model:            # PVWatts-style derating
-  noct_c: 45.0       # nominal operating cell temperature
-  gamma_per_c: -0.004  # power temperature coefficient (crystalline Si)
-  system_derate: 0.86  # inverter + wiring + soiling losses
+pv_model:              # PVWatts-style derating
+  noct_c: 45.0
+  gamma_per_c: -0.004
+  system_derate: 0.86
 
+# ----------------------------------------------------------------------------- prices
+# Scenario A (headline once real): BESCOM HT educational tariff with ToD + KERC solar export rate.
+# Scenario B: IEX day-ahead MCP, both import and export.
 prices:
-  source: iex_dam          # iex_dam (IEX day-ahead MCP); campus imports and exports at the DAM price
-  export_price_factor: 1.0 # export credited at factor * DAM price (1.0 = symmetric, no invented spread)
+  scenarios: [A, B]
+  A:
+    status: PENDING        # PENDING -> values below are STAND-INS, never headline results
+    source: "KERC tariff order (BESCOM HT-2(b) educational, ToD) + KERC solar export rate"
+    standin_note: "STAND-IN placeholder rates, NOT taken from a KERC/BESCOM document"
+    import_base_rs_kwh: 8.00          # STAND-IN
+    tod:                              # STAND-IN adders (Rs/kWh) by hour window [start, end)
+      - {start: "06:00", end: "10:00", adder: 1.00}
+      - {start: "18:00", end: "22:00", adder: 1.00}
+      - {start: "22:00", end: "06:00", adder: -1.00}
+    export_rs_kwh: 3.00               # STAND-IN
+  B:
+    status: PENDING        # becomes REAL when data/raw/iex/ covers the year
+    source: "IEX DAM 15-min MCP (all-India), import and export at MCP"
+    export_price_factor: 1.0
+    standin_note: "SYNTHETIC STAND-IN daily price shape (IEX files missing)"
+    standin_profile_rs_kwh:           # STAND-IN hour-window price levels
+      - {start: "00:00", end: "06:00", price: 4.50}
+      - {start: "06:00", end: "09:00", price: 6.00}
+      - {start: "09:00", end: "16:00", price: 3.00}
+      - {start: "16:00", end: "18:00", price: 6.00}
+      - {start: "18:00", end: "23:00", price: 10.00}
+      - {start: "23:00", end: "24:00", price: 6.00}
+
+co2:
+  status: PENDING          # verify against CEA PDF (data/raw/cea/)
+  standin_tco2_per_mwh: 0.727
+  standin_note: >-
+    CEA CO2 Baseline Database v20.0 weighted average (FY2023-24) as quoted by secondary sources
+    (Climatiq; Saur Energy); not yet verified against the CEA PDF.
+  lambda_rs_per_kg: 0.0    # carbon shadow price in the objective (0 = cost only; CO2 still reported)
+
+# ----------------------------------------------------------------------------- buildings
+battery_defaults: {soc_min: 0.20, soc_max: 0.95, soc0: 0.50, eta_ch: 0.95, eta_dis: 0.95}
 
 buildings:
-  # peak_kw: load is scaled so its annual 99th percentile equals this value
-  # critical_frac: share of load that must always be served (labs, servers, lighting)
-  hostel:    {pv_kwp: 200, peak_kw: 150, critical_frac: 0.30, battery: {kwh: 200, kw: 100}}
-  lab_block: {pv_kwp: 150, peak_kw: 250, critical_frac: 0.45, battery: {kwh: 250, kw: 125}}
-  library:   {pv_kwp: 120, peak_kw: 110, critical_frac: 0.25, battery: {kwh: 150, kw: 75}}
-  canteen:   {pv_kwp: 80,  peak_kw: 90,  critical_frac: 0.35, battery: {kwh: 100, kw: 50}}
-  admin:     {pv_kwp: 100, peak_kw: 100, critical_frac: 0.30, battery: {kwh: 120, kw: 60}}
+  # peak_kw: load scaled so its annual 99th percentile equals this value
+  # critical_frac: share of load that must always be served
+  # flex: deferrable jobs that run once per day: power kW, duration slots, window [earliest, latest start],
+  #       default = status-quo start time
+  hostel:
+    pv_kwp: 200
+    peak_kw: 150
+    critical_frac: 0.30
+    battery: {kwh: 200, kw: 100}
+    flex: [{name: water_pumps, kw: 20, slots: 8, earliest: "06:00", latest: "20:00", default: "18:00"}]
+  lab_block:
+    pv_kwp: 150
+    peak_kw: 250
+    critical_frac: 0.45
+    battery: {kwh: 250, kw: 125}
+    flex: [{name: chiller_precool, kw: 40, slots: 4, earliest: "08:00", latest: "15:00", default: "14:00"}]
+  library:
+    pv_kwp: 120
+    peak_kw: 110
+    critical_frac: 0.25
+    battery: {kwh: 150, kw: 75}
+    flex: [{name: hvac_precool, kw: 20, slots: 4, earliest: "08:00", latest: "16:00", default: "15:00"}]
+  canteen:
+    pv_kwp: 80
+    peak_kw: 90
+    critical_frac: 0.35
+    battery: {kwh: 100, kw: 50}
+    flex: [{name: cold_storage_cycle, kw: 15, slots: 6, earliest: "00:00", latest: "18:00", default: "17:00"}]
+  admin:
+    pv_kwp: 100
+    peak_kw: 100
+    critical_frac: 0.30
+    battery: {kwh: 120, kw: 60}
+    flex: [{name: ev_chargers, kw: 30, slots: 8, earliest: "08:00", latest: "18:00", default: "17:30"}]
 
-# Ausgrid cluster -> building assignment is by daytime-energy share of each cluster's mean
-# profile (highest daytime share -> first in this list).
+# ring + one cross-link; flow step F (kW): tie-line flow in {-F, 0, +F}
+tie_lines:
+  step_kw: 40
+  lines:
+    - [hostel, lab_block]
+    - [lab_block, library]
+    - [library, canteen]
+    - [canteen, admin]
+    - [admin, hostel]
+    - [lab_block, canteen]   # cross-link
+
 load_mapping_order: [lab_block, admin, library, canteen, hostel]
 
 test_days:
-  n_eval_days: 30          # evenly spaced across the year (deterministic)
+  n_eval_days: 30
+
+admm:
+  rho: 2.0                # scaled per instance by the QUBO price scale
+  max_iter: 15
+  tol_kw: 1.0
+  neighbour_timeout_s: 3.0
+  horizon_slots: 4
+
+qaoa:
+  p: 2
+  shots: 256
+  seed: 1234

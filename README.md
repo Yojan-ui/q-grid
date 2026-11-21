@@ -17,7 +17,7 @@ See [docs/BRIEF.md](docs/BRIEF.md) for the design.
 | Phase | What | State |
 |---|---|---|
 | 0 | Scaffold (layout, pyproject, Makefile, CI, Vite+R3F frontend) | ✅ done |
-| 1 | Real data pipeline (NASA POWER, Ausgrid, IEX, CEA) | ⏳ next |
+| 1 | Real data pipeline, test days, problem-day analysis | ✅ done — NASA POWER + Ausgrid REAL; tariff A, IEX, CEA **PENDING** (labelled stand-ins, see data/SOURCES.md) |
 | 2 | Building model, safety layer, local QUBO | — |
 | 3 | Solvers: QAOA / annealing / exact, tiered fallback | — |
 | 4 | Decentralised consensus-ADMM (in-process + networked) | — |

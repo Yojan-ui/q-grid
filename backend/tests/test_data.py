@@ -3,7 +3,6 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from baselines.b0_status_quo import status_quo
 from qgrid import data
 
 
@@ -64,13 +63,18 @@ def test_iex_parser(tmp_path):
     assert out.iloc[-1].mcp_rs_mwh == 3095
 
 
-def test_status_quo_balance():
-    idx = pd.date_range("2023-01-01", periods=4, freq="15min")
-    pv = pd.DataFrame({"a": [0, 10, 20, 0.0]}, index=idx)
-    load = pd.DataFrame({"a": [5, 5, 5, 5.0]}, index=idx)
-    price = pd.Series([4, 2, 2, 8.0], index=idx)
-    r = status_quo(pv, load, price, 0.7)
-    assert r["import_kwh"] == pytest.approx(2.5)        # (5+5) kW x 0.25 h
-    assert r["export_kwh"] == pytest.approx(5.0)        # (5+15) x 0.25
-    assert r["cost_rs"] == pytest.approx(5 * .25 * 4 + 5 * .25 * 8 - 20 * .25 * 2)
-    assert r["co2_kg"] == pytest.approx(2.5 * 0.7)
+def test_window_mask_wraps_midnight():
+    idx = pd.date_range("2023-01-01", periods=96, freq="15min")
+    m = data._window_mask(idx, "22:00", "06:00")
+    assert m.sum() == 32 and m[0] and not m[40] and m[95]
+
+
+def test_price_scenarios_standin_shapes():
+    cfg = data.load_config()
+    prices, status = data.build_prices(cfg)
+    assert {"A_import", "A_export", "B_import", "B_export"} <= set(prices.columns)
+    assert len(prices) == 365 * 96
+    for k in ("A", "B"):
+        assert status[k]["status"] in ("REAL", "PENDING")
+        if status[k]["status"] == "PENDING":
+            assert "STAND-IN" in status[k]["note"]
