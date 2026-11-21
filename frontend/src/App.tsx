@@ -1,40 +1,75 @@
-import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Canvas, useThree } from '@react-three/fiber'
-import { OrbitControls } from '@react-three/drei'
-import gsap from 'gsap'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Canvas } from '@react-three/fiber'
+import { EffectComposer, N8AO } from '@react-three/postprocessing'
 import * as THREE from 'three'
-import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { API, getCSV, getJSON, liveAvailable, MissingReplay, missingReplayFiles, type Index, type QaoaFile, type Scenario } from './lib/data'
-import { C, rs } from './lib/theme'
-import { CampusScene, type Anchors } from './scene/CampusScene'
-import { ProvProvider, N, FORMULA } from './panels/Prov'
+import { motion } from 'framer-motion'
+import { getCSV, getJSON, liveAvailable, MissingReplay, missingReplayFiles, type Index, type QaoaFile, type Scenario } from './lib/data'
+import { C, fmtDate, SCEN } from './lib/theme'
+import { ProvProvider } from './panels/Prov'
 import { MetricsTable, RuleBox, SolveLive, Stress } from './panels/Judge'
 import { Sandbox } from './panels/Sandbox'
-import { DataBadge, DayChart, Decisions, LabelLayer, Legend, NowCard, Timeline, fmtDate, scenarioName, zn } from './panels/Hud'
+import { AdmmLabels, CameraRig, Campus, DeviceIcons, QuantumRig, ScaleOut, useZoneGeo } from './story/World'
+import { StoryText } from './story/Panel'
+import { BEATS, type Beat, admmSlot, stepOf } from './story/model'
 
-const QuboTerrain = lazy(() => import('./scene/QuboTerrain').then(m => ({ default: m.QuboTerrain })))
-const QubitChips = lazy(() => import('./scene/QuboTerrain').then(m => ({ default: m.QubitChips })))
-const QaoaPanel = lazy(() => import('./panels/Circuit').then(m => ({ default: m.QaoaPanel })))
-const BarRace = lazy(() => import('./scene/BarRace').then(m => ({ default: m.BarRace })))
-
-type Mode = 'story' | 'explore' | 'judge' | 'sandbox'
-const MODES: [Mode, string][] = [['story', 'Story'], ['explore', 'Explore'], ['judge', 'Judge'], ['sandbox', 'What-if']]
-const CH = ['The problem', 'Decisions become qubits', 'The cost landscape', 'Quantum solve', 'Agreement without a centre', 'Result']
+type Tab = 'story' | 'verify' | 'try'
+type V3 = [number, number, number]
 const reduced = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-const HOME: [number, number, number] = [260, 300, 380]
+const TIME_BEATS: Beat[] = ['1', '6', '7']
 
-function CameraRig({ pos, target, free }: { pos: [number, number, number]; target: [number, number, number]; free: boolean }) {
-  const { camera } = useThree()
-  const tgt = useRef(new THREE.Vector3(...target))
-  const ctl = useRef<any>(null)
-  useEffect(() => {
-    const d = reduced ? 0 : 0.8
-    gsap.to(camera.position, { x: pos[0], y: pos[1], z: pos[2], duration: d, ease: 'power2.inOut' })
-    gsap.to(tgt.current, { x: target[0], y: target[1], z: target[2], duration: d, ease: 'power2.inOut',
-      onUpdate: () => { ctl.current?.target.copy(tgt.current); ctl.current?.update() } })
-  }, [pos.join(), target.join()])
-  return <OrbitControls ref={ctl} enabled={free} enableDamping dampingFactor={0.08} makeDefault
-    minDistance={90} maxDistance={1100} maxPolarAngle={Math.PI / 2 - 0.12} minPolarAngle={0.15} />
+function Sun({ sc, t }: { sc: Scenario; t: number }) {
+  const s = Math.min(95, Math.floor(t))
+  const el = THREE.MathUtils.degToRad(Math.max(28, sc.slots.sun.elevation_deg[s])), az = THREE.MathUtils.degToRad(sc.slots.sun.azimuth_deg[s])
+  const p: V3 = [Math.sin(az) * Math.cos(el) * 600, Math.sin(el) * 600, -Math.cos(az) * Math.cos(el) * 600]
+  const ref = useRef<THREE.DirectionalLight>(null!)
+  useEffect(() => { const c = ref.current.shadow.camera as THREE.OrthographicCamera; c.left = -450; c.right = 450; c.top = 450; c.bottom = -450; c.far = 1800; c.updateProjectionMatrix(); (ref.current.shadow as any).intensity = 0.5 }, [])
+  return <directionalLight ref={ref} position={p} intensity={1.9} color="#FFF8EC" castShadow shadow-mapSize={[2048, 2048]} shadow-bias={-0.0004} shadow-normalBias={0.6} />
+}
+
+function Scene({ sc, q, beat, t, focus, setFocus, removed, round, admmT, scaleOut, dropped }: {
+  sc: Scenario; q: QaoaFile; beat: Beat; t: number; focus: string; setFocus: (z: string) => void; removed: string | null; round: number; admmT: number; scaleOut: boolean; dropped: boolean }) {
+  const [hover, setHover] = useState<string | null>(null)
+  const zg = useZoneGeo(sc)
+  const fz = sc.campus.zones.find(z => z.name === q.zone)!
+  const fh = zg.find(g => g.z.name === q.zone)?.h ?? 12
+  const F: V3 = [fz.cx, 0, -fz.cy]
+  const O: V3 = [F[0], 150, F[2]]
+  const step = stepOf(beat)
+  const run = beat === '1' ? sc.runs.status_quo! : sc.runs.qgrid
+  const its = sc.admm.iterations[String(admmT)] ?? []
+  const flows5 = beat === '5' && its.length ? sc.campus.lines.map((_, l) => { const pr = its[Math.min(round, its.length - 1)].proposals[String(l)]; return pr ? (pr[0] + pr[1]) / 2 : 0 }) : null
+  const fzone = sc.campus.zones.find(z => z.name === focus)!
+  const cam: Record<string, [V3, V3]> = {
+    '1': [[300, 250, 360], [0, 0, 0]], '2': [[fzone.cx + 170, 210, -fzone.cy + 230], [fzone.cx * 0.5, 0, -fzone.cy * 0.5]],
+    '3': [[O[0], O[1] + 4, O[2] + 185], [O[0], O[1] - 2, O[2]]], '4a': [[O[0], O[1] + 4, O[2] + 185], [O[0], O[1] - 2, O[2]]],
+    '4b': [[O[0], O[1] + 2, O[2] + 175], [O[0], O[1] - 2, O[2]]],
+    '4c': [[O[0] - 30, O[1] + 2, O[2] + 200], [O[0] - 30, O[1], O[2]]], '4d': [[O[0] + 6, O[1] - 4, O[2] + 310], [O[0] + 6, O[1] - 6, O[2]]],
+    '4e': dropped ? [[F[0] + 110, 95, F[2] + 150], [F[0], 14, F[2]]] : [[O[0], O[1] + 4, O[2] + 185], [O[0], O[1] - 2, O[2]]], '4f': [[F[0] + 90, 95, F[2] + 120], [F[0], 10, F[2]]],
+    '4g': [[F[0] + 160, 190, F[2] + 230], [F[0] * 0.5, 0, F[2] * 0.5]], '5': [[0, 860, 90], [0, 0, 0]], '6': [[260, 230, 330], [0, 0, 0]],
+    '7': scaleOut ? [[-300, 2900, 2600], [-300, 0, 0]] : [[-290, 470, 640], [-290, 0, 0]],
+  }
+  const [cp, ct] = cam[beat]
+  const showRibbons = ['1', '5', '6', '7', '4e'].includes(beat)
+  const inc = new Set(sc.campus.lines.map((l, k) => (l.includes(q.zone) ? k : -1)).filter(k => k >= 0))
+  const flows4e = beat === '4e' ? sc.campus.lines.map((_, l) => (inc.has(l) ? sc.runs.qgrid.flows[l][q.slot] : 0)) : null
+  return (
+    <>
+      <color attach="background" args={[C.bg]} />
+      <fog attach="fog" args={beat === '7' && scaleOut ? [C.bg, 5000, 16000] : step >= 3 && step <= 4 ? [C.bg, 360, 2100] : [C.bg, 1400, 6000]} />
+      <hemisphereLight args={['#FFFFFF', '#E3E1D9', 1.0]} />
+      <ambientLight intensity={0.55} />
+      <Sun sc={sc} t={t} />
+      <mesh rotation-x={-Math.PI / 2} receiveShadow position-y={-0.02}><planeGeometry args={[9000, 9000]} /><meshStandardMaterial color={C.ground} roughness={1} /></mesh>
+      <CameraRig pos={cp} target={ct} free={beat === '2' || beat === '5' || beat === '6'} />
+      <Campus sc={sc} run={run} t={t} beat={beat} focus={beat === '2' ? focus : q.zone} removed={beat === '5' ? removed : null} hover={hover}
+        flows={flows5 ?? flows4e} showRibbons={showRibbons} onZone={z => z && setFocus(z)} onHover={setHover} liftAll={beat === '2'} />
+      {beat === '2' && <DeviceIcons key={focus} sc={sc} zone={focus} h={zg.find(g => g.z.name === focus)?.h ?? 12} />}
+      {beat === '7' && <Campus sc={sc} run={sc.runs.status_quo!} t={t} beat={beat} focus="" offset={[-580, 0, 0]} showRibbons />}
+      {step >= 3 && step <= 4 && <QuantumRig sc={sc} q={q} beat={beat} origin={O} buildingTop={[F[0], fh + 2, F[2]]} dropped={dropped} />}
+      {beat === '5' && <AdmmLabels sc={sc} round={round} slot={admmT} removed={removed} />}
+      {beat === '7' && <ScaleOut show={scaleOut} />}
+    </>
+  )
 }
 
 export default function App() {
@@ -42,280 +77,160 @@ export default function App() {
   const [key, setKey] = useState('')
   const [sc, setSc] = useState<Scenario | null>(null)
   const [q, setQ] = useState<QaoaFile | null>(null)
-  const [extra, setExtra] = useState<{ sandbox: any; rules: any[]; robust: Record<string, string>[] }>({ sandbox: null, rules: [], robust: [] })
-  const [mode, setMode] = useState<Mode>('story')
-  const [ch, setCh] = useState(0)
+  const [extra, setExtra] = useState<{ sandbox: any; rules: any[]; robust: Record<string, string>[]; search: any }>({ sandbox: null, rules: [], robust: [], search: null })
+  const [tab, setTab] = useState<Tab>('story')
+  const [bi, setBi] = useState(0)
   const [t, setT] = useState(0)
-  const [playing, setPlaying] = useState(!reduced)
-  const [speed, setSpeed] = useState(1)
-  const [narrate, setNarrate] = useState(false)
-  const [killed, setKilled] = useState<string | null>(null)
+  const [focus, setFocus] = useState('hostels')
+  const [removed, setRemoved] = useState<string | null>(null)
+  const [round, setRound] = useState(0)
+  const [scaleOut, setScaleOut] = useState(false)
+  const [dropped, setDropped] = useState(false)
   const [online, setOnline] = useState(false)
-  const [probs, setProbs] = useState<Float64Array | null>(null)
-  const [price, setPrice] = useState('A')
-  const [focus, setFocus] = useState<string | null>(null)
-  const [liveLog, setLiveLog] = useState<string[]>([])
-  const [rec, setRec] = useState<MediaRecorder | null>(null)
   const [missing, setMissing] = useState<string[] | null>(null)
-  const anchors = useRef<Anchors>({ pts: {}, dist: 0, w: 0, h: 0 })
+  const beat = BEATS[bi]
 
   useEffect(() => {
     getJSON<Index>('index.json').then(async i => {
       const miss = await missingReplayFiles(i.scenarios.flatMap(s => [`scenario_${s.key}.json`, `qaoa_${s.key}.json`]))
       if (miss.length) { setMissing(miss); return }
       setIdx(i); setKey(i.headline)
-    }).catch(async e => {
-      if (e instanceof MissingReplay) setMissing([...e.files, ...(await missingReplayFiles(['sandbox.json', 'rules.json']))])
-      else setMissing([String(e)])
-    })
+    }).catch(async e => setMissing(e instanceof MissingReplay ? [...e.files, ...(await missingReplayFiles(['sandbox.json', 'rules.json']))] : [String(e)]))
     getJSON<any>('sandbox.json').then(s => setExtra(x => ({ ...x, sandbox: s }))).catch(() => {})
     getJSON<any[]>('rules.json').then(r => setExtra(x => ({ ...x, rules: r }))).catch(() => {})
+    getJSON<any>('search_space.json').then(s => setExtra(x => ({ ...x, search: s }))).catch(() => {})
     getCSV('robustness.csv').then(r => setExtra(x => ({ ...x, robust: r })))
     if (new URLSearchParams(location.search).has('live')) liveAvailable().then(setOnline)
   }, [])
   useEffect(() => {
     if (!key) return
-    setSc(null); setQ(null)
-    getJSON<Scenario>(`scenario_${key}.json`).then(s => { setSc(s); getJSON<QaoaFile>(s.qaoa_file).then(setQ).catch(() => {}) })
+    getJSON<Scenario>(`scenario_${key}.json`).then(s => { setSc(s); return getJSON<QaoaFile>(s.qaoa_file).then(qq => { setQ(qq); setFocus(qq.zone) }) })
       .catch(e => setMissing(e instanceof MissingReplay ? e.files : [String(e)]))
   }, [key])
 
-  const outageSlot = useMemo(() => { const i = sc?.slots.grid_up.indexOf(0) ?? -1; return i >= 0 ? i + 2 : 76 }, [sc])
+  const admmT = useMemo(() => (sc ? admmSlot(sc) : 76), [sc])
+  // time of day per beat: steps 1, 6 and 7 replay the day once; the quantum example holds its slot
   useEffect(() => {
-    if (!sc || mode !== 'story') return
-    if (ch === 0) setT(0)
-    if (ch >= 1 && ch <= 3) setT(q?.slot ?? 76)
-    if (ch === 4) setT(outageSlot)
-  }, [ch, mode, sc, q, outageSlot])
-  useEffect(() => {
-    if (!playing || !(mode === 'explore' || (mode === 'story' && (ch === 0 || ch === 5)))) return
-    let raf = 0, last = performance.now()
+    if (!sc || !q) return
+    setScaleOut(false)
+    if (beat === '5') { setT(admmT); return }
+    if (!TIME_BEATS.includes(beat)) { setT(q.slot); return }
+    if (reduced) { setT(beat === '7' ? 95.9 : 76); return }
+    setT(0)
+    let raf = 0, start = performance.now()
+    const dur = beat === '7' ? 9000 : 14000
     const tick = (now: number) => {
-      const dt = (now - last) / 1000; last = now
-      setT(x => {
-        const nx = x + dt * 4 * speed
-        if (nx >= 95.99) { if (mode === 'story' && ch === 0) setCh(1); return mode === 'story' ? 95.99 : 0 }
-        return nx
-      })
-      raf = requestAnimationFrame(tick)
+      const f = Math.min(1, (now - start) / dur)
+      setT(f * 95.9)
+      if (f < 1) raf = requestAnimationFrame(tick)
+      else if (beat === '7') setTimeout(() => setScaleOut(true), 600)
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
-  }, [playing, mode, ch, speed])
-  useEffect(() => {
-    if (mode !== 'story' || !playing || ch === 0 || ch === 5) return
-    const id = setTimeout(() => setCh(c => Math.min(5, c + 1)), (ch === 3 ? 9000 : 8000) / speed)
+  }, [beat, sc, q, admmT])
+  useEffect(() => { if (beat !== '5') setRemoved(null) }, [beat])
+  useEffect(() => {   // 4e: tiles show their actions, then drop back into the building (camera follows)
+    setDropped(false)
+    if (beat !== '4e') return
+    const id = setTimeout(() => setDropped(true), reduced ? 0 : 3600)
     return () => clearTimeout(id)
-  }, [ch, mode, playing, speed])
+  }, [beat])
 
-  const caption = useMemo(() => {
-    if (!sc) return ''
-    const sq = sc.runs.status_quo?.metrics ?? {}, qg = sc.runs.qgrid.metrics
-    const out = sc.scenario.outage ? `BESCOM supply fails from ${sc.scenario.outage[0]} to ${sc.scenario.outage[1]}.` : 'Grid supply is available all day.'
-    return [
-      `${out} Without coordination, noon solar is sold cheaply, the evening is bought expensively, and each building rides out the outage alone: ${rs(sq.cost_rs)} for the day and ${sq.critical_downtime_h?.toFixed(2)} h with critical loads unserved.`,
-      `Every 15 minutes each building chooses: charge or discharge, diesel on or off, pump, flexible loads, and how much to share with neighbours. For ${zn(q?.zone ?? 'hostels')} at ${sc.slots.t[q?.slot ?? 76]} that is ${q?.n_qubits ?? '…'} on/off variables — one qubit each.`,
-      `Every combination gets a cost: rupees plus penalties for broken rules. Low ground is a cheap, valid schedule; red ridges break a constraint. The white cell is the exact optimum, found by checking all ${(2 ** (q?.n_qubits ?? 0)).toLocaleString('en-IN')} combinations.`,
-      `QAOA, simulated, shifts probability towards low cost one layer at a time. The best of 256 samples is checked against the exact optimum; if it misses, the solve falls back to QIEA, then annealing, then exact search.`,
-      `There is no central computer. Each building agrees tie-line flows with its neighbours only. ${Math.round(100 * (sc.admm.summary.admm_convergence_rate ?? 0))}% of slots reached full agreement; the rest were settled pairwise or set to zero, which is always safe.`,
-      `With coordination: ${rs(qg.cost_rs)} and ${qg.critical_downtime_h?.toFixed(2)} h of critical downtime, against ${rs(sq.cost_rs)} and ${sq.critical_downtime_h?.toFixed(2)} h before.${sc.price_status === 'REAL' ? '' : ' Prices are stand-ins until the official tariff arrives.'}`,
-    ][ch]
-  }, [sc, q, ch])
+  const next = useCallback(() => setBi(i => Math.min(BEATS.length - 1, i + 1)), [])
+  const back = useCallback(() => setBi(i => Math.max(0, i - 1)), [])
   useEffect(() => {
-    if (!narrate || mode !== 'story' || !caption || !('speechSynthesis' in window)) return
-    speechSynthesis.cancel(); speechSynthesis.speak(new SpeechSynthesisUtterance(caption))
-  }, [caption, narrate, mode])
-
-  const onLayer = useCallback((p: Float64Array) => setProbs(p), [])
-  const zonePos = (name?: string | null): [number, number, number] => {
-    const z = sc?.campus.zones.find(x => x.name === name)
-    return z ? [z.cx, 0, -z.cy] : [0, 0, 0]
-  }
-  const story = mode === 'story'
-  const scene: 'campus' | 'terrain' | 'result' = story && (ch === 2 || ch === 3) ? 'terrain' : story && ch === 5 ? 'result' : 'campus'
-  const zp = zonePos(story && ch === 1 ? q?.zone : focus)
-  const cams: [number, number, number][][] = [[HOME, [0, 0, 0]], [[zp[0] + 110, 120, zp[2] + 140], zp], [[120, 130, 160], [0, 10, 0]],
-    [[100, 115, 145], [0, 20, 0]], [[200, 360, 300], [0, 0, 0]], [[0, 40, 80], [0, 18, 0]]]
-  const [camPos, camTgt] = story ? cams[ch] : focus && mode === 'explore' ? [[zp[0] + 140, 160, zp[2] + 180] as [number, number, number], zp] : [HOME, [0, 0, 0] as [number, number, number]]
-
-  const startLive = (kill: string | null) => {
-    setKilled(kill)
-    if (!online) return
-    setLiveLog([])
-    const ws = new WebSocket(API.replace('http', 'ws') + '/live')
-    ws.onopen = () => ws.send(JSON.stringify({ scenario: key, kill_zone: kill, kill_slot: Math.floor(t) }))
-    ws.onmessage = e => { const d = JSON.parse(e.data); setLiveLog(l => [...l.slice(-10), `${d.t}: ${d.iters} rounds, ${d.converged ? 'agreed' : 'settled'} in ${(d.time_s * 1000).toFixed(0)} ms`]) }
-  }
-  const record = () => {
-    if (rec) { rec.stop(); setRec(null); return }
-    const c = document.querySelector('canvas') as HTMLCanvasElement | null
-    if (!c) return
-    const r = new MediaRecorder(c.captureStream(30), { mimeType: 'video/webm' })
-    const chunks: Blob[] = []
-    r.ondataavailable = e => chunks.push(e.data)
-    r.onstop = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(chunks, { type: 'video/webm' })); a.download = 'qgrid-demo.webm'; a.click() }
-    r.start(); setRec(r)
-  }
+    const f = (e: KeyboardEvent) => {
+      if (tab !== 'story' || (e.target as HTMLElement)?.tagName === 'INPUT') return
+      if (e.key === 'ArrowRight' || e.key === 'PageDown') next()
+      if (e.key === 'ArrowLeft' || e.key === 'PageUp') back()
+    }
+    window.addEventListener('keydown', f); return () => window.removeEventListener('keydown', f)
+  }, [tab, next, back])
 
   if (missing) return (
     <div className="empty"><div className="box">
       <h2>Replay data not generated yet</h2>
-      <p>Run <code>make replay</code> after the benchmark finishes (<code>make bench</code>). The demo only shows numbers produced by the pipeline and never substitutes placeholder data.</p>
-      <p className="muted">Missing or not JSON:</p>
-      <ul className="tn">{missing.map(f => <li key={f}>{f}</li>)}</ul>
+      <p>Run <code>make replay</code> after the benchmark finishes (<code>make bench</code>). This page only shows numbers produced by the pipeline and never substitutes placeholder data.</p>
+      <p className="muted">Missing or not JSON:</p><ul>{missing.map(f => <li key={f}><code>{f}</code></li>)}</ul>
       <button onClick={() => location.reload()}>Check again</button>
     </div></div>
   )
-  if (!sc || !idx) return <div className="empty"><p className="muted">Loading replay…</p></div>
-  const kill = extra.robust.find(r => r.mode === 'in-process' && r.scenario === key)
-  const slot = Math.min(95, Math.floor(t))
-  const run = story && ch === 0 ? 'status_quo' : 'qgrid'
-  const showLabels = scene === 'campus' && !(story && ch === 1)
+  if (!sc || !idx || !q) return <div className="empty"><p className="muted">Loading the RVCE replay…</p></div>
+  const step = stepOf(beat)
+  const pend = Object.values(idx.data_status).filter(v => v !== 'REAL').length
 
   return (
     <ProvProvider prov={idx.provenance}>
       <div className="app">
         <header className="top">
-          <div className="brand"><b>Q-Grid</b><span className="muted">{sc.campus.name} microgrid</span></div>
-          <div className="seg" role="tablist" aria-label="mode">
-            {MODES.map(([m, l]) => <button key={m} role="tab" aria-selected={mode === m} className={mode === m ? 'on' : ''} onClick={() => setMode(m)}>{l}</button>)}
-          </div>
+          <div className="brand"><b>Q-Grid</b><span className="muted">Coordinating RVCE’s solar, batteries and diesel, building by building</span></div>
+          <nav className="tabs" aria-label="sections">
+            {([['story', 'Story'], ['verify', 'Verify'], ['try', 'Try it']] as [Tab, string][]).map(([k, l]) =>
+              <button key={k} className={tab === k ? 'on' : ''} aria-current={tab === k} onClick={() => setTab(k)}>{l}</button>)}
+          </nav>
           <div className="right">
-            <select value={key} onChange={e => setKey(e.target.value)} aria-label="scenario">
-              {idx.scenarios.map(s => <option key={s.key} value={s.key}>{scenarioName(s.key)}, {fmtDate(s.date)}</option>)}
+            <select value={key} onChange={e => { setKey(e.target.value); setBi(0) }} aria-label="day">
+              {idx.scenarios.map(s => <option key={s.key} value={s.key}>{SCEN[s.key]}, {fmtDate(s.date)}</option>)}
             </select>
-            <button className={`pill ${online ? 'live' : ''}`} onClick={() => !online && liveAvailable().then(ok => { setOnline(ok); if (!ok) alert(`No backend at ${API}. Start it with: make backend`) })}
-              title={online ? 'Connected to the live backend' : 'Click to connect to a running backend'}>{online ? 'Live' : 'Offline replay'}</button>
-            <button className={`rec ${rec ? 'on' : ''}`} onClick={record} aria-label={rec ? 'stop recording' : 'record demo'}><i />{rec ? 'Stop' : 'Record'}</button>
           </div>
         </header>
 
-        <main className={scene === 'result' ? 'split' : ''}>
-          <div className="stage">
-            {scene === 'result' ? (
-              <div className="result">
-                {(['status_quo', 'qgrid'] as const).map(rk => (
-                  <div className="half" key={rk}>
-                    <span className={`tag ${rk}`}>{rk === 'qgrid' ? 'With Q-Grid' : 'Status quo'}</span>
-                    <Canvas camera={{ position: HOME, fov: 38 }} dpr={[1, 1.5]}>
-                      <CameraRig pos={HOME} target={[0, 0, 0]} free={false} />
-                      <CampusScene sc={sc} t={t} run={rk} />
-                    </Canvas>
-                    <span className="counter tn">{rs((rk === 'qgrid' ? sc.runs.qgrid : sc.runs.status_quo)?.cum_cost_rs[slot] ?? 0)} so far</span>
-                  </div>
-                ))}
-                <div className="race">
-                  <span className="tag">Daily cost including unserved load, all methods (lower is better; band = central optimum)</span>
-                  <Canvas camera={{ position: [0, 38, 70], fov: 45 }} dpr={[1, 1.5]}>
-                    <ambientLight intensity={0.6} /><directionalLight position={[50, 100, 50]} />
-                    <Suspense fallback={null}><BarRace rows={sc.benchmark.filter(r => r.price_scenario === 'A')} progress={1} /></Suspense>
-                  </Canvas>
-                </div>
+        {tab === 'story' && (
+          <main className="guided">
+            <section className="visual">
+              <Canvas flat shadows camera={{ position: [300, 250, 360], fov: 34, near: 1, far: 9000 }} dpr={[1, 1.6]} gl={{ antialias: true, preserveDrawingBuffer: true }}>
+                <Suspense fallback={null}>
+                  <Scene sc={sc} q={q} beat={beat} t={t} focus={focus} setFocus={setFocus} removed={removed} round={round} admmT={admmT} scaleOut={scaleOut} dropped={dropped} />
+                  {!reduced && <EffectComposer multisampling={0}><N8AO halfRes aoRadius={5} intensity={0.9} distanceFalloff={0.6} color={'#000000'} /></EffectComposer>}
+                </Suspense>
+              </Canvas>
+              {TIME_BEATS.includes(beat) && <div className="clock tn">{sc.slots.t[Math.min(95, Math.floor(t))]}{sc.slots.grid_up[Math.min(95, Math.floor(t))] ? '' : ' · grid down'}</div>}
+              {beat === '7' && !scaleOut && <div className="vlabels"><span>Status quo</span><span>Q-Grid</span></div>}
+              {beat === '7' && scaleOut && <div className="illus">Illustrative: eight campuses on one city feeder. More buildings means more neighbours to agree with; each building's plan stays at most 16 qubits.</div>}
+            </section>
+            <aside className="explain">
+              <div className="progress"><motion.div className="bar" animate={{ width: `${((bi + 1) / BEATS.length) * 100}%` }} transition={{ duration: reduced ? 0 : 0.5 }} /></div>
+              <div className="steps" aria-label="steps">{[1, 2, 3, 4, 5, 6, 7].map(s => (
+                <button key={s} className={s === step ? 'on' : s < step ? 'done' : ''} onClick={() => setBi(BEATS.findIndex(b => stepOf(b) === s))} aria-label={`Step ${s}`}>{s}</button>))}
               </div>
-            ) : (
-              <>
-                <Canvas camera={{ position: HOME, fov: 38, far: 5000 }} dpr={[1, 1.75]} gl={{ preserveDrawingBuffer: true, antialias: true }}>
-                  <CameraRig pos={camPos} target={camTgt} free={!story || ch === 0 || ch === 4} />
-                  {scene === 'campus' && <CampusScene sc={sc} t={t} run={run} killed={killed} focus={story && ch === 1 ? q?.zone : focus}
-                    onZone={z => setFocus(z)} anchors={anchors} />}
-                  {scene === 'campus' && story && ch === 1 && q && <Suspense fallback={null}><QubitChips names={q.var_names} bitsOn={q.optimum.bits} at={zonePos(q.zone)} /></Suspense>}
-                  {scene === 'terrain' && q && <><ambientLight intensity={0.5} /><directionalLight position={[80, 160, 60]} intensity={1.2} /><color attach="background" args={[C.bg]} />
-                    <Suspense fallback={null}><QuboTerrain q={q} probs={probs} showProbs={ch === 3} /></Suspense></>}
-                </Canvas>
-                <LabelLayer sc={sc} slot={slot} anchors={anchors} focus={focus} onZone={setFocus} hidden={!showLabels} />
-              </>
-            )}
-          </div>
-
-          <aside className="panel">
-            {(story || mode === 'explore') && <NowCard sc={sc} slot={slot} />}
-            {story && (
-              <section className="chapter">
-                <nav className="steps" aria-label="chapters">{CH.map((c, i) => <button key={c} aria-current={i === ch} className={i === ch ? 'on' : ''} onClick={() => setCh(i)} title={c}>{i + 1}</button>)}</nav>
-                <h2>{CH[ch]}</h2>
-                <p className="caption" aria-live="polite">{caption}</p>
-                {ch === 3 && q && <Suspense fallback={null}><QaoaPanel q={q} onLayer={onLayer} playing={playing} /></Suspense>}
-                {ch === 4 && <AdmmPanel sc={sc} slot={slot} kill={kill} killed={killed} onKill={startLive} liveLog={liveLog} online={online} />}
-                {ch === 5 && sc.headline && <Headline h={sc.headline} />}
-              </section>
-            )}
-            {(mode === 'explore' || (story && (ch === 0 || ch === 5))) && <Decisions sc={sc} slot={slot} />}
-            {(mode === 'explore' || (story && ch === 0)) && <DayChart sc={sc} slot={slot} />}
-            {mode === 'judge' && (
-              <>
-                <section><h2>Review the numbers</h2>
-                  <div className="row"><span className="muted">Price scenario</span>
-                    <div className="seg small">{['A', 'B'].map(p => <button key={p} className={price === p ? 'on' : ''} onClick={() => setPrice(p)}>{p}</button>)}</div></div>
-                  <p className="muted small">Select any figure to see its formula, source file, hash and commit.</p>
-                  <MetricsTable sc={sc} price={price} /></section>
-                <section><h3>Solve one building live</h3>
-                  {sc.live_solve ? <SolveLive live={sc.live_solve} online={online} scenario={key} params={[q?.gammas ?? [], q?.betas ?? []]} />
-                    : <p className="muted small">Live-solve instances are exported for the headline scenario.</p>}</section>
-                <section><h3>Stress tests</h3><Stress online={online} sandbox={extra.sandbox} scenario={key} onKill={setKilled} /></section>
-                <section><h3>Add an operator rule</h3><RuleBox online={online} rules={extra.rules} /></section>
-              </>
-            )}
-            {mode === 'sandbox' && <section><h2>What if…</h2><Sandbox online={online} sandbox={extra.sandbox} scenario={key} /></section>}
-          </aside>
-        </main>
-
-        <div className="bottom">
-          <div className="transport">
-            <button onClick={() => setPlaying(p => !p)} aria-label={playing ? 'Pause' : 'Play'} className="icon">{playing ? '❚❚' : '▶'}</button>
-            {story && <><button onClick={() => setCh(c => Math.max(0, c - 1))} aria-label="Previous chapter" className="icon">‹</button>
-              <button onClick={() => setCh(c => Math.min(5, c + 1))} aria-label="Next chapter" className="icon">›</button></>}
-            <select value={speed} onChange={e => setSpeed(+e.target.value)} aria-label="speed">{[0.5, 1, 2, 4].map(s => <option key={s} value={s}>{s}×</option>)}</select>
-            {story && <label className="muted small"><input type="checkbox" checked={narrate} onChange={e => setNarrate(e.target.checked)} /> Narrate</label>}
-            {story && <button className="link small" onClick={() => { setMode('explore'); setPlaying(false) }}>Explore freely</button>}
-          </div>
-          <Timeline sc={sc} t={t} setT={v => { setT(v); setPlaying(false) }} />
-        </div>
+              <div className="scroll">
+                <StoryText beat={beat} sc={sc} q={q} idx={idx} t={t} focus={focus} round={round} setRound={setRound} admmT={admmT}
+                  removed={removed} setRemoved={setRemoved} robust={extra.robust} search={extra.search} />
+              </div>
+              <div className="nav">
+                <button onClick={back} disabled={bi === 0}>Back</button>
+                <span className="muted small">← → keys</span>
+                <button className="primary" onClick={next} disabled={bi === BEATS.length - 1}>{bi === BEATS.length - 1 ? 'Done' : 'Next'}</button>
+              </div>
+            </aside>
+          </main>
+        )}
+        {tab === 'verify' && (
+          <main className="page">
+            <h1>Check any number</h1>
+            <p className="support">Select a figure to see its formula, the file it comes from, that file’s SHA-256, the script that produced it and the git commit.</p>
+            <MetricsTable sc={sc} price="A" />
+            <h2>Solve one building’s slot live</h2>
+            {sc.live_solve ? <SolveLive live={sc.live_solve} online={online} scenario={key} params={[q.gammas, q.betas]} />
+              : <p className="muted">Live-solve examples are exported for the outage-during-fest day. Choose it in the menu above.</p>}
+          </main>
+        )}
+        {tab === 'try' && (
+          <main className="page">
+            <h1>Try it</h1>
+            <p className="support">What-if results come from a fast quantum-inspired classical solver. They are a sandbox, never part of the headline results.</p>
+            <div className="two"><section><h2>What if…</h2><Sandbox online={online} sandbox={extra.sandbox} scenario={key} /></section>
+              <section><h2>Stress tests</h2><Stress online={online} sandbox={extra.sandbox} scenario={key} onKill={() => {}} />
+                <h2>Add an operator rule</h2><RuleBox online={online} rules={extra.rules} /></section></div>
+            {!online && <p className="muted small">Offline: showing precomputed cases. Start the backend (<code>make backend</code>) and open with <code>?live=1</code> to recompute.</p>}
+          </main>
+        )}
 
         <footer>
-          <Legend />
-          <div className="foot-right">
-            <DataBadge idx={idx} />
-            <span className="qlabel">QAOA simulated locally, verified against exact solutions; no quantum advantage claimed. QIEA is quantum-inspired and runs on a classical CPU.</span>
-          </div>
+          <span className="muted">Data: NASA POWER, Ausgrid, OpenStreetMap (© OpenStreetMap contributors) · {pend} items pending official data</span>
+          <span className="muted">QAOA simulated locally and verified against exact solutions; no quantum advantage claimed. QIEA is quantum-inspired, classical CPU.</span>
         </footer>
       </div>
     </ProvProvider>
-  )
-}
-
-function Headline({ h }: { h: any }) {
-  const row = `method in {B0, OURS}, scenario=${h.scenario}, price_scenario=A`
-  const cell = (k: string, label: string, unit: string, fmt: (v: number) => string) => (
-    <div><span className="muted">{label}</span>
-      <b className="tn"><N v={fmt(h.before[k])} info={{ label: `Status quo · ${k}`, unit, formula: FORMULA[k] ?? k, file: 'results/benchmark.csv', fn: 'scripts/run_benchmark.py', row }} />
-        <span className="muted"> → </span><N v={fmt(h.after[k])} info={{ label: `Q-Grid · ${k}`, unit, formula: FORMULA[k] ?? k, file: 'results/benchmark.csv', fn: 'scripts/run_benchmark.py', row }} /></b></div>)
-  return (
-    <div className="headline">
-      <div className="kpis">
-        {cell('critical_downtime_h', 'Critical downtime', 'h', v => `${v.toFixed(2)} h`)}
-        {cell('critical_unserved_kwh', 'Critical energy unserved', 'kWh', v => `${Math.round(v)} kWh`)}
-        {cell('dg_hours', 'Diesel hours', 'h', v => `${v.toFixed(1)} h`)}
-        {cell('cost_rs', 'Cost for the day', 'Rs', rs)}
-      </div>
-      <p className="muted small">Central optimum: {h.optimum_B4.critical_downtime_h.toFixed(2)} h downtime, {rs(h.optimum_B4.cost_rs)}. Re-planning takes {(h.after.replan_time_s * 1000).toFixed(0)} ms per 15-minute slot.{h.price_status === 'REAL' ? '' : ' Stand-in prices.'}</p>
-    </div>
-  )
-}
-
-function AdmmPanel({ sc, slot, kill, killed, onKill, liveLog, online }: { sc: Scenario; slot: number; kill?: Record<string, string>; killed: string | null;
-  onKill: (z: string | null) => void; liveLog: string[]; online: boolean }) {
-  const its = sc.admm.iterations[String(slot)] ?? []
-  const data = its.map(r => ({ k: r.k + 1, r: r.r_primal }))
-  return (
-    <div className="admm">
-      <p className="muted small">At {sc.slots.t[slot]}: {its.length} negotiation rounds, {its.at(-1)?.agreed ? 'every tie-line agreed' : 'settled pairwise'}.</p>
-      <div style={{ height: 104 }}><ResponsiveContainer><LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -24 }}>
-        <XAxis dataKey="k" stroke={C.muted} fontSize={11} tickLine={false} /><YAxis stroke={C.muted} fontSize={11} tickLine={false} />
-        <Tooltip contentStyle={{ background: C.surface, border: `1px solid ${C.border}`, fontSize: 12 }} />
-        <Line type="monotone" dataKey="r" stroke={C.quantum} dot={{ r: 2 }} isAnimationActive={!reduced} name="disagreement (kW)" /></LineChart></ResponsiveContainer></div>
-      <button onClick={() => onKill(killed ? null : 'heavy_labs')}>{killed ? 'Bring mechanical labs back' : 'Take mechanical labs offline'}</button>
-      {killed && kill && <p className="small">Its neighbours stop hearing from it within 3 s and island its lines. Replay of this failure: schedule feasible ({kill.feasible}), full agreement again after {kill.slots_to_reconverge || '–'} slots.</p>}
-      {killed && online && <ul className="small tn">{liveLog.map((l, i) => <li key={i}>{l}</li>)}</ul>}
-    </div>
   )
 }

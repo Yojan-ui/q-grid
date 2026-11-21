@@ -3,12 +3,13 @@
 export const API = (import.meta as any).env?.VITE_QGRID_API ?? 'http://localhost:8000'
 
 export type Zone = { name: string; cx: number; cy: number; pv_kwp: number; battery_kwh: number; battery_kw: number;
-  dg_kw: number; tank_m3: number; critical_frac: number; source: string;
+  dg_kw: number; tank_m3: number; critical_frac: number; source: string; flex?: { name: string; kw: number; slots: number }[];
   buildings: { name: string | null; levels: number; polygon: [number, number][] }[] }
 
 export type Run = { p_bat: number[][]; soc: number[][]; flows: number[][]; dg_kw: number[][]; pump_on: number[][];
   tank_m3: Record<string, number[]>; net_kw: number[][]; grid_import_kw: number[]; grid_export_kw: number[];
-  cum_cost_rs: number[]; cum_co2_kg: number[]; metrics: Record<string, any>; flex_start: Record<string, number>[] }
+  cum_cost_rs: number[]; cum_co2_kg: number[]; metrics: Record<string, any>; flex_start: Record<string, number>[]
+  demand_kw?: number[][]; crit_unserved_kw?: number[][] }
 
 export type Scenario = {
   label: string; qiea_label: string; scenario: { key: string; date: string; day_type: string; note: string; outage: string[] | null }
@@ -27,7 +28,7 @@ export type LiveSolve = { zone: string; slot: number; time: string; n_qubits: nu
     top: { bits: string; p: number; feasible: boolean; optimal: boolean }[] }; explanation: string[] }
 export type Provenance = { git_commit: string; seeds: Record<string, number>; files: Record<string, string | null> }
 export type QaoaFile = { n_qubits: number; var_names: string[]; gammas: number[]; betas: number[]; qubo_matrix: number[][];
-  qubo_const: number; probs: number[]; energies: number[]; feasible: number[]; optimum: { bits: string; objective: number; p_opt: number };
+  qubo_const: number; probs: number[]; energies: number[]; objectives?: number[]; feasible: number[]; optimum: { bits: string; objective: number; p_opt: number };
   uniform_p: number; zone: string; slot: number; simulator: string; label: string; groups: Record<string, { M: number[][]; const: number }> }
 export type Index = { scenarios: { key: string; date: string; note: string; replay_matches_benchmark: boolean }[]; headline: string;
   provenance: Provenance; label: string; data_status: Record<string, string>; files?: string[] }
