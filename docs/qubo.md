@@ -10,7 +10,7 @@ a 1-hour horizon (H = 4 slots, truncated at the end of the day). Only the first 
 
 | bits | meaning | count |
 |---|---|---|
-| c_k, d_k | battery charges / discharges at rated power P in slot k | 2H = 8 |
+| c_k, d_k | battery charges / discharges one quantum in slot k | 2H = 8 |
 | p_l, n_l | flow on free incident tie-line l: f_l = F (p_l − n_l) ∈ {−F, 0, +F} | 2 per line |
 | s | start the pending flexible job now | 0 or 1 |
 
@@ -18,15 +18,21 @@ Degree-3 buildings (lab_block, canteen: ring + cross-link) with a flexible job �
 qubits**; degree-2 buildings → 13. Islanded / fixed lines are removed from the bit set and enter as a
 constant outflow. A job at its latest feasible start is forced (no bit, constant load).
 
+**Battery quanta (net-load matched).** A charge bit stands for absorbing the forecast surplus plus one
+tie-line step, P_c,k = min(P, surplus_k + F); a discharge bit for covering the forecast deficit plus one
+step, P_d,k = min(P, deficit_k + F); rated power P when there is no surplus/deficit (< 10 % of P). With
+plain rated-power quanta, absorbing a 20 kW surplus looked like "charge 125 kW and import the rest", so
+the QUBO chose idle and exported surplus cheaply (diagnosed: Rs 1.2k/day worse than the local DP).
+
 ## 2. Affine building blocks
 
 With x the bit vector, everything below is affine in x:
 
 - Net power (kW) in slot k:
-  r_k = r0_k + f_fixed + P(c_k − d_k) + Σ_l σ_l F(p_l − n_l) + s · kw_job · [k < duration],
+  r_k = r0_k + f_fixed + P_c,k c_k − P_d,k d_k + Σ_l σ_l F(p_l − n_l) + s · kw_job · [k < duration],
   where r0_k = inflexible load + already-running flexible load − PV and σ_l = ±1 is the line orientation.
 - Battery energy after slot k:
-  e_k = e_now + Σ_{j≤k} (η_ch P Δt · c_j − P Δt / η_dis · d_j).
+  e_k = e_now + Σ_{j≤k} (η_ch P_c,j Δt · c_j − P_d,j Δt / η_dis · d_j).
 
 ## 3. Objective
 
@@ -43,9 +49,12 @@ The terminal value V_T(e) = −v·(e − e0), v = the day's mean import price, m
 adjustment used by `model.settle()` for every method. In the QUBO we add a convex quadratic fit
 a₂e_H² + a₁e_H + a₀ of V_{t+H} over the energy range reachable within the horizon.
 
-**Flexible load.** s·tail + (1 − s)·defer, where *tail* = forecast cost of the job's slots beyond the
-horizon if started now, *defer* = the cheapest forecast cost of starting later within the window
-(marginal price = import price if forecast net load > 0, else export price).
+**Flexible load.** s·tail + (1 − s)·defer, where *tail* = cost of the job's slots beyond the horizon if
+started now and *defer* = the cheapest cost of starting later within the window, both at the building's
+**battery-aware marginal price** m_t = clip(marginal value of stored energy from the DP, export price,
+import price) along the DP-optimal trajectory. The start bit's own coefficient is calibrated so that, with
+no other action, starting costs Σ m_t·kw·Δt over the horizon (its couplings to battery/flow bits through
+r_k are kept); ties are broken towards starting (prevents procrastination to the latest slot).
 
 **ADMM consensus.** Σ_l ρ/2 · (f_l − v_l)², v_l = z_l − u_l (Section 5). Quadratic, so it fits the QUBO.
 
@@ -74,17 +83,27 @@ then doubled, until the ground state of the full QUBO (found exhaustively) is fe
 Tie-line l between buildings i and j has one orientation. Each endpoint proposes f_l^i, f_l^j from its own
 QUBO; the neighbours exchange only these proposals (never load, PV or battery data):
 
-z_l = (f_l^i + f_l^j)/2, u_l^i ← u_l^i + f_l^i − z_l, with ρ increased geometrically per iteration
-(standard for non-convex / discrete ADMM) to force agreement. A line is agreed when both endpoints
-propose the same level. After the iteration cap, disagreeing lines are set to 0 (always feasible).
-Each building then re-solves once with its agreed flows fixed.
+z_l = (f_l^i + f_l^j)/2, u_l^i ← u_l^i + f_l^i − z_l, with ρ_k = ρ0·1.2^k (standard for non-convex /
+discrete ADMM) to force agreement. A line is agreed when both endpoints propose the same level; a building
+whose lines all agree keeps its proposal (sticky). After 15 iterations disagreeing lines are set to 0
+(always feasible); buildings whose final flows differ from their proposal re-solve with flows fixed.
+
+**Price-initialised duals.** Free energy always looks attractive to the receiver, so with u = 0 both ends
+open with "receive", z averages to 0 and discrete ADMM locks at 0 (a fixed point: agreement and zero dual
+residual). Before round 0 the two neighbours therefore exchange one number each, their marginal energy
+price m_t (no load/PV/battery data), and start from π0 = (m_a + m_b)/2:
+ρ·u_a = −π0·Δt·H (the sender earns π0 per kWh), ρ·u_b = +π0·Δt·H. This is the transactive-energy
+price signal; the cheap side then sells and the expensive side buys. ρ0 = 0.25·mean price·Δt/F and the
+growth rate were chosen on training days only (disjoint from test/eval days).
 
 ## 6. From bits to commands
 
-The applied slot uses the QUBO's **mode** (charge / discharge / idle), flex start and agreed flows. The
-battery power within the chosen mode is refined continuously (1-D search over [0, P_max] minimising
-exact slot cost + V_{t+1}) and then clamped by the safety layer (`qgrid/safety.py`). So the QUBO decides
-the combinatorial part (modes, timing, sharing) and a tiny classical step sets the magnitude.
+What is committed from the QUBO for the applied slot: the **tie-line levels** (via ADMM agreement) and the
+**flexible-load start**. The QUBO's battery bits are planning variables that value the hour (they decide
+whether receiving/sending and starting a job pay off). The battery set-point of the applied slot is then
+dispatched by a 1-D continuous search over its full feasible range minimising exact slot cost + V_{t+1}
+(the same cost-to-go), and clamped by the safety layer (`qgrid/safety.py`). Stated plainly: the QUBO
+decides the combinatorial coordination (sharing, timing); a tiny classical step sets battery power.
 
 ## 7. Ising form for QAOA
 

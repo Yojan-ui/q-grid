@@ -21,7 +21,7 @@ See [docs/BRIEF.md](docs/BRIEF.md) for the design.
 | 2 | Building model, safety layer, local QUBO (≤15 qubits), penalty auto-tuning | ✅ done — see docs/qubo.md |
 | 3 | Solvers: QAOA (Qiskit; Aer + equivalent numpy statevector) / annealing / exact, verified tiered fallback, scaling study | ✅ done |
 | 4 | Decentralised consensus-ADMM: in-process + networked (1 process/building, websockets, no coordinator), island mode, kill-node | ✅ done |
-| 5 | Baselines B0–B5 + benchmark | — |
+| 5 | Baselines B0–B5 + OURS on identical data, 2 price scenarios, kill-node robustness, QAOA scaling — see docs/results.md | ✅ done (prices PENDING → stand-in numbers, not headline) |
 | 6 | Replay export | — |
 | 7 | 3D cinematic demo | — |
 | 8 | Ship (README, pitch) | — |
@@ -35,4 +35,7 @@ make test                     # pytest
 make demo                     # frontend dev server (offline replay mode)
 ```
 
-Other targets: `make data`, `make bench`, `make replay` (implemented in later phases).
+Other targets: `make data`, `make bench`, `make replay`.
+
+When the missing official files arrive (see `data/SOURCES.md`, `docs/BLOCKERS.md`):
+`bash scripts/refresh_all.sh` re-runs the whole pipeline and regenerates `docs/results.md`.

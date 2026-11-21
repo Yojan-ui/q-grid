@@ -15,5 +15,6 @@ $PY -m pytest -q
 $PY scripts/train_qaoa_params.py
 $PY scripts/run_benchmark.py
 $PY scripts/qaoa_study.py
+$PY scripts/write_results_md.py
 [ -f scripts/make_replay.py ] && $PY scripts/make_replay.py || true
 echo "Done. See results/benchmark.csv, results/plots/, docs/results.md"

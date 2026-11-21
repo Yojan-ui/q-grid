@@ -1,0 +1,11 @@
+mode,method,scenario,day,killed,kill_slot,feasible,tie_line_flows_consistent,recovery_time_s,cost_rs,wall_time_s,price_status,day_type,slot,iters_at_kill_slot,agreed_at_kill_slot,slot_time_s,first_full_agreement_slot,slots_to_reconverge
+networked,OURS,A,2023-04-13,lab_block,48,True,True,3.024924000000283,13411.468038825482,22.7,PENDING,,,,,,,
+networked,B5,A,2023-04-13,lab_block,48,True,True,3.0458545000001322,13411.936020945694,8.33,PENDING,,,,,,,
+networked,OURS,B,2023-04-13,lab_block,48,True,True,3.021940584000731,9040.025138590707,7.09,PENDING,,,,,,,
+networked,B5,B,2023-04-13,lab_block,48,True,True,3.0134707079996588,9040.025138590707,5.57,PENDING,,,,,,,
+in-process,OURS,B,2023-04-13,lab_block,48,True,,,8922.919875432812,,,sunny,48.0,1.0,True,0.005775249999715015,48.0,0.0
+in-process,OURS,B,2023-01-10,lab_block,48,True,,,46924.369885211985,,,high_price,48.0,1.0,True,0.009744582999701379,48.0,0.0
+in-process,OURS,B,2023-07-25,lab_block,48,True,,,34825.34512456015,,,monsoon_cloudy,48.0,1.0,True,0.013143625000338943,48.0,0.0
+in-process,OURS,A,2023-01-10,lab_block,48,True,,,55023.46350330323,,,high_price,48.0,15.0,False,0.4294977910003581,88.0,40.0
+in-process,OURS,A,2023-04-13,lab_block,48,True,,,12349.927200061627,,,sunny,48.0,2.0,True,0.013297749999765074,48.0,0.0
+in-process,OURS,A,2023-07-25,lab_block,48,True,,,45009.12948252217,,,monsoon_cloudy,48.0,15.0,False,0.4481035000007978,91.0,43.0

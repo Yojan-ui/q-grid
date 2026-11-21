@@ -68,6 +68,12 @@ class Node:
 
     # ------------------------------------------------------------------ transport
     async def _handler(self, ws):
+        try:
+            await self._consume(ws)
+        except websockets.ConnectionClosed:
+            pass  # a neighbour crashed or finished; silence detection handles it
+
+    async def _consume(self, ws):
         async for raw in ws:
             m = json.loads(raw)
             async with self.cond:
