@@ -1,0 +1,124 @@
+"""Fetch / verify raw data for Q-Grid into data/raw/.
+
+Automatic:  NASA POWER hourly irradiance + temperature (public API, no key).
+Manual:     Ausgrid Solar Home, IEX DAM prices, CEA CO2 baseline: these sites block scripted
+            downloads or render via JavaScript, so this script checks for the files and prints
+            exact instructions when they are missing (exit code 2).
+
+Usage:  python scripts/fetch_data.py [--year 2023]
+"""
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import json
+import sys
+from pathlib import Path
+
+import requests
+
+ROOT = Path(__file__).resolve().parents[1]
+RAW = ROOT / "data" / "raw"
+
+LAT, LON = 12.92, 77.50  # Bengaluru campus site
+
+NASA_URL = (
+    "https://power.larc.nasa.gov/api/temporal/hourly/point"
+    "?parameters=ALLSKY_SFC_SW_DWN,T2M&community=RE&longitude={lon}&latitude={lat}"
+    "&start={y}0101&end={y}1231&format=JSON&time-standard=LST"
+)
+
+
+def fetch_nasa(year: int) -> Path:
+    out = RAW / "nasa_power" / f"bengaluru_{year}_hourly.json"
+    if out.exists():
+        print(f"[nasa]    cached {out.relative_to(ROOT)}")
+        return out
+    out.parent.mkdir(parents=True, exist_ok=True)
+    url = NASA_URL.format(lat=LAT, lon=LON, y=year)
+    print(f"[nasa]    GET {url}")
+    r = requests.get(url, timeout=120, headers={"User-Agent": "qgrid-data-fetch/0.1"})
+    r.raise_for_status()
+    data = r.json()
+    params = data["properties"]["parameter"]
+    assert {"ALLSKY_SFC_SW_DWN", "T2M"} <= set(params), params.keys()
+    data["_qgrid_fetch"] = {"url": url, "fetched_utc": dt.datetime.now(dt.UTC).isoformat()}
+    out.write_text(json.dumps(data))
+    print(f"[nasa]    saved {out.relative_to(ROOT)} ({len(params['T2M'])} hours)")
+    return out
+
+
+MANUAL = {
+    "ausgrid": dict(
+        dir=RAW / "ausgrid",
+        patterns=["*.zip", "*.csv"],
+        instructions="""\
+Ausgrid Solar Home Electricity Data (2012-13, half-hourly, 300 homes, Sydney).
+Ausgrid removed the original page; the dataset is mirrored by a researcher:
+  1. Download https://pierreh.eu/downloads/Ausgrid_solar_home_data.zip
+     (or any copy of '2012-2013 Solar home electricity data v2.zip' / the CSV
+      'Solar-home-half-hour-data---1-July-2012-to-30-June-2013').
+  2. Put the .zip (or extracted .csv) in data/raw/ausgrid/
+Licence: as published by Ausgrid for research use; cite Ratnam et al. 2017,
+doi:10.1080/14786451.2015.1100196.""",
+    ),
+    "iex": dict(
+        dir=RAW / "iex",
+        patterns=["*.xlsx", "*.xls", "*.csv"],
+        instructions="""\
+IEX Day-Ahead Market (DAM) 15-minute market clearing prices, calendar year {year}.
+  1. Open https://www.iexindia.com/market-data/day-ahead-market/market-snapshot
+  2. Set Interval = 15 Min Block, Delivery period = a date range (the site limits
+     ranges; download month by month if needed), Area = MCP (all-India).
+  3. Click Export -> Excel. Repeat to cover 01-Jan-{year} .. 31-Dec-{year}.
+  4. Put all exported files in data/raw/iex/  (any filenames).""",
+    ),
+    "cea": dict(
+        dir=RAW / "cea",
+        patterns=["*.pdf"],
+        instructions="""\
+CEA CO2 Baseline Database for the Indian Power Sector (latest User Guide PDF).
+  1. Open https://cea.nic.in/  -> Reports -> 'CO2 Baseline Database'
+     (cea.nic.in blocks scripted downloads).
+  2. Download the latest 'User Guide Version NN.0' PDF.
+  3. Put it in data/raw/cea/ and fill data/raw/cea/emission_factor.yaml:
+       version: "NN.0"
+       fiscal_year: "YYYY-YY"
+       weighted_average_tco2_per_mwh: <value from the PDF's results table>
+       page: <page number in the PDF>""",
+    ),
+}
+
+
+def check_manual(name: str, year: int) -> bool:
+    spec = MANUAL[name]
+    d: Path = spec["dir"]
+    d.mkdir(parents=True, exist_ok=True)
+    found = [p for pat in spec["patterns"] for p in d.glob(pat)]
+    if name == "cea":
+        ok = bool(found) and (d / "emission_factor.yaml").exists()
+    else:
+        ok = bool(found)
+    if ok:
+        print(f"[{name:7s}] found {len(found)} file(s) in {d.relative_to(ROOT)}")
+    else:
+        print(f"\n[{name:7s}] MISSING — manual step required:\n")
+        print("  " + spec["instructions"].format(year=year).replace("\n", "\n  ") + "\n")
+    return ok
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--year", type=int, default=2023)
+    args = ap.parse_args()
+    fetch_nasa(args.year)
+    ok = all([check_manual(n, args.year) for n in MANUAL])
+    if not ok:
+        print("Some raw data is missing; complete the manual steps above, then re-run.")
+        return 2
+    print("All raw data present.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
