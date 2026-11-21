@@ -215,3 +215,22 @@ def search_space(var_counts: dict[str, int], slots: int = 96) -> dict:
     N = slots * sum(var_counts.values())
     return {"vars_per_slot": var_counts, "slots": slots, "N_binary": N, "log10_states": round(N * math.log10(2), 1),
             "formula": "N = slots x sum_i n_i ; |space| = 2^N"}
+
+
+def fetch_roads(cfg: dict, force: bool = False) -> list[list[list[float]]]:
+    """Footways/roads inside the campus outline from OSM (visual context only), cached to data/raw/osm_<slug>_roads.json.
+    Returns polylines in local metres."""
+    cc = cfg["campus"]
+    p = RAW / f"osm_{cc['slug']}_roads.json"
+    if not p.exists() or force:
+        raw = json.loads((RAW / f"osm_{cc['slug']}.json").read_text())
+        sel = raw["_qgrid_fetch"]["campus_element"]
+        q = f'[out:json][timeout:90];{sel}->.c;.c map_to_area->.a;(way["highway"](area.a););out geom tags;'
+        data = _overpass(q)
+        data["_qgrid_fetch"] = {"query": q, "fetched_utc": dt.datetime.now(dt.UTC).isoformat(), "licence": "ODbL 1.0",
+                                "credit": OSM_CREDIT}
+        p.write_text(json.dumps(data))
+    data = json.loads(p.read_text())
+    lat0, lon0 = cfg["site"]["lat"], cfg["site"]["lon"]
+    return [[[round(x, 1), round(y, 1)] for x, y in _xy([(g["lon"], g["lat"]) for g in e["geometry"]], lat0, lon0)]
+            for e in data["elements"] if e.get("geometry")]

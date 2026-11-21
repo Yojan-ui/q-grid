@@ -6,7 +6,7 @@ import numpy as np
 from ..qubo import QUBO
 
 
-def anneal(q: QUBO, n_chains: int = 16, sweeps: int = 120, seed: int = 0,
+def anneal(q: QUBO, n_chains: int = 8, sweeps: int = 40, seed: int = 0,
            t_start: float | None = None, t_end: float | None = None) -> np.ndarray:
     """Return the final states of all chains (n_chains, n), each chain ending at its best visited state."""
     rng = np.random.default_rng(seed)

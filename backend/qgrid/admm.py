@@ -82,6 +82,7 @@ class DayStats:
     disagreements: int = 0
     resolved_bilateral: int = 0
     critical_cuts: int = 0
+    explanations: dict = field(default_factory=dict)
     log: list[dict] = field(default_factory=list)
     slots: list[dict] = field(default_factory=list)
     kill: dict | None = None
@@ -109,7 +110,8 @@ class DayStats:
 
 def run_day(campus: Campus, day: DayData, method: str = "qaoa", log: bool = False,
             kill: tuple[int, int] | None = None, seed: int | None = None,
-            rules: list[dict] | None = None, t_range: tuple[int, int] | None = None) -> tuple[Schedule, DayStats]:
+            rules: list[dict] | None = None, t_range: tuple[int, int] | None = None,
+            explain_slots: set[int] | None = None, on_slot=None) -> tuple[Schedule, DayStats]:
     """t_range (tests/what-if only): optimise slots in [a, b); other slots run the safe default."""
     cfg = campus.cfg
     ac, qc = cfg["admm"], cfg["qaoa"]
@@ -225,9 +227,12 @@ def run_day(campus: Campus, day: DayData, method: str = "qaoa", log: bool = Fals
             if i in dead:
                 cmd = ag.apply_safe_default(t, out)
             else:
-                dec = last[i][2] if i in last else None
+                lp_i, sol_i, dec = last[i] if i in last else (None, None, None)
                 if dec is None or any(dec["flows"].get(l, 0.0) != flow[l] for l, _ in ag.incident if l in z):
-                    _, _, dec = solve(ag, t, [], out, {}, 0.0, 99)
+                    lp_i, sol_i, dec = solve(ag, t, [], out, {}, 0.0, 99)
+                if explain_slots and t in explain_slots:
+                    from .explain import explain
+                    st.explanations.setdefault(t, {})[ag.name] = explain(lp_i, sol_i.x, zone=ag.name)
                 cmd = ag.apply(t, dec, out)
             sched.p_bat[i, t], sched.dg_kw[i, t], sched.pump_on[i, t] = cmd["p_bat"], cmd["dg_kw"], float(cmd["pump_on"])
         for i, ag in enumerate(agents):
@@ -239,6 +244,10 @@ def run_day(campus: Campus, day: DayData, method: str = "qaoa", log: bool = Fals
         if log:
             st.slots.append({"t": t, "iters": k_used, "converged": bool(agreed), "time_s": st.slot_time_s[-1],
                              "flows": flow.tolist(), "alive": alive})
+        if on_slot is not None:
+            on_slot({"t": t, "iters": k_used, "converged": bool(agreed), "flows": flow.tolist(),
+                     "p_bat": sched.p_bat[:, t].tolist(), "dg_kw": sched.dg_kw[:, t].tolist(),
+                     "pump_on": sched.pump_on[:, t].tolist(), "alive": alive, "time_s": st.slot_time_s[-1]})
         if kill is not None and t == kill[1]:
             st.kill = {"building": campus.names[kill[0]], "slot": t, "iters_at_kill_slot": k_used,
                        "agreed_at_kill_slot": bool(agreed), "replan_time_s": st.slot_time_s[-1]}

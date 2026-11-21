@@ -34,17 +34,19 @@ from qgrid.solvers.exact import approx_ratio, solve_exact  # noqa: E402
 from qgrid.solvers.qaoa import load_params, optimise_params, probabilities_aer, run_qaoa  # noqa: E402
 
 
-def export_distributions(proc):
+def export_distributions(proc, zone: str = "hostels", slot: int = 76):
+    """One QUBO per scenario (hostels zone, 19:00, scenario A: battery, DG, jobs, tie-lines), simulated with
+    qiskit-aer; saves the full distribution, QUBO matrix, term groups and exact optimum for the demo."""
     campus = load_campus()
-    days = proc["meta"]["days"]
-    i = campus.names.index("hostel")
+    scen = proc["meta"]["days"]["scenarios"]
+    i = campus.names.index(zone)
     out = {}
-    for key in ("sunny", "monsoon_cloudy", "high_price"):
-        day = make_day(campus, proc, days[key], "A")
-        ag = BuildingAgent(campus, day, i)
-        t = 48  # 12:00
-        lp = ag.local_problem(t, ag.incident, v={l: 0.0 for l, _ in ag.incident}, rho=0.05)
+    for key, sc in scen.items():
+        day = make_day(campus, proc, sc["date"], "A", key, sc.get("outage"))
+        ag = BuildingAgent(campus, day, i, campus.cfg["admm"]["horizon_slots"])
+        lp = ag.local_problem(slot, ag.incident, v={l: 0.0 for l, _ in ag.incident}, rho=0.05)
         qubos = Q.build(lp)
+        groups, _, _ = Q.build_groups(lp)
         en = Q.enumerate_all(lp, qubos)
         total, A_x, A_s, _ = Q.auto_tune(lp, qubos, enum=en)
         ex = solve_exact(lp, qubos, enum=en)
@@ -54,49 +56,55 @@ def export_distributions(proc):
         t_aer = time.time() - t0
         X = en["X"]
         order = np.argsort(-r.probs)
-        top = [{"bits": "".join(str(int(v)) for v in X[k]), "p": round(float(r.probs[k]), 6),
-                "energy": round(float(en["total"][k]), 3), "feasible": bool(en["feas"][k]),
+        bits = lambda k: "".join(str(int(v)) for v in X[k])  # noqa: E731
+        top = [{"bits": bits(k), "p": round(float(r.probs[k]), 6), "energy": round(float(en["total"][k]), 3),
+                "objective": round(float(en["ob"][k]), 3), "feasible": bool(en["feas"][k]),
                 "optimal": bool(ex.opt_mask[k])} for k in order[:256]]
         opt_idx = int(np.argmax(ex.opt_mask))
         rec = {
-            "label": QUANTUM_LABEL, "day": days[key], "day_type": key, "building": "hostel", "slot": t,
-            "scenario": "A", "price_status": day.status["price_scenario"],
+            "label": QUANTUM_LABEL, "scenario": key, "day": sc["date"], "zone": zone, "slot": slot,
+            "price_scenario": "A", "price_status": day.status["price_scenario"],
             "n_qubits": lp.n, "var_names": lp.var_names(), "p": 2,
             "gammas": np.round(g, 6).tolist(), "betas": np.round(b, 6).tolist(),
-            "qubo_matrix": np.round(total.M, 4).tolist(), "penalties": {"A_x": A_x, "A_s": A_s},
-            "probs": np.round(r.probs, 7).tolist(),           # full distribution, index = sum bit_i 2^i
-            "top_states": top,
-            "optimum": {"bits": "".join(str(int(v)) for v in X[opt_idx]), "objective": ex.objective,
+            "qubo_matrix": np.round(total.M, 4).tolist(), "qubo_const": round(float(total.const), 4),
+            "groups": {k: {"M": np.round(v.M, 4).tolist(), "const": round(float(v.const), 4)} for k, v in groups.items()},
+            "penalties": {"A_x": A_x, "A_s": A_s},
+            "probs": np.round(r.probs, 7).tolist(), "energies": np.round(en["total"], 3).tolist(),
+            "feasible": en["feas"].astype(int).tolist(), "top_states": top,
+            "optimum": {"bits": bits(opt_idx), "objective": ex.objective,
                         "p_opt": round(float(r.probs[ex.opt_mask].sum()), 6)},
-            "uniform_p": 2.0 ** -lp.n,
-            "qaoa_best_sample_feasible": bool(Q.feasible_mask(lp, r.samples).any()),
-            "simulator": "qiskit-aer statevector", "aer_time_s": round(t_aer, 3),
+            "uniform_p": 2.0 ** -lp.n, "simulator": "qiskit-aer statevector (ideal, noiseless)",
+            "aer_time_s": round(t_aer, 3),
         }
-        p_out = ROOT / "results" / "replay" / f"qaoa_{key}.json"
-        p_out.write_text(json.dumps(rec))
+        (ROOT / "results" / "replay" / f"qaoa_{key}.json").write_text(json.dumps(rec))
         out[key] = {"n": lp.n, "p_opt": rec["optimum"]["p_opt"], "uniform": rec["uniform_p"]}
-        print(f"[dist] {key}: n={lp.n} P(opt)={rec['optimum']['p_opt']:.4f} (uniform {rec['uniform_p']:.5f}) -> {p_out.name}")
+        print(f"[dist] {key}: n={lp.n} P(opt)={rec['optimum']['p_opt']:.4f} (uniform {rec['uniform_p']:.6f})")
     return out
 
 
-def truncate(lp: Q.LocalProblem, H: int, n_lines: int, flex: bool) -> Q.LocalProblem:
-    import copy
-    q = copy.copy(lp)
-    q.r0, q.pi, q.pe = lp.r0[:H], lp.pi[:H], lp.pe[:H]
-    q.lines = lp.lines[:n_lines]
-    q.v = {l: lp.v.get(l, 0.0) for l, _ in q.lines}
-    q.flex = lp.flex if flex else None
-    return q
+def truncate(lp: Q.LocalProblem, H: int, n_lines: int, jobs: bool, dg: bool = False) -> Q.LocalProblem:
+    import dataclasses
+    tk = lp.tank
+    if tk is not None:
+        tk = dataclasses.replace(tk, demand=tk.demand[:H])
+    d = lp.dg
+    if d is not None:
+        d = dataclasses.replace(d, q=d.q[:H])
+    lines = lp.lines[:n_lines]
+    return dataclasses.replace(lp, r0=lp.r0[:H], pi=lp.pi[:H], pe=lp.pe[:H], grid=lp.grid[:H], noncrit=lp.noncrit[:H],
+                               pc=lp.pc[:H] if lp.pc is not None else None, pd=lp.pd[:H] if lp.pd is not None else None,
+                               lines=lines, v={l: lp.v.get(l, 0.0) for l, _ in lines},
+                               jobs=lp.jobs if jobs else [], dg=d if dg else None, tank=tk)
 
 
 def scaling_study(proc, n_per_size: int = 6, seed: int = 11):
-    insts = [lp for _, lp in sample_instances(proc, proc["meta"]["days"]["eval_days"], 40, seed=seed)]
-    configs = [(1, 0, False), (1, 1, False), (2, 1, False), (2, 2, False), (3, 2, False), (4, 1, False),
-               (4, 2, False), (4, 2, True), (4, 3, True)]
+    insts = [lp for _, lp in sample_instances(proc, proc["meta"]["days"]["eval_days"], 60, seed=seed)]
+    configs = [(1, 0, False), (1, 1, False), (2, 1, False), (2, 2, False), (3, 1, False), (3, 2, False),
+               (3, 2, True), (3, 3, True)]
     rows = []
     rng = np.random.default_rng(seed)
     for H, nl, fx in configs:
-        pool = [truncate(lp, H, nl, fx) for lp in insts if len(lp.lines) >= nl and (not fx or lp.has_s)]
+        pool = [truncate(lp, H, nl, fx) for lp in insts if lp.bat.present and len(lp.lines) >= nl and (not fx or lp.jobs)]
         pool = [pool[k] for k in rng.permutation(len(pool))[:n_per_size]]
         for lp in pool:
             qubos = Q.build(lp)

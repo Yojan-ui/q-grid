@@ -1,0 +1,32 @@
+{
+  "centralised_full_day": {
+    "vars_per_slot": {
+      "academic": 4,
+      "heavy_labs": 3,
+      "hostels": 5,
+      "library": 3,
+      "canteen": 3,
+      "admin": 3,
+      "server_room": 2,
+      "health_centre": 2,
+      "pumping_station": 1,
+      "_tie_lines": 20
+    },
+    "slots": 96,
+    "N_binary": 4416,
+    "log10_states": 1329.3,
+    "formula": "N = slots x sum_i n_i ; |space| = 2^N"
+  },
+  "local_qubo_qubits": {
+    "academic": 14,
+    "heavy_labs": 13,
+    "hostels": 13,
+    "library": 13,
+    "canteen": 13,
+    "admin": 11,
+    "server_room": 10,
+    "health_centre": 8,
+    "pumping_station": 3
+  },
+  "note": "centralised: per slot one charge + one discharge bit per battery, DG, pump, job-start bits and 2 bits per tie-line; local QUBOs: horizon of 3 slots, capped at 16 qubits"
+}

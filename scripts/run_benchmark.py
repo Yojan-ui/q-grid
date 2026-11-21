@@ -1,14 +1,16 @@
-"""Benchmark all methods on identical data, days, constraints and horizon.
+"""Benchmark v2 (RVCE campus) — all methods on identical data, days, constraints and horizon.
 
-Methods: B0 status quo, B1 rule-based, B2-GA, B2-PSO, B3 per-building MPC-MILP, B4 central MILP
-(global optimum), B5 ADMM + exact local solver, OURS ADMM + QAOA (verified tiered), and the ablation
-ABL ADMM + QAOA-only (accept any feasible QAOA sample; test days only).
-Days: 3 test days + 30-day evaluation set; price scenarios A and B.
-Outputs: results/benchmark.csv (per day), results/benchmark_summary.csv, results/robustness.csv,
-results/plots/*.png, results/replay/admm_<daytype>_<scenario>.json, results/schedules/*.json.
+Methods: B0 status quo, B1 rule-based, B2-GA, B2-PSO, B3 per-zone MPC-MILP, B4 central MILP (optimum within
+0.1 % MIP gap), B5 ADMM + exact local solver, OURS ADMM + QAOA (verified tiers), OURS-QIEA ADMM + QIEA,
+C-QIEA centralised campus QUBO solved by QIEA.
+QAOA in the loop runs only on the 6 named scenarios; on the 30-day evaluation set the OURS row uses the
+classical local tiers (SA -> exact) and is labelled "OURS (classical local tiers)".
+Outputs: results/benchmark.csv, benchmark_summary.csv, robustness.csv, headline.json, economics.json,
+search_space.json, results/plots/*.png, results/replay/admm_<scenario>_<price>.json, results/schedules/*.json.
 """
 from __future__ import annotations
 
+import copy
 import json
 import os
 import sys
@@ -22,33 +24,40 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / "backend"), str(ROOT)]
 
-METHODS = ["B0", "B1", "B2-GA", "B2-PSO", "B3", "B4", "B5", "OURS"]
-TEST_KEYS = ("sunny", "monsoon_cloudy", "high_price")
+SCEN_METHODS = ["B0", "B1", "B2-GA", "B2-PSO", "B3", "B4", "B5", "OURS", "OURS-QIEA", "C-QIEA"]
+EVAL_METHODS = ["B0", "B1", "B2-GA", "B2-PSO", "B3", "B4", "B5", "OURS", "C-QIEA", "B5-nobattery"]
 
 
-def _schedule_json(campus, day, sched, metrics):
-    from qgrid.model import net_power, soc_trajectory
-    net = net_power(campus, day, sched)
-    return {
-        "p_bat": np.round(sched.p_bat, 3).tolist(),
-        "soc": [np.round(soc_trajectory(b.battery, sched.p_bat[i]) / b.battery.kwh, 4).tolist()
-                for i, b in enumerate(campus.buildings)],
-        "flows": np.round(sched.flows, 3).tolist(), "flex_start": sched.flex_start,
-        "net_kw": np.round(net, 3).tolist(), "metrics": {k: v for k, v in metrics.items() if k != "net_kw"},
-    }
+def _schedule_json(campus, day, sched, m):
+    from qgrid.model import net_power, soc_trajectory, tank_trajectory
+    return {"p_bat": np.round(sched.p_bat, 2).tolist(),
+            "soc": [np.round(soc_trajectory(b.battery, sched.p_bat[i]) / max(b.battery.kwh, 1e-9), 4).tolist()
+                    for i, b in enumerate(campus.buildings)],
+            "flows": np.round(sched.flows, 2).tolist(), "dg_kw": np.round(sched.dg_kw, 2).tolist(),
+            "pump_on": sched.pump_on.astype(int).tolist(), "flex_start": sched.flex_start,
+            "tank_m3": {b.name: np.round(tank_trajectory(b.tank, sched.pump_on[i], day.water), 2).tolist()
+                        for i, b in enumerate(campus.buildings) if b.tank},
+            "net_kw": np.round(net_power(campus, day, sched), 2).tolist(),
+            "metrics": {k: v for k, v in m.items() if k != "net_kw"}}
 
 
-def run_task(day_str: str, day_type: str, scenario: str) -> dict:
-    from baselines import b0_status_quo, b1_rule_based, b2_ga_pso, b3_mpc_milp, b4_central_milp
+def run_task(day_str: str, key: str, scen: str) -> dict:
+    from baselines import b0_status_quo, b1_rule_based, b2_ga_pso, b3_mpc_milp, b4_central_milp, c_qiea
     from qgrid import data as qdata
     from qgrid.admm import run_day
     from qgrid.model import check_feasibility, load_campus, make_day, settle
+    from qgrid.solvers import STATS, reset_stats
 
     campus = load_campus()
     proc = qdata.load_processed()
-    day = make_day(campus, proc, day_str, scenario)
-    is_test = day_type in TEST_KEYS
-    rows, extra = [], {"schedules": {}, "admm_log": None}
+    meta = proc["meta"]
+    sc = meta["days"]["scenarios"].get(key, {})
+    day = make_day(campus, proc, day_str, scen, key, sc.get("outage"))
+    is_s = key != "eval"
+    nobat = copy.deepcopy(campus)
+    for b in nobat.buildings:
+        b.battery.kw = 0.0
+        b.battery.kwh = 0.0
     solvers = {
         "B0": lambda: (b0_status_quo.solve(campus, day), None),
         "B1": lambda: (b1_rule_based.solve(campus, day), None),
@@ -57,177 +66,204 @@ def run_task(day_str: str, day_type: str, scenario: str) -> dict:
         "B3": lambda: (b3_mpc_milp.solve(campus, day), None),
         "B4": lambda: (b4_central_milp.solve(campus, day), None),
         "B5": lambda: run_day(campus, day, method="exact"),
-        "OURS": lambda: run_day(campus, day, method="qaoa", log=is_test),
+        "OURS": lambda: run_day(campus, day, method="qaoa" if is_s else "classical", log=is_s),
+        "OURS-QIEA": lambda: run_day(campus, day, method="qiea"),
+        "C-QIEA": lambda: (c_qiea.solve(campus, day), None),
+        "B5-nobattery": lambda: run_day(nobat, day, method="exact"),
     }
-    if is_test:
-        solvers["ABL-QAOA-only"] = lambda: run_day(campus, day, method="qaoa_only")
-    for name, fn in solvers.items():
+    rows, extra = [], {"schedules": {}, "admm_log": None}
+    for name in (SCEN_METHODS if is_s else EVAL_METHODS):
+        reset_stats()
         t0 = time.perf_counter()
-        sched, st = fn()
+        sched, st = solvers[name]()
         rt = time.perf_counter() - t0
-        m = settle(campus, day, sched)
-        f = check_feasibility(campus, sched)
-        row = {
-            "method": name, "scenario": scenario, "day": day_str, "day_type": day_type,
-            "price_status": day.status["price_scenario"], "co2_status": day.status["cea"],
-            "cost_rs": m["cost_rs"], "energy_cost_rs": m["energy_cost_rs"], "terminal_adj_rs": m["terminal_adj_rs"],
-            "co2_kg": m["co2_kg"], "import_kwh": m["import_kwh"], "export_kwh": m["export_kwh"],
-            "self_consumption_pct": m["self_consumption_pct"], "peak_import_kw": m["peak_import_kw"],
-            "runtime_s": rt, "feasible": f["feasible"], "feasibility_rate": f["feasibility_rate"],
-            "qaoa_p_opt": np.nan, "qaoa_approx_ratio": np.nan, "qaoa_found_opt_rate": np.nan,
-            "qaoa_feasible_rate": np.nan, "tier_qaoa": np.nan, "tier_anneal": np.nan, "tier_exact": np.nan,
-            "admm_iters": np.nan, "line_disagreements": np.nan, "recovery_time_s": np.nan,
-            "milp_status": str(sched.info.get("milp_status", "")),
-        }
+        cmp_campus = nobat if name == "B5-nobattery" else campus
+        m = settle(cmp_campus, day, sched)
+        f = check_feasibility(cmp_campus, sched, day)
+        row = {"method": name, "price_scenario": scen, "scenario": key, "day": day_str, "day_type": day.day_type,
+               "price_status": day.status["price_scenario"], "local_solver": "",
+               **{k: m[k] for k in ("cost_rs", "objective_rs", "energy_cost_rs", "fuel_cost_rs", "voll_rs", "co2_kg",
+                                     "dg_hours", "dg_litres", "critical_downtime_h", "critical_unserved_kwh",
+                                     "unserved_kwh", "import_kwh", "export_kwh", "self_consumption_pct",
+                                     "peak_import_kw", "terminal_adj_rs")},
+               "runtime_s": rt, "replan_time_s": sched.info.get("replan_time_s", np.nan),
+               "feasible": f["feasible"], "feasibility_rate": f["feasibility_rate"],
+               "milp_status": str(sched.info.get("milp_status", "")),
+               "qaoa_solves": STATS["qaoa_solves"], "qaoa_time_s": STATS["qaoa_time_s"], "cache_hits": STATS["cache_hits"]}
+        if name in ("B3", "B4"):
+            row["replan_time_s"] = rt
         if st is not None:
             s = st.summary()
-            row.update({"admm_iters": s["admm_iters_mean"], "line_disagreements": s["line_disagreements"],
-                        "tier_qaoa": s["tiers"]["qaoa"], "tier_anneal": s["tiers"]["anneal"],
-                        "tier_exact": s["tiers"]["exact"]})
-            if "qaoa_p_opt" in s:
-                row.update({k: s[k] for k in ("qaoa_p_opt", "qaoa_approx_ratio", "qaoa_found_opt_rate",
-                                              "qaoa_feasible_rate")})
-            if name == "OURS" and is_test:
-                extra["admm_log"] = {"iterations": st.log, "slots": st.slots, "lines": campus.lines,
-                                     "buildings": campus.names}
+            row.update({"admm_iters": s["admm_iters_mean"], "admm_convergence_rate": s["admm_convergence_rate"],
+                        "admm_oscillations": s["admm_oscillations"], "line_disagreements": s["line_disagreements"],
+                        "critical_guard_cuts": s["critical_guard_cuts"], "replan_time_s": s["replan_time_s"],
+                        **{f"tier_{k}": v for k, v in s["tiers"].items()}})
+            for k in ("qaoa_p_opt", "qaoa_approx_ratio", "qaoa_found_opt_rate", "qaoa_feasible_rate"):
+                row[k] = s.get(k, np.nan)
+            row["local_solver"] = {"B5": "exact", "OURS": "QAOA->QIEA->SA->exact" if is_s else "SA->exact (classical tiers)",
+                                   "OURS-QIEA": "QIEA->SA->exact", "B5-nobattery": "exact"}.get(name, "")
+            if name == "OURS" and is_s:
+                extra["admm_log"] = {"iterations": st.log, "slots": st.slots, "lines": campus.lines, "zones": campus.names}
         rows.append(row)
-        if is_test and name in ("B0", "B3", "B4", "B5", "OURS"):
+        if is_s and name in ("B0", "B3", "B4", "B5", "OURS", "OURS-QIEA", "C-QIEA"):
             extra["schedules"][name] = _schedule_json(campus, day, sched, m)
-    # in-process kill on test days (OURS): feasibility + re-convergence
-    if is_test:
-        k = campus.names.index("lab_block")
-        sched, st = run_day(campus, day, method="qaoa", kill=(k, 48))
-        f = check_feasibility(campus, sched)
-        extra["kill_inprocess"] = {"day": day_str, "day_type": day_type, "scenario": scenario, "killed": "lab_block",
-                                   "kill_slot": 48, "feasible": f["feasible"], "cost_rs": settle(campus, day, sched)["cost_rs"],
+    if is_s and scen == "A":
+        k = campus.names.index("heavy_labs")
+        ks = 74 if sc.get("outage") else 48
+        sched, st = run_day(campus, day, method="classical", kill=(k, ks))
+        extra["kill_inprocess"] = {"scenario": key, "day": day_str, "price_scenario": scen, "killed": "heavy_labs",
+                                   "kill_slot": ks, "feasible": check_feasibility(campus, sched, day)["feasible"],
+                                   "critical_downtime_h": settle(campus, day, sched)["critical_downtime_h"],
                                    **{k2: v for k2, v in st.kill.items() if k2 != "building"}}
-    return {"rows": rows, "extra": extra, "day": day_str, "day_type": day_type, "scenario": scenario}
+    return {"rows": rows, "extra": extra, "day": day_str, "key": key, "scen": scen}
 
 
 def main(workers: int | None = None):
     from qgrid import QUANTUM_LABEL
     from qgrid import data as qdata
+    from qgrid.campus import search_space
     from qgrid.model import load_campus
+    from qgrid.qubo import MAX_QUBITS
 
     t_all = time.time()
     proc = qdata.load_processed()
     meta = proc["meta"]
     campus = load_campus()
-    scen = campus.cfg["prices"]["scenarios"]
-    tasks = [(meta["days"][k], k, s) for s in scen for k in TEST_KEYS]
-    tasks += [(d, "eval", s) for s in scen for d in meta["days"]["eval_days"]]
+    cfg = campus.cfg
+    scen_list = cfg["prices"]["scenarios"]
+    tasks = [(v["date"], k, s) for s in scen_list for k, v in meta["days"]["scenarios"].items()]
+    tasks += [(d, "eval", s) for s in scen_list for d in meta["days"]["eval_days"]]
     workers = workers or max(1, (os.cpu_count() or 2) - 2)
-    print(f"{len(tasks)} tasks on {workers} workers")
+    print(f"{len(tasks)} tasks on {workers} workers", flush=True)
     results = []
     with ProcessPoolExecutor(max_workers=workers) as ex:
         futs = {ex.submit(run_task, *t): t for t in tasks}
         for n, fut in enumerate(as_completed(futs), 1):
             r = fut.result()
             results.append(r)
-            ours = next(x for x in r["rows"] if x["method"] == "OURS")
-            print(f"[{n}/{len(tasks)}] {r['scenario']} {r['day']} {r['day_type']:<15} OURS Rs {ours['cost_rs']:,.0f} "
-                  f"({ours['runtime_s']:.1f}s)  t={time.time() - t_all:.0f}s", flush=True)
+            o = next(x for x in r["rows"] if x["method"] == "OURS")
+            print(f"[{n}/{len(tasks)}] {r['scen']} {r['day']} {r['key']:<12} OURS Rs {o['cost_rs']:,.0f} "
+                  f"crit {o['critical_downtime_h']:.2f}h ({o['runtime_s']:.0f}s) t={time.time() - t_all:.0f}s", flush=True)
 
     df = pd.DataFrame([row for r in results for row in r["rows"]])
-    b4 = df[df.method == "B4"].set_index(["scenario", "day"])["cost_rs"]
-    df["gap_to_B4_pct"] = [100 * (c - b4[(s, d)]) / abs(b4[(s, d)]) for c, s, d in zip(df.cost_rs, df.scenario, df.day)]
+    b4 = df[df.method == "B4"].set_index(["price_scenario", "day", "scenario"])["objective_rs"]
+    df["gap_to_B4_pct"] = [100 * (o - b4[(p, d, k)]) / abs(b4[(p, d, k)])
+                           for o, p, d, k in zip(df.objective_rs, df.price_scenario, df.day, df.scenario)]
+    sem = float(cfg["economics"]["semester_days"])
+    df["cost_rs_semester"] = df.cost_rs * sem
+    df["co2_t_year"] = df.co2_kg * 365 / 1000
 
-    # networked kill-node experiment (real processes, websockets), sunny day, OURS and B5
+    # networked kill (real processes over websockets) on the headline scenario, OURS and B5
     sys.path.insert(0, str(ROOT / "scripts"))
     from kill_node import run as net_run
+    hs = cfg["headline_scenario"]
+    hdate = meta["days"]["scenarios"][hs]["date"]
     rob = []
-    for s in scen:
-        for meth, label in (("qaoa", "OURS"), ("exact", "B5")):
-            r = net_run(meta["days"]["sunny"], s, meth, kill="lab_block", kill_slot=48)
-            rob.append({"mode": "networked", "method": label, "scenario": s, "day": meta["days"]["sunny"],
-                        "killed": "lab_block", "kill_slot": 48, "feasible": r["feasible"],
-                        "tie_line_flows_consistent": r["tie_line_flows_consistent"],
-                        "recovery_time_s": r["recovery_time_s"], "cost_rs": r["cost_rs"],
-                        "wall_time_s": r["wall_time_s"], "price_status": r["price_status"]})
-            mask = (df.method == label) & (df.scenario == s) & (df.day_type == "sunny")
-            df.loc[mask, "recovery_time_s"] = r["recovery_time_s"]
-            print(f"[net-kill] {label} {s}: recovery {r['recovery_time_s']:.2f}s feasible={r['feasible']}")
+    for meth, label in (("qaoa", "OURS"), ("exact", "B5")):
+        r = net_run(hdate, "A", meth, kill="heavy_labs", kill_slot=74, scenario_key=hs)
+        rob.append({"mode": "networked", "method": label, "scenario": hs, "price_scenario": "A", "day": hdate,
+                    "killed": "heavy_labs", "kill_slot": 74, "feasible": r["feasible"],
+                    "tie_line_flows_consistent": r["tie_line_flows_consistent"], "recovery_time_s": r["recovery_time_s"],
+                    "critical_downtime_h": r["critical_downtime_h"], "wall_time_s": r["wall_time_s"]})
+        df.loc[(df.method == label) & (df.scenario == hs) & (df.price_scenario == "A"), "recovery_time_s"] = r["recovery_time_s"]
+        print(f"[net-kill] {label}: recovery {r['recovery_time_s']}s feasible={r['feasible']}", flush=True)
     for r in results:
         if "kill_inprocess" in r["extra"]:
-            rob.append({"mode": "in-process", "method": "OURS", **r["extra"]["kill_inprocess"]})
+            rob.append({"mode": "in-process", "method": "OURS (classical tiers)", **r["extra"]["kill_inprocess"]})
     pd.DataFrame(rob).to_csv(ROOT / "results" / "robustness.csv", index=False)
 
-    cols = ["method", "scenario", "day", "day_type", "price_status", "co2_status", "cost_rs", "co2_kg",
-            "gap_to_B4_pct", "self_consumption_pct", "peak_import_kw", "runtime_s", "feasibility_rate", "qaoa_p_opt",
-            "admm_iters", "recovery_time_s", "qaoa_approx_ratio", "qaoa_found_opt_rate", "qaoa_feasible_rate",
-            "tier_qaoa", "tier_anneal", "tier_exact", "line_disagreements", "energy_cost_rs", "terminal_adj_rs",
-            "import_kwh", "export_kwh", "feasible", "milp_status"]
-    df = df[cols].sort_values(["scenario", "day_type", "day", "method"])
+    df = df.sort_values(["price_scenario", "scenario", "day", "method"])
     df.to_csv(ROOT / "results" / "benchmark.csv", index=False)
-
-    num = ["cost_rs", "co2_kg", "gap_to_B4_pct", "self_consumption_pct", "peak_import_kw", "runtime_s",
-           "feasibility_rate", "qaoa_p_opt", "admm_iters", "qaoa_found_opt_rate", "tier_qaoa", "tier_anneal", "tier_exact"]
-    ev = df[df.day_type == "eval"].groupby(["scenario", "method"])[num].mean().reset_index()
+    num = ["cost_rs", "objective_rs", "cost_rs_semester", "co2_kg", "co2_t_year", "dg_hours", "dg_litres",
+           "critical_downtime_h", "critical_unserved_kwh", "gap_to_B4_pct", "self_consumption_pct", "peak_import_kw",
+           "replan_time_s", "runtime_s", "feasibility_rate", "qaoa_p_opt", "qaoa_approx_ratio", "admm_iters",
+           "admm_convergence_rate", "admm_oscillations"]
+    ev = df[df.scenario == "eval"].groupby(["price_scenario", "method"])[num].mean().reset_index()
     ev.insert(2, "day_set", "eval30_mean")
-    td = df[df.day_type != "eval"].copy()
-    td["day_set"] = td.day_type
-    summ = pd.concat([ev, td[["scenario", "method", "day_set"] + num]])
-    status = {s: meta["prices"][s]["status"] for s in scen}
-    summ.insert(0, "price_status", summ.scenario.map(status))
+    sd = df[df.scenario != "eval"].copy()
+    sd["day_set"] = sd.scenario
+    summ = pd.concat([ev, sd[["price_scenario", "method", "day_set"] + num]])
+    status = {s: meta["prices"][s]["status"] for s in scen_list}
+    summ.insert(0, "price_status", summ.price_scenario.map(status))
     summ.to_csv(ROOT / "results" / "benchmark_summary.csv", index=False)
 
-    rdir = ROOT / "results" / "replay"
-    sdir = ROOT / "results" / "schedules"
+    # headline card: outage during fest evening, scenario A, status quo vs Q-Grid
+    h = df[(df.scenario == hs) & (df.price_scenario == "A")].set_index("method")
+    card = {"scenario": hs, "day": hdate, "price_scenario": "A", "price_status": status["A"],
+            "note": meta["days"]["scenarios"][hs]["note"], "label": QUANTUM_LABEL,
+            "before": {k: float(h.loc["B0", k]) for k in ("cost_rs", "dg_hours", "dg_litres", "critical_downtime_h",
+                                                           "critical_unserved_kwh", "unserved_kwh")},
+            "after": {k: float(h.loc["OURS", k]) for k in ("cost_rs", "dg_hours", "dg_litres", "critical_downtime_h",
+                                                            "critical_unserved_kwh", "unserved_kwh", "replan_time_s")},
+            "optimum_B4": {k: float(h.loc["B4", k]) for k in ("cost_rs", "critical_downtime_h", "critical_unserved_kwh")},
+            "source": "results/benchmark.csv rows method in {B0, OURS, B4}, scenario=" + hs + ", price_scenario=A"}
+    (ROOT / "results" / "headline.json").write_text(json.dumps(card, indent=2))
+
+    # battery payback (ASSUMPTION capex) from B5 with vs without batteries on the 30-day set
+    eco = {}
+    for s in scen_list:
+        e = df[(df.scenario == "eval") & (df.price_scenario == s)].pivot(index="day", columns="method", values="cost_rs")
+        saving_day = float((e["B5-nobattery"] - e["B5"]).mean())
+        kwh = sum(b.battery.kwh for b in campus.buildings)
+        capex = kwh * float(cfg["economics"]["battery_capex_rs_per_kwh"])
+        eco[s] = {"price_status": status[s], "battery_kwh_total": kwh, "capex_rs_ASSUMPTION": capex,
+                  "battery_saving_rs_per_day": saving_day, "annual_saving_rs": saving_day * 365,
+                  "simple_payback_years": capex / (saving_day * 365) if saving_day > 0 else None,
+                  "method": "mean daily cost B5 without batteries minus B5 with batteries, 30-day set, x365"}
+    (ROOT / "results" / "economics.json").write_text(json.dumps(eco, indent=2))
+
+    counts = {}
+    for i, b in enumerate(campus.buildings):
+        counts[b.name] = min(MAX_QUBITS, (2 * cfg["admm"]["horizon_slots"] if b.battery.present else 0)
+                             + 2 * len(campus.incident(i)) + (1 if b.dg else 0) + (1 if b.tank else 0) + len(b.flex))
+    full = {b.name: (2 if b.battery.present else 0) + (1 if b.dg else 0) + (1 if b.tank else 0) + len(b.flex)
+            for b in campus.buildings}
+    full["_tie_lines"] = 2 * len(campus.lines)
+    (ROOT / "results" / "search_space.json").write_text(json.dumps(
+        {"centralised_full_day": search_space(full), "local_qubo_qubits": counts,
+         "note": "centralised: per slot one charge + one discharge bit per battery, DG, pump, job-start bits and "
+                 "2 bits per tie-line; local QUBOs: horizon of 3 slots, capped at 16 qubits"}, indent=2))
+
+    rdir, sdir = ROOT / "results" / "replay", ROOT / "results" / "schedules"
     sdir.mkdir(exist_ok=True)
     for r in results:
-        if r["day_type"] in TEST_KEYS:
+        if r["key"] != "eval":
             if r["extra"]["admm_log"]:
-                (rdir / f"admm_{r['day_type']}_{r['scenario']}.json").write_text(
+                (rdir / f"admm_{r['key']}_{r['scen']}.json").write_text(
                     json.dumps({"label": QUANTUM_LABEL, "day": r["day"], **r["extra"]["admm_log"]}, default=float))
-            (sdir / f"{r['day_type']}_{r['scenario']}.json").write_text(
-                json.dumps({"day": r["day"], "scenario": r["scenario"], **r["extra"]["schedules"]}, default=float))
-    make_plots(df, summ, status)
-    print(f"done in {time.time() - t_all:.0f}s -> results/benchmark.csv, benchmark_summary.csv, robustness.csv")
-    print(ev.pivot_table(index="method", columns="scenario", values=["cost_rs", "gap_to_B4_pct"]).round(2))
+            (sdir / f"{r['key']}_{r['scen']}.json").write_text(
+                json.dumps({"day": r["day"], "scenario": r["key"], "price_scenario": r["scen"], **r["extra"]["schedules"]},
+                           default=float))
+    make_plots(df, status)
+    print(f"done in {time.time() - t_all:.0f}s")
+    print(ev.pivot_table(index="method", columns="price_scenario", values=["cost_rs", "gap_to_B4_pct"]).round(2))
+    print(json.dumps(card, indent=1))
 
 
-def make_plots(df, summ, status):
+def make_plots(df, status):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     from qgrid import QUANTUM_LABEL
 
-    order = ["B0", "B1", "B2-GA", "B2-PSO", "B3", "B5", "OURS", "B4"]
-    ev = df[df.day_type == "eval"]
-    fig, axs = plt.subplots(1, 2, figsize=(14, 4.8))
-    for ax, s in zip(axs, sorted(ev.scenario.unique())):
-        g = ev[ev.scenario == s].groupby("method").cost_rs.mean().reindex(order)
-        colors = ["#9aa5b1"] * 5 + ["#5b8def", "#2a9d8f", "#264653"]
-        ax.bar(g.index, g.values, color=colors)
-        ax.axhline(g["B4"], color="#264653", ls="--", lw=1, label="B4 central optimum")
-        for k, v in enumerate(g.values):
-            ax.text(k, v, f"{v:,.0f}", ha="center", va="bottom", fontsize=7)
-        tag = "" if status[s] == "REAL" else "  [STAND-IN prices — PENDING, not a headline result]"
-        ax.set_title(f"Scenario {s}: mean daily cost, 30-day eval set{tag}", fontsize=9,
-                     color="k" if status[s] == "REAL" else "#b00020")
-        ax.set_ylabel("Rs / day"); ax.legend(fontsize=8); ax.tick_params(axis="x", labelsize=8)
-    fig.suptitle(QUANTUM_LABEL, fontsize=8)
-    fig.tight_layout()
-    fig.savefig(ROOT / "results" / "plots" / "benchmark_cost.png", dpi=130)
-
-    fig, axs = plt.subplots(1, 2, figsize=(14, 4.4))
-    for ax, s in zip(axs, sorted(ev.scenario.unique())):
-        d = ev[(ev.scenario == s) & (ev.method != "B4")]
-        data = [d[d.method == m].gap_to_B4_pct.values for m in order[:-1]]
-        ax.boxplot(data, tick_labels=order[:-1])
-        ax.axhline(0, color="k", lw=.6)
-        ax.set_title(f"Scenario {s}: gap to B4 per day (%)" + ("" if status[s] == "REAL" else " [STAND-IN prices]"), fontsize=9)
-        ax.tick_params(axis="x", labelsize=8)
-    fig.tight_layout()
-    fig.savefig(ROOT / "results" / "plots" / "benchmark_gap.png", dpi=130)
-
-    fig, ax = plt.subplots(figsize=(7, 4))
-    g = ev.groupby("method").runtime_s.mean().reindex(order)
-    ax.bar(g.index, g.values, color="#5b8def")
-    ax.set_yscale("log"); ax.set_ylabel("seconds per day (log)"); ax.set_title("Runtime per simulated day (mean, both scenarios)", fontsize=9)
-    ax.tick_params(axis="x", labelsize=8)
-    fig.tight_layout()
-    fig.savefig(ROOT / "results" / "plots" / "benchmark_runtime.png", dpi=130)
+    order = ["B0", "B1", "B2-GA", "B2-PSO", "B3", "C-QIEA", "B5", "OURS-QIEA", "OURS", "B4"]
+    for kind, sel in (("eval", df.scenario == "eval"), ("headline", df.scenario == "outage_fest")):
+        d = df[sel]
+        fig, axs = plt.subplots(1, 2, figsize=(15, 4.8))
+        for ax, s in zip(axs, ("A", "B")):
+            g = d[d.price_scenario == s].groupby("method").objective_rs.mean().reindex([m for m in order if m in set(d.method)])
+            ax.bar(g.index, g.values, color=["#9aa5b1"] * (len(g) - 3) + ["#5b8def", "#2a9d8f", "#264653"][-min(3, len(g)):])
+            ax.axhline(g.get("B4", np.nan), color="#264653", ls="--", lw=1, label="B4 optimum")
+            for k, v in enumerate(g.values):
+                ax.text(k, v, f"{v:,.0f}", ha="center", va="bottom", fontsize=7)
+            tag = "" if status[s] == "REAL" else " [STAND-IN prices, PENDING]"
+            ax.set_title(f"{'30-day mean' if kind == 'eval' else 'Outage during fest'} — scenario {s}: Rs/day incl. VOLL{tag}",
+                         fontsize=9, color="k" if status[s] == "REAL" else "#b00020")
+            ax.tick_params(axis="x", labelsize=7, rotation=30); ax.legend(fontsize=8)
+        fig.suptitle(QUANTUM_LABEL + " · QIEA = quantum-inspired, classical CPU", fontsize=8)
+        fig.tight_layout()
+        fig.savefig(ROOT / "results" / "plots" / f"benchmark_{kind}.png", dpi=130)
+        plt.close(fig)
 
 
 if __name__ == "__main__":

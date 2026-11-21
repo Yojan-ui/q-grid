@@ -120,3 +120,43 @@ The QAOA result is checked for feasibility and compared to that exact optimum (a
 P(optimum)); tiered fallback QAOA → simulated annealing → exact (`qgrid/solvers`).
 
 > QAOA on a local simulator: verified against exact solutions, no quantum advantage claimed.
+
+---
+
+## v2 (RVCE campus model) — additions
+
+**Horizon** H = 3 slots (45 min). **Variables** per zone: 2H battery bits (if a battery), `g` diesel generator on for the
+horizon (if a DG and not forced on by its minimum on-time), `w` borewell pump on for the horizon (if a tank and not forced by
+level safety), one start bit per flexible job in its window (most urgent first), 2 bits per free tie-line; budget ≤ 16 qubits
+(lowest-priority job bits are dropped first; their jobs are still forced at their latest start by the safety layer).
+
+**Residual** r_k = r0_k + f_fixed + P_c,k c_k − P_d,k d_k + Σ σ_l F(p_l − n_l) + Σ_j kw_j s_j[k < dur_j] + P_pump w − q_k g,
+with the DG quantum q_k = clip(deficit_k + F, P_min, P_rated).
+
+**Groups** (each a separate QUBO so decisions can be explained term by term):
+`grid` (surrogate of the exact slot cost: tariff when the grid is up; when islanded, value of lost load — 0 for spill,
+VOLL_nc up to the non-critical demand, VOLL_c beyond), `battery_ctg`, `water_value` (−v_w · level_H, v_w = pumping energy
+avoided later), `dg_fuel` (litres(q) × diesel price over the horizon), `flex_timing`, `admm`, `rule:<id>` (operator rules,
+e.g. a large linear penalty on `g` for "no DG during exams unless outage"; a quadratic shortfall term on the tank level for
+"keep tanks above X % by T").
+
+**Hard constraints** add: tank level within [min, max] over the horizon (where a feasible pump decision exists) and — in
+islanded slots where at least one bitstring achieves it — **critical-load service**: r_k ≤ non-critical demand_k. In those
+slots the surrogate is fitted only over the residuals that satisfy it (the 0 → 40 → 1000 Rs/kWh kink is too sharp for one
+quadratic; diagnosed when zones exported power they needed for their own critical loads).
+
+**Safety additions** (`qgrid/safety.py`, `admm.critical_guard`): DG minimum on-time and minimum load; pump forced on below the
+minimum level, off before overflow; operator tank targets forced when the remaining time requires it; in islanded slots a zone
+never exports on a tie-line if that would leave its own critical load unserved (the line drops to 0 at both ends).
+
+**Explanations** (`qgrid/explain.py`): for each committed bit, ΔE_g = E_g(x with the bit flipped) − E_g(x) per group; the largest
+terms become a sentence with the actual prices, kW, SoC, tank level and Rs.
+
+**Solver tiers** QAOA (simulated circuit) → QIEA (quantum-inspired, classical CPU; Han & Kim 2002 rotation-gate update) →
+simulated annealing → exact; each tier accepted only if verified optimal. QAOA parameters are warm-started per zone (6 COBYLA
+steps from the zone's previous parameters); solved QUBOs are cached.
+
+**ADMM with binaries** has no convergence guarantee. Reported per run: convergence rate (slots with full agreement), mean
+iterations, oscillation cases (proposal vectors repeating with period 2). Disagreeing lines → bilateral resolution (each end
+evaluates its exact local optimum with the line at −F, 0, +F; the level with the lowest summed *exact* cost wins) → else 0.
+Optional over-relaxation/damping of z (`admm.relax`).

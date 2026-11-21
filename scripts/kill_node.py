@@ -25,7 +25,7 @@ from qgrid.model import T, Schedule, check_feasibility, load_campus, make_day, s
 
 
 def run(day: str, scenario: str = "A", method: str = "qaoa", kill: str | None = None, kill_slot: int = 48,
-        slots: int = T, port_base: int = 8765) -> dict:
+        slots: int = T, port_base: int = 8765, scenario_key: str = "") -> dict:
     campus = load_campus()
     outdir = ROOT / "results" / "net"
     outdir.mkdir(parents=True, exist_ok=True)
@@ -36,7 +36,8 @@ def run(day: str, scenario: str = "A", method: str = "qaoa", kill: str | None = 
         out.unlink(missing_ok=True)
         outs[b] = out
         cmd = [sys.executable, "-m", "qgrid.node", "--building", b, "--day", day, "--scenario", scenario,
-               "--method", method, "--port-base", str(port_base), "--slots", str(slots), "--out", str(out)]
+               "--method", method, "--port-base", str(port_base), "--slots", str(slots), "--out", str(out),
+               "--scenario-key", scenario_key]
         if kill == b:
             cmd += ["--die-at-slot", str(kill_slot)]
         procs.append(subprocess.Popen(cmd, cwd=ROOT, env={**__import__("os").environ,
@@ -53,6 +54,8 @@ def run(day: str, scenario: str = "A", method: str = "qaoa", kill: str | None = 
             r = recs[b]
             n = len(r["p_bat"])
             sched.p_bat[i, :n] = r["p_bat"]
+            sched.dg_kw[i, :n] = r.get("dg_kw", [0.0] * n)
+            sched.pump_on[i, :n] = r.get("pump_on", [0.0] * n)
             sched.flex_start[i] = dict(r["flex_start"])
         # a crashed node's battery stays idle from the crash on (its record ends at the crash -> zeros)
     for l, (a, b) in enumerate(campus.lines):
@@ -63,16 +66,30 @@ def run(day: str, scenario: str = "A", method: str = "qaoa", kill: str | None = 
             if not np.allclose(fa[:n], fb[:n]):
                 consistent = False
             sched.flows[l, :n] = fa[:n]
-    # killed building: status-quo default for its flexible job if it had not started before the crash
-    if kill:
-        i = campus.names.index(kill)
-        for j in campus.buildings[i].flex:
-            if j.name not in sched.flex_start[i]:
-                sched.flex_start[i][j.name] = j.default if j.default >= kill_slot else max(kill_slot, j.earliest)
     proc = qdata.load_processed()
-    dd = make_day(campus, proc, day, scenario)
+    sc = proc["meta"]["days"]["scenarios"].get(scenario_key, {})
+    dd = make_day(campus, proc, day, scenario, scenario_key, sc.get("outage"))
+    # crashed zone after the crash: its controller is offline -> safe default (float-switch pump, DG/UPS only in outage)
+    if kill:
+        from qgrid.agent import BuildingAgent
+        i = campus.names.index(kill)
+        ag = BuildingAgent(campus, dd, i)
+        r = recs.get(kill)
+        for t in range(T):
+            if r is not None and t < len(r["p_bat"]):
+                ag.e = float(ag.bat.step(ag.e, r["p_bat"][t])) if ag.bat.present else 0.0
+                if ag.tank is not None:
+                    ag.level += (ag.tank.pump_m3 if r["pump_on"][t] else 0.0) - ag.water[t]
+                for j in ag.pending_jobs():
+                    if j.name in r["flex_start"] and r["flex_start"][j.name] <= t:
+                        ag.started[j.name] = r["flex_start"][j.name]
+                        ag.running += j.profile(ag.started[j.name])
+                continue
+            c = ag.apply_safe_default(t)
+            sched.p_bat[i, t], sched.dg_kw[i, t], sched.pump_on[i, t] = c["p_bat"], c["dg_kw"], float(c["pump_on"])
+        sched.flex_start[i] = dict(ag.started)
     m = settle(campus, dd, sched)
-    feas = check_feasibility(campus, sched)
+    feas = check_feasibility(campus, sched, dd)
     surv = [b for b in campus.names if b != kill and b in recs]
     rec_time = None
     if kill:
@@ -81,6 +98,7 @@ def run(day: str, scenario: str = "A", method: str = "qaoa", kill: str | None = 
     res = {
         "day": day, "scenario": scenario, "method": method, "kill": kill, "kill_slot": kill_slot if kill else None,
         "slots": slots, "wall_time_s": round(wall, 2), "cost_rs": m["cost_rs"], "co2_kg": m["co2_kg"],
+        "critical_downtime_h": m["critical_downtime_h"], "scenario_key": scenario_key,
         "feasible": feas["feasible"], "violations": feas["violations"], "feasibility_rate": feas["feasibility_rate"],
         "tie_line_flows_consistent": consistent,
         "recovery_time_s": rec_time,
@@ -102,6 +120,9 @@ if __name__ == "__main__":
     ap.add_argument("--kill", default=None)
     ap.add_argument("--kill-slot", type=int, default=48)
     ap.add_argument("--slots", type=int, default=T)
+    ap.add_argument("--scenario-key", default="")
     a = ap.parse_args()
-    day = a.day or qdata.load_processed()["meta"]["days"]["sunny"]
-    print(json.dumps(run(day, a.scenario, a.method, a.kill, a.kill_slot, a.slots), indent=2, default=str))
+    meta = qdata.load_processed()["meta"]
+    key = a.scenario_key or meta.get("headline_scenario", "outage_fest")
+    day = a.day or meta["days"]["scenarios"][key]["date"]
+    print(json.dumps(run(day, a.scenario, a.method, a.kill, a.kill_slot, a.slots, scenario_key=key), indent=2, default=str))

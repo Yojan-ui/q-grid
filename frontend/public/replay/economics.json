@@ -1,0 +1,20 @@
+{
+  "A": {
+    "price_status": "PENDING",
+    "battery_kwh_total": 1460.0,
+    "capex_rs_ASSUMPTION": 36500000.0,
+    "battery_saving_rs_per_day": 4459.929234964995,
+    "annual_saving_rs": 1627874.1707622232,
+    "simple_payback_years": 22.421880422680044,
+    "method": "mean daily cost B5 without batteries minus B5 with batteries, 30-day set, x365"
+  },
+  "B": {
+    "price_status": "PENDING",
+    "battery_kwh_total": 1460.0,
+    "capex_rs_ASSUMPTION": 36500000.0,
+    "battery_saving_rs_per_day": 7628.500000000002,
+    "annual_saving_rs": 2784402.5000000005,
+    "simple_payback_years": 13.10873697319263,
+    "method": "mean daily cost B5 without batteries minus B5 with batteries, 30-day set, x365"
+  }
+}

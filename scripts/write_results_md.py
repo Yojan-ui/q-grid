@@ -1,7 +1,9 @@
-"""Generate docs/results.md from results/*.csv (every number in the document is read from CSV)."""
+"""Generate docs/results.md from results/*.csv and render the doc templates (docs/templates/*.md -> docs/ and
+README.md). Every number is read from the result files; placeholders look like {{key}} (see values())."""
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -12,178 +14,135 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / "backend"), str(ROOT)]
 from qgrid import QUANTUM_LABEL  # noqa: E402
 
-ORDER = ["B0", "B1", "B2-GA", "B2-PSO", "B3", "B4", "B5", "OURS", "ABL-QAOA-only"]
-NAMES = {"B0": "B0 status quo", "B1": "B1 rule-based battery", "B2-GA": "B2 genetic algorithm",
-         "B2-PSO": "B2 particle swarm", "B3": "B3 per-building MPC-MILP", "B4": "B4 central campus MILP (optimum)",
-         "B5": "B5 ADMM + exact local solver", "OURS": "**OURS ADMM + QAOA (verified tiers)**",
-         "ABL-QAOA-only": "Ablation: ADMM + QAOA-only (no fallback)"}
+ORDER = ["B0", "B1", "B2-GA", "B2-PSO", "B3", "C-QIEA", "B5", "OURS-QIEA", "OURS", "B4"]
+NAMES = {"B0": "B0 status quo", "B1": "B1 rule-based", "B2-GA": "B2 genetic algorithm", "B2-PSO": "B2 particle swarm",
+         "B3": "B3 per-zone MPC-MILP", "B4": "B4 central MILP (optimum)", "B5": "B5 ADMM + exact local solver",
+         "OURS": "**OURS ADMM + QAOA**", "OURS-QIEA": "OURS-QIEA ADMM + QIEA†", "C-QIEA": "C-QIEA central QUBO + QIEA†",
+         "B5-nobattery": "B5 without batteries"}
 
 
-def fmt(x, d=1):
+def f(x, d=0):
     return "–" if x is None or (isinstance(x, float) and np.isnan(x)) else f"{x:,.{d}f}"
 
 
-def table(df: pd.DataFrame, scen: str, day_set: str) -> str:
-    d = df[(df.scenario == scen) & (df.day_set == day_set)].set_index("method")
-    rows = ["| Method | Cost Rs/day | CO2 kg/day | Gap to B4 | Self-consumption | Peak import kW | Runtime s/day | Feasibility | QAOA P(opt) | ADMM iters/slot |",
-            "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|"]
+def table(df, price, day_set):
+    d = df[(df.price_scenario == price) & (df.day_set == day_set)].set_index("method")
+    cols = [("cost_rs", "Rs/day", 0), ("objective_rs", "Rs incl. VOLL", 0), ("gap_to_B4_pct", "gap to B4 %", 2),
+            ("critical_downtime_h", "crit. downtime h", 2), ("dg_hours", "DG h", 1), ("dg_litres", "DG L", 0),
+            ("co2_kg", "CO2 kg", 0), ("self_consumption_pct", "self-cons. %", 1), ("peak_import_kw", "peak kW", 0),
+            ("replan_time_s", "re-plan s/slot", 3), ("feasibility_rate", "feasible %", 1), ("qaoa_p_opt", "QAOA P(opt)", 4),
+            ("admm_convergence_rate", "ADMM conv. %", 1)]
+    out = ["| Method | " + " | ".join(c[1] for c in cols) + " |", "|---|" + "---:|" * len(cols)]
     for m in ORDER:
         if m not in d.index:
             continue
         r = d.loc[m]
-        rows.append(f"| {NAMES[m]} | {fmt(r.cost_rs, 0)} | {fmt(r.co2_kg, 0)} | {fmt(r.gap_to_B4_pct, 2)} % | "
-                    f"{fmt(r.self_consumption_pct, 1)} % | {fmt(r.peak_import_kw, 0)} | {fmt(r.runtime_s, 2)} | "
-                    f"{fmt(100 * r.feasibility_rate, 1)} % | {fmt(r.qaoa_p_opt, 4)} | {fmt(r.admm_iters, 2)} |")
-    return "\n".join(rows)
+        vals = []
+        for k, _, dd in cols:
+            v = r.get(k, np.nan)
+            v = 100 * v if k in ("feasibility_rate", "admm_convergence_rate") and not pd.isna(v) else v
+            vals.append(f(v, dd))
+        out.append(f"| {NAMES[m]} | " + " | ".join(vals) + " |")
+    return "\n".join(out)
+
+
+def values() -> dict:
+    """Flat dict of every number the templates may use."""
+    b = pd.read_csv(ROOT / "results" / "benchmark.csv")
+    s = pd.read_csv(ROOT / "results" / "benchmark_summary.csv")
+    v = {}
+    for _, r in s.iterrows():
+        for k in ("cost_rs", "objective_rs", "gap_to_B4_pct", "critical_downtime_h", "dg_hours", "dg_litres", "co2_kg",
+                  "replan_time_s", "admm_convergence_rate", "qaoa_p_opt", "cost_rs_semester", "co2_t_year", "self_consumption_pct"):
+            if k in r and not pd.isna(r[k]):
+                v[f"{r.method}.{r.day_set}.{r.price_scenario}.{k}"] = float(r[k])
+    h = json.loads((ROOT / "results" / "headline.json").read_text())
+    for side in ("before", "after", "optimum_B4"):
+        for k, x in h[side].items():
+            v[f"headline.{side}.{k}"] = x
+    eco = json.loads((ROOT / "results" / "economics.json").read_text())
+    for sc_, e in eco.items():
+        for k, x in e.items():
+            if isinstance(x, (int, float)) or x is None:
+                v[f"eco.{sc_}.{k}"] = x
+    ss = json.loads((ROOT / "results" / "search_space.json").read_text())
+    v["search.N"] = ss["centralised_full_day"]["N_binary"]
+    v["search.log10"] = ss["centralised_full_day"]["log10_states"]
+    v["search.max_qubits"] = max(ss["local_qubo_qubits"].values())
+    o = b[(b.method == "OURS") & (b.scenario != "eval")]
+    tq, ti, ta, tx = (o[f"tier_{k}"].sum() for k in ("qaoa", "qiea", "anneal", "exact"))
+    tot = tq + ti + ta + tx
+    v.update({"tiers.qaoa_pct": 100 * tq / tot, "tiers.qiea_pct": 100 * ti / tot, "tiers.anneal_pct": 100 * ta / tot,
+              "tiers.exact_pct": 100 * tx / tot, "tiers.total": tot, "qaoa.solves": o.qaoa_solves.sum(),
+              "qaoa.time_s": o.qaoa_time_s.sum(), "qaoa.p_opt_mean": o.qaoa_p_opt.mean(),
+              "qaoa.found_opt_pct": 100 * o.qaoa_found_opt_rate.mean(), "admm.conv_pct": 100 * o.admm_convergence_rate.mean(),
+              "admm.iters": o.admm_iters.mean(), "admm.osc": o.admm_oscillations.sum()})
+    rob = pd.read_csv(ROOT / "results" / "robustness.csv")
+    net = rob[rob["mode"] == "networked"]
+    v["robust.recovery_s"] = float(net.recovery_time_s.max()) if len(net) else float("nan")
+    v["robust.all_feasible"] = bool(rob.feasible.all())
+    sc = pd.read_csv(ROOT / "results" / "qaoa_scaling.csv")
+    t = sc[(sc.params == "trained")].groupby(["n_qubits", "p"]).p_opt.mean()
+    nmax = int(sc.n_qubits.max())
+    for p in (1, 2, 3):
+        v[f"scaling.p{p}.nmax.p_opt"] = float(t.loc[(nmax, p)])
+    v["scaling.nmax"] = nmax
+    v["scaling.uniform_nmax"] = 2.0 ** -nmax
+    meta = json.loads((ROOT / "data" / "processed" / "meta.json").read_text())
+    v["price_A_status"] = meta["prices"]["A"]["status"]
+    v["price_B_status"] = meta["prices"]["B"]["status"]
+    return v
+
+
+def render(text: str, v: dict) -> str:
+    def rep(m):
+        key, _, fmt_ = m.group(1).partition("|")
+        x = v.get(key.strip())
+        if x is None:
+            return f"⟨missing {key.strip()}⟩"
+        if isinstance(x, bool):
+            return "yes" if x else "no"
+        d = int(fmt_) if fmt_ else 0
+        return f"{x:,.{d}f}" if isinstance(x, (int, float)) else str(x)
+    return re.sub(r"\{\{([^}]+)\}\}", rep, text)
 
 
 def main():
-    bench = pd.read_csv(ROOT / "results" / "benchmark.csv")
-    summ = pd.read_csv(ROOT / "results" / "benchmark_summary.csv")
-    rob = pd.read_csv(ROOT / "results" / "robustness.csv")
-    scal = pd.read_csv(ROOT / "results" / "qaoa_scaling.csv")
+    s = pd.read_csv(ROOT / "results" / "benchmark_summary.csv")
     meta = json.loads((ROOT / "data" / "processed" / "meta.json").read_text())
-    status = meta["data_status"]
-    scen_status = {s: meta["prices"][s]["status"] for s in ("A", "B")}
-    days = meta["days"]
-    ev = summ[summ.day_set == "eval30_mean"].set_index(["scenario", "method"])
-    out = [f"# Results\n\n> {QUANTUM_LABEL}.\n",
-           "_Generated by `scripts/write_results_md.py` from `results/benchmark.csv`, `benchmark_summary.csv`, "
-           "`robustness.csv` and `qaoa_scaling.csv`; do not edit numbers by hand._\n"]
-
-    pend = [k for k, v in status.items() if v != "REAL"]
-    if pend:
-        out.append("## ⚠️ Data status — read first\n")
-        out.append(f"Real: NASA POWER irradiance/temperature and Ausgrid load shapes. **PENDING: {', '.join(pend)}.** "
-                   "Both price scenarios currently run on clearly labelled STAND-IN prices "
-                   "(see `data/SOURCES.md`, `docs/BLOCKERS.md`), and CO2 uses an unverified factor. "
-                   "**None of the Rs figures below is a headline result yet.** They demonstrate that the pipeline "
-                   "runs end to end and how the methods compare *relative to each other on identical inputs*. "
-                   "Re-run `scripts/refresh_all.sh` after the official files are added; this document regenerates.\n")
-
-    out.append("## Setup\n")
-    out.append(f"- 5 buildings (hostel, lab block, library, canteen, admin), ring of tie-lines + one cross-link, "
-               f"15-min slots, 96 per day; capacities are design assumptions (`config.yaml`).\n"
-               f"- Days: sunny {days['sunny']}, monsoon-cloudy {days['monsoon_cloudy']}, high-price {days['high_price']} "
-               f"({days['criteria']['high_price']}), plus {len(days['eval_days'])} evaluation days evenly spaced over 2023.\n"
-               "- Every method uses the same data, constraints, horizon (one day, perfect day-ahead forecast) and the same "
-               "settlement (`qgrid.model.settle`, incl. the same terminal value for stored energy). Feasibility is audited "
-               "by `qgrid.model.check_feasibility` for every schedule.\n"
-               "- B4 uses continuous tie-line flows in [−F, F]; the decentralised methods use discrete levels {−F, 0, F}. "
-               "B4 is therefore a lower bound (global optimum of a relaxation).\n"
-               "- QAOA: p = 2, 256 shots, parameters pre-trained on training days disjoint from the test/eval days; "
-               "statevector simulation (numpy, verified identical to qiskit-aer in tests). The exact optimum is "
-               "computed for every local QUBO; QAOA's answer is used only when verified optimal, otherwise SA, "
-               "then exact.\n")
-
-    for s in ("A", "B"):
-        lab = "" if scen_status[s] == "REAL" else " — STAND-IN prices (PENDING)"
-        title = "BESCOM HT educational ToD + KERC export" if s == "A" else "IEX DAM both ways"
-        out.append(f"## Scenario {s}: {title}{lab}\n")
-        out.append("### 30-day evaluation set (mean per day)\n")
-        out.append(table(summ, s, "eval30_mean") + "\n")
-        for k in ("sunny", "monsoon_cloudy", "high_price"):
-            out.append(f"### Test day: {k.replace('_', ' ')} ({days[k]})\n")
-            out.append(table(summ, s, k) + "\n")
-
-    out.append("## Interpretation (honest)\n")
-    for s in ("A", "B"):
-        g = lambda m, c="cost_rs": float(ev.loc[(s, m), c])  # noqa: E731
-        ours, b5, b4, b3, b0 = g("OURS"), g("B5"), g("B4"), g("B3"), g("B0")
-        best_classic = min(("B0", "B1", "B2-GA", "B2-PSO", "B3"), key=lambda m: g(m))
-        lines = [f"**Scenario {s}{' (stand-in prices)' if scen_status[s] != 'REAL' else ''}.** "
-                 f"OURS averages Rs {ours:,.0f}/day vs B4 optimum Rs {b4:,.0f} "
-                 f"(gap {g('OURS', 'gap_to_B4_pct'):.2f} %), B5 Rs {b5:,.0f} (gap {g('B5', 'gap_to_B4_pct'):.2f} %), "
-                 f"status quo Rs {b0:,.0f} ({100 * (b0 - ours) / b0:.1f} % saving vs B0)."]
-        tol = 5e-4  # |difference| < 0.05 % counts as a tie
-        cl = ("B0", "B1", "B2-GA", "B2-PSO", "B3")
-        beaten = [m for m in cl if ours < g(m) * (1 - tol)]
-        tied = [m for m in cl if abs(ours - g(m)) <= tol * g(m)]
-        lost = [m for m in cl if ours > g(m) * (1 + tol)]
-        lines.append(f"On the eval-set mean, OURS beats {', '.join(beaten) or 'none'}"
-                     + (f", ties (within 0.05 %) with {', '.join(tied)}" if tied else "")
-                     + (f" and does **not** beat {', '.join(lost)}" if lost else "") + ". "
-                     f"The best non-sharing classical method is {best_classic} (Rs {g(best_classic):,.0f}).")
-        dd = bench[(bench.scenario == s) & (bench.day_type == "eval")].pivot(index="day", columns="method", values="cost_rs")
-        wins = int((dd["OURS"] < dd["B3"] * (1 - tol)).sum())
-        ties = int(((dd["OURS"] - dd["B3"]).abs() <= tol * dd["B3"]).sum())
-        lines.append(f"Per day vs B3: OURS cheaper on {wins}, tied on {ties}, dearer on {len(dd) - wins - ties} of {len(dd)} evaluation days.")
-        lines.append(f"OURS vs B5 (same ADMM, exact local solver): difference {100 * (ours - b5) / b5:+.2f} %. "
-                     "Because QAOA's answer is only used when verified optimal, the two differ only through "
-                     "ties between equally optimal bitstrings, not through solution quality.")
-        out.append(" ".join(lines) + "\n")
-    out.append("Where the decentralised method loses to B4: discrete tie-line levels (B4 is continuous), 1-hour local "
-               "horizons with a local cost-to-go instead of a joint day-ahead plan, and ADMM lines that fail to agree "
-               "within 15 iterations are set to 0. Its advantages are structural, not cost: no central solver or single "
-               "point of failure, buildings exchange only tie-line proposals and one marginal price per slot "
-               "(no load/PV/battery data), and a crashed building is islanded automatically (below).\n")
-    if scen_status["B"] != "REAL":
-        out.append("Scenario B note: with import price = export price, sharing between buildings has no economic value "
-                   "(a kWh is worth the same sent to the grid or to a neighbour), so B3 and B4 coincide or nearly so. "
-                   "With the stand-in shape the absolute numbers mean little until real IEX prices are loaded.\n")
-
-    oe = bench[(bench.method == "OURS")]
-    out.append("## ADMM convergence (honest)\n")
-    out.append(f"- Mean ADMM iterations per slot: {oe.admm_iters.mean():.2f} (cap 15); mean tie-line disagreements forced to 0 "
-               f"per day: {oe.line_disagreements.mean():.1f} (of 6 lines x 96 slots = 576 line-slots). Discrete ADMM often "
-               "reaches the iteration cap; unresolved lines fall back to 0 flow, which is always feasible but forgoes sharing. "
-               "This is a main contributor to the gap to B4. The `slots_to_reconverge` column in the robustness table counts "
-               "slots until *every* surviving line agrees again, so with frequent cap hits it can be large even when the "
-               "schedule stays feasible.\n")
-    out.append("## QAOA quality inside the benchmark (OURS)\n")
-    o = bench[bench.method == "OURS"]
-    tq, ta, tx = o.tier_qaoa.sum(), o.tier_anneal.sum(), o.tier_exact.sum()
-    tot = tq + ta + tx
-    out.append(f"- Local solves: {int(tot):,}; accepted from QAOA (verified optimal) {100 * tq / tot:.1f} %, "
-               f"simulated annealing {100 * ta / tot:.1f} %, exact {100 * tx / tot:.1f} %.\n"
-               f"- Mean P(optimum) under the QAOA distribution: {o.qaoa_p_opt.mean():.4f}; best-of-256-shots found the "
-               f"optimum in {100 * o.qaoa_found_opt_rate.mean():.1f} % of solves; a feasible sample was returned in "
-               f"{100 * o.qaoa_feasible_rate.mean():.1f} % of solves.\n")
-    ab = bench[bench.method == "ABL-QAOA-only"]
-    if len(ab):
-        m = ab.merge(bench[bench.method == "B5"][["scenario", "day", "cost_rs"]], on=["scenario", "day"], suffixes=("", "_b5"))
-        out.append(f"- Ablation (accept any feasible QAOA sample, test days): cost differs from B5 by "
-                   f"{100 * ((m.cost_rs - m.cost_rs_b5) / m.cost_rs_b5).mean():+.2f} % on average "
-                   f"(range {100 * ((m.cost_rs - m.cost_rs_b5) / m.cost_rs_b5).min():+.2f} … "
-                   f"{100 * ((m.cost_rs - m.cost_rs_b5) / m.cost_rs_b5).max():+.2f} %). This is why the verified fallback exists.\n")
-
-    out.append("## QAOA scaling study (`results/qaoa_scaling.csv`, `results/plots/qaoa_scaling.png`)\n")
-    agg = scal[scal.params == "trained"].groupby(["n_qubits", "p"]).agg(p_opt=("p_opt", "mean"), uni=("uniform_p", "mean"),
-                                                                          ar=("best_sample_approx_ratio", "mean"),
-                                                                          found=("found_opt", "mean")).reset_index()
-    out.append("| qubits | p | P(optimum) | uniform 2^-n | best-of-256 approx. ratio | found optimum |\n|---:|---:|---:|---:|---:|---:|")
-    for _, r in agg.iterrows():
-        out.append(f"| {int(r.n_qubits)} | {int(r.p)} | {r.p_opt:.4f} | {r.uni:.5f} | {r.ar:.4f} | {100 * r.found:.0f} % |")
-    out.append("\nP(optimum) decays roughly exponentially with qubit count and improves with depth p; with transferred "
-               "parameters it stays above the uniform baseline. At these sizes exhaustive search takes milliseconds, so "
-               "there is no runtime advantage — consistent with the no-quantum-advantage label.\n")
-
-    out.append("## Robustness: kill a building (`results/robustness.csv`)\n")
-    out.append("| Mode | Method | Scenario | Day | Killed @ slot | Feasible | Flows consistent | Recovery time s | Slots to re-converge |\n|---|---|---|---|---|---|---|---:|---:|")
-    for _, r in rob.iterrows():
-        out.append(f"| {r['mode']} | {r['method']} | {r['scenario']} | {r['day']} | {r['killed']} @ {int(r['kill_slot'])} | "
-                   f"{r['feasible']} | {r.get('tie_line_flows_consistent', '–')} | {fmt(r.get('recovery_time_s', np.nan), 2)} | "
-                   f"{fmt(r.get('slots_to_reconverge', np.nan), 0)} |")
-    out.append("\nNetworked mode runs one OS process per building over websockets with no coordinator; recovery time includes "
-               "the 3 s silence detection. Every kill run produced a feasible schedule.\n" if bool(rob.feasible.all()) else
-               "\n**Some kill runs were infeasible — see robustness.csv.**\n")
-
-    out.append("## Related work (verified references only)\n")
-    out.append("- E. Farhi, J. Goldstone, S. Gutmann, *A Quantum Approximate Optimization Algorithm*, arXiv:1411.4028 (2014).\n"
-               "- A. Lucas, *Ising formulations of many NP problems*, Frontiers in Physics 2:5 (2014), doi:10.3389/fphy.2014.00005.\n"
-               "- S. Boyd, N. Parikh, E. Chu, B. Peleato, J. Eckstein, *Distributed Optimization and Statistical Learning via the "
-               "Alternating Direction Method of Multipliers*, Foundations and Trends in Machine Learning 3(1):1–122 (2011), "
-               "doi:10.1561/2200000016.\n"
-               "- E. L. Ratnam, S. R. Weller, C. M. Kellett, A. T. Murray, *Residential load and rooftop PV generation: an "
-               "Australian distribution network dataset*, Int. J. Sustainable Energy (2017), doi:10.1080/14786451.2015.1100196.\n")
-    out.append("## Limitations\n")
-    out.append("- Prices (both scenarios) and the CO2 factor are PENDING official sources (see top).\n"
-               "- Campus loads are residential Ausgrid shapes rescaled to assumed building peaks.\n"
-               "- Perfect day-ahead forecasts for every method; no forecast error study yet.\n"
-               "- QAOA is simulated classically (ideal, noiseless); no hardware runs.\n"
-               "- Tie-lines are lossless with a fixed rating; no AC power-flow / voltage constraints.\n")
+    st = meta["data_status"]
+    pend = [f"{k}: {x}" for k, x in st.items() if x != "REAL"]
+    out = [f"# Results (RVCE campus model)\n\n> {QUANTUM_LABEL}. † QIEA = quantum-inspired evolutionary algorithm, classical CPU — not quantum computing.\n",
+           "_Generated by `scripts/write_results_md.py` from `results/*.csv`; do not edit numbers by hand. "
+           "Earlier generic 5-building results: `docs/results_v1.md`._\n",
+           "## ⚠️ Data status — read first\n",
+           "Real: NASA POWER (PV), Ausgrid (hostel load shape), OpenStreetMap (layout). **PENDING:** " + "; ".join(pend) + ". "
+           "Both price scenarios use labelled STAND-IN prices and campus loads are area-based estimates, so **no Rs figure "
+           "below is a headline result yet**; comparisons between methods on identical inputs are meaningful. "
+           "Re-run `scripts/refresh_all.sh` when the files in `docs/data_request.md` arrive.\n",
+           "## Setup\n",
+           "9 OSM-derived zones, tie-lines from the real layout (MST + 2 mesh links), 96 × 15-min slots. QAOA in the loop on "
+           "the 6 named scenarios; on the 30-day set the OURS row uses the classical local tiers (SA → exact). B4 = MILP to a "
+           "0.1 % gap with continuous tie-line flows (a relaxation of the decentralised methods' discrete levels). Objective "
+           "comparisons (gap to B4) include value of lost load (VOLL, an ASSUMPTION) so that shedding is never 'cheaper'.\n"]
+    for p in ("A", "B"):
+        out.append(f"## Price scenario {p} ({'headline: BESCOM HT ToD + KERC export' if p == 'A' else 'sensitivity: IEX DAM both ways'}) — {meta['prices'][p]['status']}\n")
+        out.append("### 30-day evaluation set (mean per day)\n\n" + table(s, p, "eval30_mean") + "\n")
+        for k in meta["days"]["scenarios"]:
+            sc = meta["days"]["scenarios"][k]
+            out.append(f"### {k.replace('_', ' ')} — {sc['date']} ({sc['note']})\n\n" + table(s, p, k) + "\n")
+    v = values()
+    tmpl = (ROOT / "docs" / "templates" / "results_tail.md")
+    if tmpl.exists():
+        out.append(render(tmpl.read_text(), v))
     (ROOT / "docs" / "results.md").write_text("\n".join(out))
-    print("wrote docs/results.md")
+    for t in (ROOT / "docs" / "templates").glob("*.md"):
+        if t.name == "results_tail.md":
+            continue
+        dest = ROOT / ("README.md" if t.name == "README.md" else f"docs/{t.name}")
+        dest.write_text(render(t.read_text(), v))
+    missing = sum(p.read_text().count("⟨missing") for p in [ROOT / "README.md", *(ROOT / "docs").glob("*.md")])
+    print(f"wrote docs/results.md and rendered templates ({missing} missing placeholders)")
 
 
 if __name__ == "__main__":

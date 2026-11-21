@@ -36,7 +36,7 @@ HOST = "127.0.0.1"
 
 class Node:
     def __init__(self, building: str, day: str, scenario: str, method: str, port_base: int,
-                 die_at_slot: int | None = None, slots: int = T, synthetic: bool = False):
+                 die_at_slot: int | None = None, slots: int = T, synthetic: bool = False, scenario_key: str = ""):
         self.campus = load_campus()
         cfg = self.campus.cfg
         self.i = self.campus.names.index(building)
@@ -47,7 +47,8 @@ class Node:
             proc, dd = None, synthetic_day(self.campus, scenario=scenario)
         else:
             proc = qdata.load_processed()
-            dd = make_day(self.campus, proc, day, scenario)
+            sc = proc["meta"]["days"]["scenarios"].get(scenario_key, {})
+            dd = make_day(self.campus, proc, day, scenario, scenario_key, sc.get("outage"))
         self.agent = BuildingAgent(self.campus, dd, self.i, cfg["admm"]["horizon_slots"])
         self.r0 = rho0(self.campus, dd)
         del dd, proc  # the node keeps only its own building's data (inside the agent) + public prices
@@ -255,8 +256,9 @@ def main():
     ap.add_argument("--slots", type=int, default=T)
     ap.add_argument("--out", required=True)
     ap.add_argument("--synthetic", action="store_true", help="SYNTHETIC day (tests/CI only)")
+    ap.add_argument("--scenario-key", default="", help="named scenario (e.g. outage_fest) for its outage window")
     a = ap.parse_args()
-    node = Node(a.building, a.day, a.scenario, a.method, a.port_base, a.die_at_slot, a.slots, a.synthetic)
+    node = Node(a.building, a.day, a.scenario, a.method, a.port_base, a.die_at_slot, a.slots, a.synthetic, a.scenario_key)
     asyncio.run(node.main(a.out))
 
 

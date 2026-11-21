@@ -9,7 +9,7 @@ from .model import T, load_campus, make_day
 
 def training_days(meta: dict, k: int = 12) -> list[str]:
     """Days disjoint from the test days and the 30-day evaluation set (15th of each month, nudged)."""
-    used = set(meta["days"]["eval_days"]) | {meta["days"][x] for x in ("sunny", "monsoon_cloudy", "high_price")}
+    used = set(meta["days"]["eval_days"]) | {v["date"] for v in meta["days"]["scenarios"].values()}
     out = []
     for m in range(1, 13):
         for d in (15, 16, 17, 18, 19):
@@ -34,7 +34,10 @@ def sample_instances(proc: dict, days: list[str], n: int, seed: int = 0, scenari
             cache[(day, i)] = BuildingAgent(campus, make_day(campus, proc, day, scenario), i)
         ag = cache[(day, i)]
         t = int(rng.integers(24, T - 8))
-        ag.e = float(rng.uniform(ag.bat.e_min, ag.bat.e_max))
+        if ag.bat.present:
+            ag.e = float(rng.uniform(ag.bat.e_min, ag.bat.e_max))
+        if ag.tank is not None:
+            ag.level = float(rng.uniform(ag.tank.l_min + 10, ag.tank.l_max - 10))
         ag.started = {}
         ag.running[:] = 0
         lines = ag.incident

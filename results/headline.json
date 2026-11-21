@@ -1,0 +1,31 @@
+{
+  "scenario": "outage_fest",
+  "day": "2023-06-15",
+  "price_scenario": "A",
+  "price_status": "PENDING",
+  "note": "HEADLINE stress test: BESCOM outage 18:00-21:00 during fest evening peak (ASSUMED outage window)",
+  "label": "QAOA on a local simulator: verified against exact solutions, no quantum advantage claimed",
+  "before": {
+    "cost_rs": 153498.65048852444,
+    "dg_hours": 6.0,
+    "dg_litres": 191.63137990487277,
+    "critical_downtime_h": 3.0,
+    "critical_unserved_kwh": 723.6839071745391,
+    "unserved_kwh": 4998.728825299632
+  },
+  "after": {
+    "cost_rs": 161910.6815887255,
+    "dg_hours": 5.75,
+    "dg_litres": 252.125,
+    "critical_downtime_h": 2.5,
+    "critical_unserved_kwh": 15.616555312682209,
+    "unserved_kwh": 4078.021356025042,
+    "replan_time_s": 1.0440123423645293
+  },
+  "optimum_B4": {
+    "cost_rs": 161701.71935166928,
+    "critical_downtime_h": 0.0,
+    "critical_unserved_kwh": 3.019806626980426e-14
+  },
+  "source": "results/benchmark.csv rows method in {B0, OURS, B4}, scenario=outage_fest, price_scenario=A"
+}

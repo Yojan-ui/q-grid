@@ -116,12 +116,16 @@ class BuildingAgent:
             defer = (min(costs) if costs else tail) + 1e-3 * j.kw * j.slots * DT
             jobs.append(Q.FlexState(j.name, j.kw, j.slots, True, must, tail, defer, now, j.latest))
         dg = None
+        rule_terms: list[dict] = []
         if self.dg is not None:
             q = np.clip(deficit + extra, self.dg.p_min, self.dg.kw)
             litres = float(((self.dg.fuel_a * self.dg.kw + self.dg.fuel_b * q) * DT).sum())
             fuel = litres * (self.dg.price + self.lam_ef * self.dg.co2_per_l)
             forced = 0 < self.dg_run < self.dg.min_on_slots
-            dg = Q.DGState(q, fuel, forced, self.dg_allowed(t, H))
+            dg = Q.DGState(q, fuel, forced, True)
+            if not forced and not self.dg_allowed(t, H):
+                rule_terms.append({"id": next(r["id"] for r in self.rules if r["type"] == "dg_forbid"),
+                                   "var": "g", "coef": 10.0 * fuel + 1000.0})
         tank = None
         if self.tank is not None:
             tk = self.tank
@@ -144,7 +148,7 @@ class BuildingAgent:
         return Q.LocalProblem(t=t, bat=self.bat, e_now=self.e, r0=r0, pi=self.pi[sl], pe=self.pe[sl],
                               lines=list(free_lines), F=self.F, fixed_out=fixed_out, v=v or {}, rho=rho, ctg=ctg,
                               jobs=jobs, dg=dg, tank=tank, grid=self.gridup[sl], noncrit=noncrit,
-                              voll_nc=self.voll_nc, voll_c=self.voll_c, pc=pc, pd=pd)
+                              voll_nc=self.voll_nc, voll_c=self.voll_c, pc=pc, pd=pd, rule_terms=rule_terms)
 
     def critical_shortfall(self, t: int, outflow_kw: float) -> float:
         """Upper bound check used by the safety layer in islanded slots: critical kW that could not be served

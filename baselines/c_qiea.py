@@ -1,6 +1,7 @@
 """C-QIEA: centralised whole-campus QUBO per slot, solved by QIEA (quantum-INSPIRED, classical CPU).
 
-Per slot the zone QUBOs are stacked into one campus QUBO (~100 binary variables). Each tie-line has one
+Per slot the zone QUBOs are stacked into one campus QUBO (~60-100 binary variables). QIEA is warm-started from each
+zone's exact local optimum with tie-lines at 0 (cheap: <= 16 bits per zone), so the evolutionary search only has to resolve the coupling. Each tie-line has one
 copy of its two flow bits in each endpoint zone; a penalty A (p_a - p_b)^2 + A (n_a - n_b)^2 ties the copies,
 and a repair step makes every observed bitstring consistent and exclusive before evaluation. Penalties are
 set heuristically (the instance is too large to enumerate). Decisions are applied through the same agents
@@ -65,7 +66,20 @@ def solve(campus: Campus, day: DayData, rules=None, pop: int = 16, gens: int = 1
                 X[:, offs[b] + lps[b].idx[f"p{l}"]] = X[:, offs[a] + lps[a].idx[f"p{l}"]]
             return X
 
-        x, _, _ = qiea(big, pop=pop, gens=gens, seed=seed + t, repair=repair)
+        from qgrid.solvers import solve_local
+        parts = []
+        for ag, lp in zip(agents, lps):     # each zone's exact plan with tie-lines at 0 (consistent start)
+            lp0 = ag.local_problem(t, [])
+            x_loc = solve_local(lp0, "exact").x
+            xi = np.zeros(lp.n)
+            for v, k in lp0.idx.items():
+                if v in lp.idx:
+                    xi[lp.idx[v]] = x_loc[k]
+            parts.append(xi)
+        x0 = np.concatenate(parts)
+        x, _, _ = qiea(big, pop=pop, gens=gens, seed=seed + t, repair=repair, x0=repair(x0[None, :])[0])
+        if big.energy(x)[0] > big.energy(repair(x0[None, :]))[0]:
+            x = repair(x0[None, :])[0]
         flows = np.zeros(len(campus.lines))
         decs = []
         for lp, o in zip(lps, offs):

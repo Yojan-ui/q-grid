@@ -28,7 +28,10 @@ SLOTS_PER_DAY = 96
 
 
 def load_config(path: Path | None = None) -> dict:
-    return yaml.safe_load((path or ROOT / "config.yaml").read_text())
+    """config.yaml, or the file named by QGRID_CONFIG (another campus, see scripts/new_campus.py)."""
+    import os
+    p = path or (ROOT / os.environ["QGRID_CONFIG"] if os.environ.get("QGRID_CONFIG") else ROOT / "config.yaml")
+    return yaml.safe_load(Path(p).read_text())
 
 
 def year_index(year: int) -> pd.DatetimeIndex:

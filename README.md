@@ -1,41 +1,85 @@
-# Q-Grid
+# Q-Grid — decentralised, QAOA-verified scheduling for the RVCE campus microgrid
 
-Decentralised, quantum-optimised scheduling for campus solar+battery microgrids.
-EUREKA hackathon — Track 3: Smart Decentralised Energy Systems.
+EUREKA Track 3 · Smart Decentralised Energy Systems
 
-Each building solves a small local QUBO (≤16 qubits) with QAOA, and neighbouring buildings
-agree on tie-line flows via consensus-ADMM — no central solver at runtime. Every QAOA result is
-checked for feasibility and against the exact local optimum, with a tiered fallback
-(QAOA → simulated annealing → exact) and a safety layer that clamps every command.
+![Q-Grid demo](docs/media/hero.gif)
 
 > QAOA on a local simulator: verified against exact solutions, no quantum advantage claimed.
+> QIEA = quantum-inspired evolutionary algorithm on a classical CPU (not quantum computing).
 
-See [docs/BRIEF.md](docs/BRIEF.md) for the design.
+**Data status:** real NASA POWER irradiance, Ausgrid household shapes (hostels), OpenStreetMap layout (© OpenStreetMap
+contributors). **PENDING:** KERC/BESCOM tariff (PENDING), IEX prices (PENDING), CEA CO2 factor, RVCE calendar
+and meter data — labelled stand-ins, never headline results. See `data/SOURCES.md`, `docs/BLOCKERS.md`, `docs/data_request.md`.
 
-## Status
+## The problem (status quo, from results/*.csv)
+BESCOM outage during the fest evening: status quo **3.00 h** of critical-load downtime,
+6.0 DG hours, Rs 153,499 for the day (stand-in prices).
 
-| Phase | What | State |
-|---|---|---|
-| 0 | Scaffold (layout, pyproject, Makefile, CI, Vite+R3F frontend) | ✅ done |
-| 1 | Real data pipeline, test days, problem-day analysis | ✅ done — NASA POWER + Ausgrid REAL; tariff A, IEX, CEA **PENDING** (labelled stand-ins, see data/SOURCES.md) |
-| 2 | Building model, safety layer, local QUBO (≤15 qubits), penalty auto-tuning | ✅ done — see docs/qubo.md |
-| 3 | Solvers: QAOA (Qiskit; Aer + equivalent numpy statevector) / annealing / exact, verified tiered fallback, scaling study | ✅ done |
-| 4 | Decentralised consensus-ADMM: in-process + networked (1 process/building, websockets, no coordinator), island mode, kill-node | ✅ done |
-| 5 | Baselines B0–B5 + OURS on identical data, 2 price scenarios, kill-node robustness, QAOA scaling — see docs/results.md | ✅ done (prices PENDING → stand-in numbers, not headline) |
-| 6 | Replay export | — |
-| 7 | 3D cinematic demo | — |
-| 8 | Ship (README, pitch) | — |
+## Result
+| Outage during fest (scenario A) | Status quo | Q-Grid | Central optimum (B4) |
+|---|---:|---:|---:|
+| Critical-load downtime (h) | 3.00 | **2.50** | 0.00 |
+| Cost (Rs/day) | 153,499 | 161,911 | 161,702 |
+| DG hours | 6.00 | 5.75 | – |
+| Re-plan time per slot | – | 1.044 s | – |
 
-## Quick start
+30-day evaluation set (scenario A, mean Rs/day): status quo 166,645 · per-zone MILP 161,686 ·
+**Q-Grid 162,163** (7.63 % above optimum) · central optimum 156,919.
+QAOA answers verified optimal in 66.0 % of local solves (rest: QIEA / annealing / exact fallback).
+Full tables: [docs/results.md](docs/results.md).
 
-```bash
-conda activate qgrid          # Python 3.11
-make install                  # pip install -e .[dev] + frontend npm install
-make test                     # pytest
-make demo                     # frontend dev server (offline replay mode)
+## Architecture
+```mermaid
+flowchart LR
+  subgraph Data
+    N[NASA POWER] --> PV[PV per zone]
+    O[OpenStreetMap RVCE] --> Z[9 zones + tie-lines + roof area]
+    A[Ausgrid shapes + timetables] --> L[zone loads]
+  end
+  subgraph Zone_i["each zone (own process)"]
+    Q[local QUBO ≤16 qubits] --> S{QAOA → QIEA → SA → exact}
+    E[exhaustive search] -->|verify| S
+    S --> SAFE[safety layer: SoC, DG min-on, tanks, critical loads]
+  end
+  Z --> Zone_i
+  PV --> Zone_i
+  L --> Zone_i
+  Zone_i <-->|tie-line proposals + 1 price, websockets| Zone_j[neighbour zones]
+  SAFE --> R[replay JSON] --> UI[3D demo: story · judge · sandbox]
+  API[FastAPI live] --- UI
 ```
 
-Other targets: `make data`, `make bench`, `make replay`.
+## How to run
+```bash
+conda activate qgrid && make install
+make test                      # pytest
+make demo                      # frontend (+ live backend on :8000); frontend alone works offline
+make data && make qaoa && make bench && make replay   # full pipeline (~20 min on a MacBook)
+make verify                    # recompute headline numbers, PASS/FAIL vs results/manifest.json
+bash scripts/refresh_all.sh    # after adding the PENDING files
+python scripts/new_campus.py --name "<campus>" --lat <lat> --lon <lon>   # another campus
+```
 
-When the missing official files arrive (see `data/SOURCES.md`, `docs/BLOCKERS.md`):
-`bash scripts/refresh_all.sh` re-runs the whole pipeline and regenerates `docs/results.md`.
+## Status
+| Step | What | State |
+|---|---|---|
+| 0–5 (v1) | generic 5-building pipeline, kept in docs/results_v1.md | ✅ |
+| 1 | pricing scenarios A (headline) / B (sensitivity), SOURCES with page numbers when REAL | ✅ code · data PENDING |
+| 2 | RVCE campus from OSM, timetable/Ausgrid loads, DG, tanks, outage islanding, 6 scenarios | ✅ (calendar/loads PENDING) |
+| 3 | QAOA only on scenarios, warm start, QUBO cache, ADMM convergence stats & fallbacks | ✅ |
+| 4 | QAOA → QIEA → SA → exact tiers, C-QIEA, baselines B0–B5, benchmark both price scenarios | ✅ |
+| 5 | plain-English operator rules (guarded) + deterministic explanations | ✅ |
+| 6 | replay export | ✅ |
+| 7 | 3D demo: story (6 chapters), judge/review, what-if sandbox, honesty strip, recording | ✅ |
+| 8 | new_campus.py, manifest + make verify, CI | ✅ |
+| 9 | report, why-quantum, viva Q&A, pitch, data request | ✅ |
+
+## Honest limits
+PENDING prices/CO2/calendar/meter data; loads are area-based estimates; perfect forecasts; QAOA simulated (ideal, noiseless);
+ADMM with binaries has no convergence guarantee (full agreement in 48.7 % of slots, rest settled safely);
+lossless tie-lines without AC power flow. Docs: [report](docs/report.md) · [why quantum](docs/why_quantum.md) ·
+[viva Q&A](docs/viva_qa.md) · [pitch](docs/pitch.md) · [QUBO derivation](docs/qubo.md).
+
+## Credits
+The QIEA solver tier and the LLM rule-guard idea were inspired by RVCE team ReZero's *Q-Route* project. Map data
+© OpenStreetMap contributors (ODbL). Ausgrid Solar Home Electricity Data (CC BY 3.0 AU). NASA POWER (NASA LaRC).

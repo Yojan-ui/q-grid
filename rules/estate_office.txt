@@ -1,0 +1,6 @@
+# Operator rules in plain English (one per line). Parsed offline by templates; QGRID_USE_LLM=1 enables the
+# Claude API parser. Every rule is validated against the campus before it can affect a schedule.
+keep hostel tanks above 40% by 6 am
+no DG during exams unless outage
+EV charging only after 10 pm
+Thermal lab compressor must run Tue 2-4 pm

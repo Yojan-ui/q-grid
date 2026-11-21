@@ -1,0 +1,150 @@
+{
+  "git_commit": "35a0b2031b8a3d86918759475e10a44d1f13fb5c",
+  "python": "3.11.18",
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "packages": {
+    "numpy": "2.2.6",
+    "scipy": "1.17.1",
+    "pandas": "3.1.1",
+    "qiskit": "2.6.2",
+    "qiskit-aer": "0.18.4",
+    "pulp": "3.3.2",
+    "highspy": "1.16.0",
+    "pymoo": "0.6.2",
+    "fastapi": "0.165.0",
+    "pydantic": "2.14.4"
+  },
+  "seeds": {
+    "qaoa": 1234,
+    "ga_pso": 1,
+    "c_qiea": 7,
+    "kmeans": 0
+  },
+  "files": {
+    "config.yaml": "425a0dc03b90525a002db9b2bb3f685060c8a9d2fc00c91e835503190553a0ae",
+    "configs/profiles.yaml": "0c6f0104d66136d52f63c497f7a8922aab0fb7d773185e00b0e85f95a1b8b102",
+    "data/raw/nasa_power/bengaluru_2023_hourly.json": "16eb50dc779967bc5e64885cefe16b3d413b0fd756ef6ce4365344b17280de2e",
+    "data/raw/ausgrid/Ausgrid_solar_home_data.zip": "5a766f52b6c8b3b72730380f4422e478934bc94640a4b089dd0e0e3c055c5d82",
+    "data/raw/osm_rvce.json": "04dfc10996581ef4ce9e27e3b1e660c4e2b8f8f47d31e4e9ec6fbc5a9ae36e76",
+    "data/raw/lab_schedule.csv": "71cb459d99bbb77836ed2aae3d6cbc598e5b169ca584c0b6ddaa9a9db224d495",
+    "data/processed/campus.json": "724a29ad0d223dcc3e68f8fb4bd54bce521da3572096cf72b4faf4a808e7c3e2",
+    "results/qaoa_params.json": "a8163fff4f9a8a4dd431b13dc0fd817d196e8e6d0f8f7514f66decfe83852e10",
+    "results/benchmark.csv": "2c7ecb58063abb10361dc2ddf0962dd7856358df414854d8e3db3404d166e57e",
+    "results/headline.json": "d88a00d8c11800b38c0831584e55987b7196f5fa7bd4fc76480a317fd5db3ef6"
+  },
+  "runtime": {
+    "benchmark_runtime_s": 795,
+    "workers": 8,
+    "machine": "MacBook (10 cores, 16 GB)"
+  },
+  "headline_checks": [
+    {
+      "method": "B0",
+      "scenario": "outage_fest",
+      "price_scenario": "A",
+      "metric": "cost_rs",
+      "value": 153498.65048852444,
+      "rel_tol": 1e-06,
+      "abs_tol": 0.01
+    },
+    {
+      "method": "B0",
+      "scenario": "outage_fest",
+      "price_scenario": "A",
+      "metric": "critical_downtime_h",
+      "value": 3.0,
+      "rel_tol": 1e-06,
+      "abs_tol": 1e-06
+    },
+    {
+      "method": "B0",
+      "scenario": "outage_fest",
+      "price_scenario": "A",
+      "metric": "dg_hours",
+      "value": 6.0,
+      "rel_tol": 1e-06,
+      "abs_tol": 1e-06
+    },
+    {
+      "method": "B4",
+      "scenario": "outage_fest",
+      "price_scenario": "A",
+      "metric": "cost_rs",
+      "value": 161701.71935166928,
+      "rel_tol": 0.002,
+      "abs_tol": 0.01
+    },
+    {
+      "method": "B4",
+      "scenario": "outage_fest",
+      "price_scenario": "A",
+      "metric": "critical_downtime_h",
+      "value": 0.0,
+      "rel_tol": 0.002,
+      "abs_tol": 1e-06
+    },
+    {
+      "method": "B4",
+      "scenario": "outage_fest",
+      "price_scenario": "A",
+      "metric": "dg_hours",
+      "value": 6.0,
+      "rel_tol": 0.002,
+      "abs_tol": 1e-06
+    },
+    {
+      "method": "B5",
+      "scenario": "outage_fest",
+      "price_scenario": "A",
+      "metric": "cost_rs",
+      "value": 162985.90393273442,
+      "rel_tol": 1e-06,
+      "abs_tol": 0.01
+    },
+    {
+      "method": "B5",
+      "scenario": "outage_fest",
+      "price_scenario": "A",
+      "metric": "critical_downtime_h",
+      "value": 2.5,
+      "rel_tol": 1e-06,
+      "abs_tol": 1e-06
+    },
+    {
+      "method": "B5",
+      "scenario": "outage_fest",
+      "price_scenario": "A",
+      "metric": "dg_hours",
+      "value": 6.0,
+      "rel_tol": 1e-06,
+      "abs_tol": 1e-06
+    },
+    {
+      "method": "OURS",
+      "scenario": "outage_fest",
+      "price_scenario": "A",
+      "metric": "cost_rs",
+      "value": 161910.6815887255,
+      "rel_tol": 1e-06,
+      "abs_tol": 0.01
+    },
+    {
+      "method": "OURS",
+      "scenario": "outage_fest",
+      "price_scenario": "A",
+      "metric": "critical_downtime_h",
+      "value": 2.5,
+      "rel_tol": 1e-06,
+      "abs_tol": 1e-06
+    },
+    {
+      "method": "OURS",
+      "scenario": "outage_fest",
+      "price_scenario": "A",
+      "metric": "dg_hours",
+      "value": 5.75,
+      "rel_tol": 1e-06,
+      "abs_tol": 1e-06
+    }
+  ]
+}
