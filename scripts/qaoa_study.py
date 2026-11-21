@@ -1,0 +1,167 @@
+"""QAOA study on real-data local QUBOs.
+
+1. Distributions for the 3D demo: one instance per test day (hostel, 12:00, scenario A), simulated with
+   qiskit-aer (reference simulator), p = 2 trained parameters -> results/replay/qaoa_<key>.json
+2. Scaling study: qubits (3..15, by truncating horizon/lines) x p = 1..3 ->
+   results/qaoa_scaling.csv, results/plots/qaoa_scaling.png
+   - trained (transferred) parameters on every instance (numpy statevector)
+   - per-instance optimised parameters for n <= 10 (COBYLA), to show the parameter-transfer gap
+   - Aer wall time per circuit for timing comparison
+QAOA on a local simulator: verified against exact solutions, no quantum advantage claimed.
+"""
+from __future__ import annotations
+
+import json
+import sys
+import time
+from pathlib import Path
+
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt  # noqa: E402
+import numpy as np  # noqa: E402
+import pandas as pd  # noqa: E402
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path[:0] = [str(ROOT / "backend"), str(ROOT)]
+from qgrid import QUANTUM_LABEL  # noqa: E402
+from qgrid import data as qdata  # noqa: E402
+from qgrid import qubo as Q  # noqa: E402
+from qgrid.agent import BuildingAgent  # noqa: E402
+from qgrid.instances import sample_instances  # noqa: E402
+from qgrid.model import load_campus, make_day  # noqa: E402
+from qgrid.solvers.exact import approx_ratio, solve_exact  # noqa: E402
+from qgrid.solvers.qaoa import load_params, optimise_params, probabilities_aer, run_qaoa  # noqa: E402
+
+
+def export_distributions(proc):
+    campus = load_campus()
+    days = proc["meta"]["days"]
+    i = campus.names.index("hostel")
+    out = {}
+    for key in ("sunny", "monsoon_cloudy", "high_price"):
+        day = make_day(campus, proc, days[key], "A")
+        ag = BuildingAgent(campus, day, i)
+        t = 48  # 12:00
+        lp = ag.local_problem(t, ag.incident, v={l: 0.0 for l, _ in ag.incident}, rho=0.05)
+        qubos = Q.build(lp)
+        en = Q.enumerate_all(lp, qubos)
+        total, A_x, A_s, _ = Q.auto_tune(lp, qubos, enum=en)
+        ex = solve_exact(lp, qubos, enum=en)
+        g, b = load_params(2)
+        t0 = time.time()
+        r = run_qaoa(total, p=2, shots=1024, seed=1234, backend="aer", params=(g, b))
+        t_aer = time.time() - t0
+        X = en["X"]
+        order = np.argsort(-r.probs)
+        top = [{"bits": "".join(str(int(v)) for v in X[k]), "p": round(float(r.probs[k]), 6),
+                "energy": round(float(en["total"][k]), 3), "feasible": bool(en["feas"][k]),
+                "optimal": bool(ex.opt_mask[k])} for k in order[:256]]
+        opt_idx = int(np.argmax(ex.opt_mask))
+        rec = {
+            "label": QUANTUM_LABEL, "day": days[key], "day_type": key, "building": "hostel", "slot": t,
+            "scenario": "A", "price_status": day.status["price_scenario"],
+            "n_qubits": lp.n, "var_names": lp.var_names(), "p": 2,
+            "gammas": np.round(g, 6).tolist(), "betas": np.round(b, 6).tolist(),
+            "qubo_matrix": np.round(total.M, 4).tolist(), "penalties": {"A_x": A_x, "A_s": A_s},
+            "probs": np.round(r.probs, 7).tolist(),           # full distribution, index = sum bit_i 2^i
+            "top_states": top,
+            "optimum": {"bits": "".join(str(int(v)) for v in X[opt_idx]), "objective": ex.objective,
+                        "p_opt": round(float(r.probs[ex.opt_mask].sum()), 6)},
+            "uniform_p": 2.0 ** -lp.n,
+            "qaoa_best_sample_feasible": bool(Q.feasible_mask(lp, r.samples).any()),
+            "simulator": "qiskit-aer statevector", "aer_time_s": round(t_aer, 3),
+        }
+        p_out = ROOT / "results" / "replay" / f"qaoa_{key}.json"
+        p_out.write_text(json.dumps(rec))
+        out[key] = {"n": lp.n, "p_opt": rec["optimum"]["p_opt"], "uniform": rec["uniform_p"]}
+        print(f"[dist] {key}: n={lp.n} P(opt)={rec['optimum']['p_opt']:.4f} (uniform {rec['uniform_p']:.5f}) -> {p_out.name}")
+    return out
+
+
+def truncate(lp: Q.LocalProblem, H: int, n_lines: int, flex: bool) -> Q.LocalProblem:
+    import copy
+    q = copy.copy(lp)
+    q.r0, q.pi, q.pe = lp.r0[:H], lp.pi[:H], lp.pe[:H]
+    q.lines = lp.lines[:n_lines]
+    q.v = {l: lp.v.get(l, 0.0) for l, _ in q.lines}
+    q.flex = lp.flex if flex else None
+    return q
+
+
+def scaling_study(proc, n_per_size: int = 6, seed: int = 11):
+    insts = [lp for _, lp in sample_instances(proc, proc["meta"]["days"]["eval_days"], 40, seed=seed)]
+    configs = [(1, 0, False), (1, 1, False), (2, 1, False), (2, 2, False), (3, 2, False), (4, 1, False),
+               (4, 2, False), (4, 2, True), (4, 3, True)]
+    rows = []
+    rng = np.random.default_rng(seed)
+    for H, nl, fx in configs:
+        pool = [truncate(lp, H, nl, fx) for lp in insts if len(lp.lines) >= nl and (not fx or lp.has_s)]
+        pool = [pool[k] for k in rng.permutation(len(pool))[:n_per_size]]
+        for lp in pool:
+            qubos = Q.build(lp)
+            en = Q.enumerate_all(lp, qubos)
+            total, *_ = Q.auto_tune(lp, qubos, enum=en)
+            ex = solve_exact(lp, qubos, enum=en)
+            c, h, J = total.to_ising()
+            sig = float(np.sqrt((h ** 2).sum() + (J ** 2).sum())) or 1.0
+            E = (en["total"] - c) / sig
+            for p in (1, 2, 3):
+                for mode in ("trained", "optimised"):
+                    if mode == "optimised" and lp.n > 10:
+                        continue
+                    t0 = time.perf_counter()
+                    params = load_params(p) if mode == "trained" else optimise_params([E], p, maxiter=120)[:2]
+                    t_opt = time.perf_counter() - t0
+                    r = run_qaoa(total, p=p, shots=256, seed=seed, params=params, total_energies=en["total"])
+                    feas = Q.feasible_mask(lp, r.samples)
+                    best = float(qubos[0].energy(r.samples[feas]).min()) if feas.any() else np.nan
+                    t1 = time.perf_counter()
+                    if mode == "trained" and p == 2:
+                        probabilities_aer(h / sig, J / sig, *params)
+                        t_aer = time.perf_counter() - t1
+                    else:
+                        t_aer = np.nan
+                    with np.errstate(all="ignore"):
+                        e_mean = float(r.probs[ex.feasible] @ en["ob"][ex.feasible]) / max(r.probs[ex.feasible].sum(), 1e-12)
+                    rows.append({
+                        "n_qubits": lp.n, "p": p, "params": mode,
+                        "p_opt": float(r.probs[ex.opt_mask].sum()), "uniform_p": 2.0 ** -lp.n,
+                        "expected_approx_ratio": float(np.clip(
+                            (ex.worst_feasible - e_mean) / max(ex.worst_feasible - ex.objective, 1e-12), -10, 1)),
+                        "best_sample_approx_ratio": approx_ratio(best, ex) if feas.any() else np.nan,
+                        "found_opt": bool(feas.any() and approx_ratio(best, ex) >= 1 - 1e-9),
+                        "p_feasible": float(r.probs[ex.feasible].sum()),
+                        "param_opt_time_s": t_opt if mode == "optimised" else 0.0,
+                        "aer_time_s": t_aer,
+                    })
+    df = pd.DataFrame(rows)
+    df.to_csv(ROOT / "results" / "qaoa_scaling.csv", index=False)
+    agg = df.groupby(["params", "p", "n_qubits"]).mean(numeric_only=True).reset_index()
+
+    fig, axs = plt.subplots(1, 3, figsize=(15, 4.4))
+    for (mode, p), g in agg.groupby(["params", "p"]):
+        ls = "-" if mode == "trained" else "--"
+        axs[0].semilogy(g.n_qubits, g.p_opt, ls, marker="o", label=f"p={p} {mode}")
+        axs[1].plot(g.n_qubits, g.best_sample_approx_ratio, ls, marker="o", label=f"p={p} {mode}")
+    u = agg.drop_duplicates("n_qubits")
+    axs[0].semilogy(u.n_qubits, u.uniform_p, "k:", label="uniform 2^-n")
+    axs[0].set(xlabel="qubits", ylabel="P(optimum)", title="Probability of the exact optimum")
+    axs[1].set(xlabel="qubits", ylabel="approx. ratio (best of 256 shots)", title="Best-sample approximation ratio")
+    t = agg[(agg.params == "trained") & (agg.p == 2)]
+    axs[2].semilogy(t.n_qubits, t.aer_time_s, "o-", label="Aer statevector, p=2 (s/circuit)")
+    axs[2].set(xlabel="qubits", ylabel="seconds", title="Simulation time")
+    for a in axs:
+        a.legend(fontsize=7); a.grid(alpha=.3)
+    fig.suptitle(QUANTUM_LABEL, fontsize=9)
+    fig.tight_layout()
+    fig.savefig(ROOT / "results" / "plots" / "qaoa_scaling.png", dpi=130)
+    print(agg[agg.params == "trained"].pivot_table(index="n_qubits", columns="p", values=["p_opt", "best_sample_approx_ratio"]).round(4))
+    return df
+
+
+if __name__ == "__main__":
+    proc = qdata.load_processed()
+    export_distributions(proc)
+    scaling_study(proc)
+    print("saved results/qaoa_scaling.csv, results/plots/qaoa_scaling.png")

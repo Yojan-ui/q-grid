@@ -88,7 +88,8 @@ class QUBO:
 
     def energy(self, X: np.ndarray) -> np.ndarray:
         X = np.atleast_2d(X).astype(float)
-        return self.const + np.einsum("bi,ij,bj->b", X, self.M, X)
+        with np.errstate(all="ignore"):  # macOS Accelerate raises spurious FP flags in matmul
+            return self.const + ((X @ self.M) * X).sum(axis=1)
 
     def __add__(self, o: "QUBO") -> "QUBO":
         return QUBO(self.const + o.const, self.M + o.M)
@@ -239,7 +240,8 @@ def feasible_mask(lp: LocalProblem, X: np.ndarray) -> np.ndarray:
         ok &= ~((X[:, lp.ip(j)] == 1) & (X[:, lp.in_(j)] == 1))
     for k in range(H):
         e0k, ak = energy_affine(lp, k)
-        e = e0k + np.einsum("bi,i->b", X, ak)
+        with np.errstate(all="ignore"):
+            e = e0k + X @ ak
         ok &= (e >= lp.bat.e_min - 1e-6) & (e <= lp.bat.e_max + 1e-6)
     return ok
 
@@ -278,22 +280,30 @@ def coeff_scale(q: QUBO) -> float:
     return float(np.abs(np.diag(M)).sum() + np.abs(M - np.diag(np.diag(M))).sum()) + 1e-9
 
 
-def auto_tune(lp: LocalProblem, qubos=None, max_doublings: int = 12):
+def enumerate_all(lp: LocalProblem, qubos=None) -> dict:
+    """Energies of every bitstring under each QUBO part, plus the exact feasibility mask (once per solve)."""
+    ob, px, ps = qubos or build(lp)
+    X = all_bitstrings(lp.n)
+    return {"X": X, "ob": ob.energy(X), "px": px.energy(X), "ps": ps.energy(X), "feas": feasible_mask(lp, X)}
+
+
+def auto_tune(lp: LocalProblem, qubos=None, max_doublings: int = 12, enum: dict | None = None):
     """Penalty auto-tuning: A_x = coefficient bound of the objective (a violated exclusivity costs
     more than any objective gain); A_s doubled from 5 % of that bound until the ground state of the
     full QUBO is feasible (checked exhaustively). Returns (total QUBO, A_x, A_s, ground-state index)."""
-    ob, px, ps = qubos or build(lp)
-    X = all_bitstrings(lp.n)
-    feas = feasible_mask(lp, X)
+    qubos = qubos or build(lp)
+    ob, px, ps = qubos
+    en = enum or enumerate_all(lp, qubos)
+    feas = en["feas"]
     S = coeff_scale(ob)
     A_x = S
-    e_ob, e_px, e_ps = ob.energy(X), px.energy(X), ps.energy(X)
     A_s = 0.0
     for _ in range(max_doublings + 1):
-        tot = e_ob + A_x * e_px + A_s * e_ps
+        tot = en["ob"] + A_x * en["px"] + A_s * en["ps"]
         g = int(np.argmin(tot))
         if feas[g]:
             break
         A_s = 0.05 * S if A_s == 0 else 2 * A_s
+    en["total"] = en["ob"] + A_x * en["px"] + A_s * en["ps"]
     total = ob + px.scale(A_x) + ps.scale(A_s)
     return total, A_x, A_s, g
