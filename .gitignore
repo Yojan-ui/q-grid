@@ -1,0 +1,21 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+.env
+.env.*
+*.log
+.DS_Store
+.ipynb_checkpoints/
+# large raw data downloads are cached locally; SOURCES.md documents how to refetch
+data/raw/*
+!data/raw/.gitkeep
+!data/raw/SOURCES.md
+data/processed/*.parquet
+!data/processed/.gitkeep
+# IBM token etc.
+qiskit-ibm.json
+# frontend
+frontend/node_modules/
+frontend/dist/
