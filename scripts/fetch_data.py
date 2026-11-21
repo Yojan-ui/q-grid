@@ -81,11 +81,9 @@ CEA CO2 Baseline Database for the Indian Power Sector (latest User Guide PDF).
   1. Open https://cea.nic.in/  -> Reports -> 'CO2 Baseline Database'
      (cea.nic.in blocks scripted downloads).
   2. Download the latest 'User Guide Version NN.0' PDF.
-  3. Put it in data/raw/cea/ and fill data/raw/cea/emission_factor.yaml:
-       version: "NN.0"
-       fiscal_year: "YYYY-YY"
-       weighted_average_tco2_per_mwh: <value from the PDF's results table>
-       page: <page number in the PDF>""",
+  3. Put it in data/raw/cea/. The value is then read from the PDF into
+     data/raw/cea/emission_factor.yaml (version, fiscal_year,
+     weighted_average_tco2_per_mwh, page), checked by hand against the PDF.""",
     ),
 }
 

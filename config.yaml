@@ -1,0 +1,36 @@
+# Q-Grid campus configuration.
+# Capacities below are DESIGN ASSUMPTIONS for a representative Indian engineering campus
+# (not measured data). Time-series inputs (irradiance, temperature, load shapes, prices,
+# CO2 factor) come from real datasets; see data/SOURCES.md.
+
+site:
+  name: "Bengaluru campus (12.92N, 77.50E)"
+  lat: 12.92
+  lon: 77.50
+  year: 2023
+  slot_minutes: 15
+
+pv_model:            # PVWatts-style derating
+  noct_c: 45.0       # nominal operating cell temperature
+  gamma_per_c: -0.004  # power temperature coefficient (crystalline Si)
+  system_derate: 0.86  # inverter + wiring + soiling losses
+
+prices:
+  source: iex_dam          # iex_dam (IEX day-ahead MCP); campus imports and exports at the DAM price
+  export_price_factor: 1.0 # export credited at factor * DAM price (1.0 = symmetric, no invented spread)
+
+buildings:
+  # peak_kw: load is scaled so its annual 99th percentile equals this value
+  # critical_frac: share of load that must always be served (labs, servers, lighting)
+  hostel:    {pv_kwp: 200, peak_kw: 150, critical_frac: 0.30, battery: {kwh: 200, kw: 100}}
+  lab_block: {pv_kwp: 150, peak_kw: 250, critical_frac: 0.45, battery: {kwh: 250, kw: 125}}
+  library:   {pv_kwp: 120, peak_kw: 110, critical_frac: 0.25, battery: {kwh: 150, kw: 75}}
+  canteen:   {pv_kwp: 80,  peak_kw: 90,  critical_frac: 0.35, battery: {kwh: 100, kw: 50}}
+  admin:     {pv_kwp: 100, peak_kw: 100, critical_frac: 0.30, battery: {kwh: 120, kw: 60}}
+
+# Ausgrid cluster -> building assignment is by daytime-energy share of each cluster's mean
+# profile (highest daytime share -> first in this list).
+load_mapping_order: [lab_block, admin, library, canteen, hostel]
+
+test_days:
+  n_eval_days: 30          # evenly spaced across the year (deterministic)
