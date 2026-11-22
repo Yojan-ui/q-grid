@@ -333,9 +333,17 @@ class BuildingLP:
         if warm is not None:
             self._qp.warm_start(x=warm)
         r = self._qp.solve()
-        if r.info.status not in ("solved", "solved inaccurate"):
-            raise RuntimeError(f"building QP {self.b.name}: {r.info.status}")
-        return np.array(r.x)
+        x = np.array(r.x) if r.x is not None else None
+        if r.info.status in ("solved", "solved inaccurate") and x is not None and np.isfinite(x).all():
+            return x
+        # inexact local solve (e.g. OSQP iteration limit): ADMM tolerates it; use the iterate if finite,
+        # otherwise keep the previous local solution
+        self.inexact = getattr(self, "inexact", 0) + 1
+        if x is not None and np.isfinite(x).all():
+            return np.clip(x, self.lb, self.ub)
+        if warm is not None:
+            return np.asarray(warm)
+        raise RuntimeError(f"building QP {self.b.name}: {r.info.status}")
 
     def recover(self, y: np.ndarray, f_fixed: np.ndarray, imp_cap: np.ndarray) -> tuple[np.ndarray, float]:
         """Physically consistent plan after ADMM: cable flows fixed to the agreed values, import capped at the

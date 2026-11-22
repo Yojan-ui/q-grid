@@ -160,7 +160,8 @@ class Master:
         return QUBO(const, M)
 
     def heuristic(self, y0: np.ndarray, solver: str, seed: int, sweeps: int = 2, max_q: int = 16,
-                  verify: bool = True, p: int = 2, shots: int = 256) -> tuple[np.ndarray, float, MasterStats]:
+                  verify: bool = True, p: int = 2, shots: int = 256, record: list | None = None,
+                  tag: dict | None = None) -> tuple[np.ndarray, float, MasterStats]:
         import time
         t0 = time.perf_counter()
         st = MasterStats()
@@ -194,6 +195,15 @@ class Master:
                 if verify and solver == "qaoa":
                     ex = self._block_exact(y, B)
                     st.block_opt += int(Jc[j] <= ex + 1e-6 * max(1.0, abs(ex)))
+                    if record is not None and sw == 0 and len(B) <= 12:
+                        # block QUBO and its true-objective landscape for the simulator/hardware/exact comparison
+                        nb = len(B)
+                        Z = ((np.arange(1 << nb)[:, None] >> np.arange(nb)[None, :]) & 1).astype(float)
+                        Yz = np.repeat(y[None, :], len(Z), axis=0); Yz[:, B] = Z
+                        record.append({**(tag or {}), "block": [list(map(str, self.lay.names[k])) for k in B],
+                                       "qubo_M": np.round(q.M, 6).tolist(), "qubo_const": float(q.const),
+                                       "J_all": np.round(self.J(Yz), 4).tolist(), "J_exact": ex,
+                                       "qaoa_best_J": float(Jc[j]), "qaoa_found_opt": bool(Jc[j] <= ex + 1e-6 * max(1.0, abs(ex)))})
                 if Jc[j] < Jy - 1e-9:
                     y, Jy = Y[j].copy(), float(Jc[j])
                     st.improved += 1

@@ -17,10 +17,11 @@ export type Scenario = {
   campus: { name: string; credit: string; outline: [number, number][] | null; zones: Zone[]; lines: [string, string][]; line_step_kw: number }
   slots: { t: string[]; sun: { elevation_deg: number[]; azimuth_deg: number[] }; pv_kw: number[][]; load_kw: number[][];
     crit_kw: number[][]; price_import: number[]; price_export: number[]; grid_up: number[]; co2_kg_per_kwh: number }
-  runs: { qgrid: Run; status_quo?: Run }; replay_matches_benchmark: boolean
+  runs: { qgrid: Run; status_quo?: Run; qgrid_v2?: Run }; replay_matches_benchmark: boolean
   admm: { iterations: Record<string, { k: number; r_primal: number; r_dual: number; agreed: boolean; proposals: Record<string, number[]> }[]>; summary: Record<string, any>; lines: [string, string][] }
   explanations: Record<string, Record<string, string[]>>; qaoa_file: string; benchmark: Record<string, any>[]
   headline?: any; live_solve?: LiveSolve[]; provenance: Provenance
+  v2?: V2Data
   problem?: { rs_lost: number; reusable_kwh: number; co2_kg: number; dg_hours: number; cost_rs: number; critical_downtime_h: number; definition: string } | null
 }
 export type LiveSolve = { zone: string; slot: number; time: string; n_qubits: number; var_names: string[]; qubo_matrix: number[][];
@@ -83,3 +84,18 @@ export async function post<T>(path: string, body: any): Promise<T> {
   return r.json()
 }
 export const fmt = (v: number, d = 0) => (v ?? 0).toLocaleString('en-IN', { maximumFractionDigits: d, minimumFractionDigits: d })
+
+// ---- optimiser v2 (results/v2, scripts/run_benchmark_v2.py)
+export type V2Row = Record<string, any> & { method: string }
+export type BendersIter = { k: number; UB: number; best_UB: number; LB: number; gap_pct: number; admm_iters: number;
+  admm_converged: boolean; admm_r: number[]; cuts_per_building: number }
+export type Commitment = { dg: Record<string, number>; mode: Record<string, number>; pump: Record<string, number>; flex: Record<string, number> }
+export type V2Example = {
+  slot: number; time: string; benders: BendersIter[]; binaries: Record<string, number>; first_hour: number; note: string
+  block: LiveSolve & { kind: string; hours: number[] }
+  commitment: Record<string, Commitment>
+  admm_rounds: { k: number; r_primal: number; agreed: boolean; proposals: Record<string, number[]> }[]
+}
+export type V2Data = { rows: V2Row[]; summary: (V2Row & { day_set: string; n_days: number })[]; tariff_status: string
+  demand_rs_per_kva_month: number; days_per_month: number; power_factor: number; label: string
+  replay_matches_benchmark?: boolean; example?: V2Example }

@@ -56,7 +56,6 @@ make test                      # pytest
 make demo                      # frontend (+ live backend on :8000); frontend alone works offline
 make data && make qaoa && make bench && make replay   # full pipeline (~20 min on a MacBook)
 make verify                    # recompute headline numbers, PASS/FAIL vs results/manifest.json
-node frontend/scripts/capture.mjs --url http://localhost:5173 --out shots   # screenshots of every story step (headless Chrome)
 bash scripts/refresh_all.sh    # after adding the PENDING files
 python scripts/new_campus.py --name "<campus>" --lat <lat> --lon <lon>   # another campus
 ```
@@ -74,6 +73,7 @@ python scripts/new_campus.py --name "<campus>" --lat <lat> --lon <lon>   # anoth
 | 7 | 3D demo: light step-by-step explainer (7 steps, one continuous 3D thread: campus → decisions → qubits → QAOA circuit → measurement → decoded plan → ADMM → storage → results), Verify and Try it tabs, honesty strip | ✅ |
 | 8 | new_campus.py, manifest + make verify, CI | ✅ |
 | 9 | report, why-quantum, viva Q&A, pitch, data request | ✅ |
+| v2 | optimiser v2 (branch `optimiser-v2`): 24 h rolling MPC, hybrid Benders (QAOA/QIEA/SA/exact master on hourly commitments, LP subproblem by consensus ADMM), solar forecast, demand charge (PENDING), optional IBM/D-Wave runs; results in [docs/results_v2.md](docs/results_v2.md) | ✅ code · tariff PENDING · hardware needs tokens |
 
 ## Honest limits
 PENDING prices/CO2/calendar/meter data; loads are area-based estimates; perfect forecasts; QAOA simulated (ideal, noiseless);

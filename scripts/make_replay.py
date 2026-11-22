@@ -158,6 +158,15 @@ def build_scenario(key: str) -> dict:
     if sq:
         runs["status_quo"] = run_block(np.array(sq["p_bat"]), np.array(sq["flows"]), np.array(sq["dg_kw"]),
                                        np.array(sq["pump_on"]), sq["flex_start"], sq["metrics"], np.array(sq["net_kw"]))
+    # optimiser v2 run of the same day (QAOA master), if the v2 benchmark has been run
+    v2s = ROOT / "results" / "v2" / "schedules" / f"{key}_V2-QAOA.json"
+    if v2s.exists():
+        from qgrid.v2.tariff import settle_v2
+        j = json.loads(v2s.read_text())
+        sch2 = Schedule(np.asarray(j["p_bat"], float), [dict(x) for x in j["flex_start"]], np.asarray(j["flows"], float),
+                        np.asarray(j["dg_kw"], float), np.asarray(j["pump_on"], float))
+        m2 = settle_v2(campus, day, sch2)
+        runs["qgrid_v2"] = run_block(sch2.p_bat, sch2.flows, sch2.dg_kw, sch2.pump_on, j["flex_start"], m2, m2["net_kw"])
     # compact ADMM log: per slot iterations with residuals and proposals
     admm = {}
     for rec in st.log:
@@ -259,6 +268,52 @@ def shot_table(samples, lp, qubos, exr):
     return sorted(rows, key=lambda r: (-r["count"], r["bits"]))
 
 
+V2_COLS = ["method", "objective_incl_demand_rs", "cost_incl_demand_rs", "cost_rs", "objective_rs", "demand_charge_rs",
+           "peak_kva", "co2_kg", "dg_hours", "critical_downtime_h", "critical_unserved_kwh", "gap_to_opt_pct", "runtime_s",
+           "replan_time_s", "benders_iters_mean", "benders_gap_mean_pct", "benders_converged_rate", "master_opt_share",
+           "qaoa_block_opt_share", "qaoa_block_solves", "admm_converged_rate", "admm_iters_mean", "feasible", "solar"]
+
+
+def attach_v2(campus, meta, outs: dict) -> None:
+    """Optimiser v2 results (results/v2, from scripts/run_benchmark_v2.py) and the headline worked example."""
+    d = ROOT / "results" / "v2"
+    if not (d / "benchmark_v2.csv").exists():
+        return
+    import pandas as pd
+    from qgrid import QUANTUM_LABEL
+    b = pd.read_csv(d / "benchmark_v2.csv")
+    s = pd.read_csv(d / "benchmark_v2_summary.csv")
+    cols = [c for c in V2_COLS if c in b.columns]
+    summ = s[[c for c in ["day_set", "n_days"] + V2_COLS if c in s.columns]].to_dict(orient="records")
+    tv = campus.cfg["tariff_v2"]
+    hs = campus.cfg["headline_scenario"]
+    for k, o in outs.items():
+        rows = b[b.scenario == k][cols].to_dict(orient="records")
+        o["v2"] = {"rows": rows, "summary": summ, "tariff_status": tv["status"],
+                   "demand_rs_per_kva_month": tv["demand_rs_per_kva_month"], "days_per_month": tv["days_per_month"],
+                   "power_factor": tv["power_factor"], "label": QUANTUM_LABEL}
+        if "qgrid_v2" in o["runs"]:
+            row = b[(b.scenario == k) & (b.method == "V2-QAOA")]
+            got = o["runs"]["qgrid_v2"]["metrics"]
+            # stored v2 schedules are rounded to 0.01 kW, so the re-settled objective may differ by a few rupees
+            ref = float(row.iloc[0].objective_incl_demand_rs) if len(row) else float("nan")
+            o["v2"]["replay_matches_benchmark"] = bool(len(row) and abs(ref - got["objective_incl_demand_rs"]) <= 1e-4 * abs(ref))
+    sched = d / "schedules" / f"{hs}_V2-QAOA.json"
+    if sched.exists() and hs in outs:
+        from qgrid import data as qdata
+        from qgrid.v2.explain import explain_slot
+        from qgrid.v2.horizon import YearData
+        sc = meta["days"]["scenarios"][hs]
+        proc = qdata.load_processed()
+        yd = YearData(campus, proc, "A", forecast=False)
+        with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
+            ex = explain_slot(campus, yd, sc["date"], sc.get("outage"), json.loads(sched.read_text()), t0=72,
+                              zone="pumping_station", kind="pump")
+        outs[hs]["v2"]["example"] = ex
+        print(f"v2 worked example: {ex['time']}, {len(ex['benders'])} Benders iterations, "
+              f"block {ex['block']['n_qubits']} qubits, QAOA = exact: {ex['block']['qaoa']['best_bits'] == ex['block']['exact']['bits']}")
+
+
 def main():
     from qgrid import data as qdata
     from qgrid.model import load_campus
@@ -276,6 +331,7 @@ def main():
     RDIR.mkdir(parents=True, exist_ok=True)
     index = {"scenarios": [], "headline": campus.cfg["headline_scenario"], "provenance": prov,
              "label": outs[keys[0]]["label"], "data_status": meta["data_status"]}
+    attach_v2(campus, meta, outs)
     for k, o in outs.items():
         o["provenance"] = prov
         (RDIR / f"scenario_{k}.json").write_text(dump(o))

@@ -91,7 +91,154 @@ def values() -> dict:
     meta = json.loads((ROOT / "data" / "processed" / "meta.json").read_text())
     v["price_A_status"] = meta["prices"]["A"]["status"]
     v["price_B_status"] = meta["prices"]["B"]["status"]
+    v.update(values_v2())
     return v
+
+
+def values_v2() -> dict:
+    """Optimiser v2 numbers (results/v2/*), keyed v2.<method>.<day_set>.<metric>; empty if not run yet."""
+    d = ROOT / "results" / "v2"
+    v = {}
+    if not (d / "benchmark_v2_summary.csv").exists():
+        return v
+    s = pd.read_csv(d / "benchmark_v2_summary.csv")
+    for _, r in s.iterrows():
+        for k, x in r.items():
+            if k in ("day_set", "method") or isinstance(x, str) or pd.isna(x):
+                continue
+            v[f"v2.{r.method}.{r.day_set}.{k}"] = float(x)
+    b = pd.read_csv(d / "benchmark_v2.csv")
+    head = "outage_fest"
+    for _, r in b[b.scenario == head].iterrows():
+        for k in ("objective_incl_demand_rs", "cost_incl_demand_rs", "peak_kva", "demand_charge_rs", "co2_kg", "dg_hours",
+                  "critical_downtime_h", "gap_to_opt_pct", "runtime_s", "replan_time_s", "benders_iters_mean",
+                  "benders_gap_mean_pct", "master_opt_share", "qaoa_block_opt_share", "admm_converged_rate", "admm_iters_mean"):
+            if k in r and not pd.isna(r[k]):
+                v[f"v2.head.{r.method}.{k}"] = float(r[k])
+    for m in b.method.unique():
+        sub = b[(b.method == m) & (b.scenario != "eval")]
+        if "master_opt_share" in sub and sub.master_opt_share.notna().any():
+            v[f"v2.scen.{m}.master_opt_pct"] = 100 * float(sub.master_opt_share.mean())
+        if "qaoa_block_opt_share" in sub and sub.qaoa_block_opt_share.notna().any():
+            v[f"v2.scen.{m}.block_opt_pct"] = 100 * float(sub.qaoa_block_opt_share.mean())
+            v[f"v2.scen.{m}.block_solves"] = float(sub.qaoa_block_solves.sum())
+        if "admm_converged_rate" in sub and sub.admm_converged_rate.notna().any():
+            v[f"v2.scen.{m}.admm_conv_pct"] = 100 * float(sub.admm_converged_rate.mean())
+        if "benders_converged_rate" in sub and sub.benders_converged_rate.notna().any():
+            v[f"v2.scen.{m}.benders_conv_pct"] = 100 * float(sub.benders_converged_rate.mean())
+    fe = d / "forecast_error.csv"
+    if fe.exists():
+        f_ = pd.read_csv(fe)
+        for k in ("nmae_pct", "nmae_1h_pct", "nmae_4-24h_pct", "bias_pct"):
+            v[f"v2.fc.mean.{k}"] = float(f_[k].mean())
+            v[f"v2.fc.max.{k}"] = float(f_[k].max())
+    hw = d / "hardware.json"
+    if hw.exists():
+        hj = json.loads(hw.read_text())
+        v["v2.hw.ibm_status"] = hj["ibm"]["status"]
+        v["v2.hw.dwave_status"] = hj["dwave"].get("dwave", "")
+        v["v2.hw.campus_n"] = hj["dwave"].get("n_binaries")
+        v["v2.hw.sa_gap_pct"] = hj["dwave"].get("sa_gap_pct")
+        rows = hj["ibm"].get("rows", [])
+        if rows:
+            v["v2.hw.aer_found_opt_pct"] = 100 * float(np.mean([r["aer_found_opt"] for r in rows]))
+            v["v2.hw.n_blocks"] = len(rows)
+    import yaml
+    cfg = yaml.safe_load((ROOT / "config.yaml").read_text())
+    v["v2.tariff_status"] = cfg["tariff_v2"]["status"]
+    v["v2.demand_rate_month"] = float(cfg["tariff_v2"]["demand_rs_per_kva_month"])
+    return v
+
+
+V2_LABEL = {"B0": "Status quo", "B1": "Rule-based", "B2-GA": "Genetic algorithm", "B2-PSO": "Particle swarm",
+            "B3": "Per-zone MILP (no sharing)", "B4": "Central MILP, energy only (v1 optimum)",
+            "B4-DC": "Central MILP with demand charge (optimum)", "V1": "Old Q-Grid (binary ADMM + QAOA)",
+            "V2-QAOA": "v2 hybrid, QAOA master", "V2-QIEA": "v2 hybrid, QIEA† master", "V2-SA": "v2 hybrid, annealing master",
+            "V2-EXACT": "v2 hybrid, exact master", "V2-EXACT-FC": "v2 hybrid, exact master, solar forecast",
+            "V2-QAOA-FC": "v2 hybrid, QAOA master, solar forecast"}
+V2_ORDER = list(V2_LABEL)
+
+
+def table_v2(df) -> str:
+    cols = [("objective_incl_demand_rs", "Rs/day incl. demand charge + VOLL", 0), ("cost_incl_demand_rs", "Rs/day (money)", 0),
+            ("peak_kva", "peak kVA", 0), ("co2_kg", "CO₂ kg", 0), ("dg_hours", "DG h", 2),
+            ("critical_downtime_h", "critical downtime h", 2), ("gap_to_opt_pct", "gap to optimum %", 2),
+            ("runtime_s", "runtime s", 1), ("benders_iters_mean", "Benders iters", 1),
+            ("master_opt_share", "masters optimal (QAOA/QIEA/SA)", 2)]
+    lines = ["| Method | " + " | ".join(c[1] for c in cols) + " |", "|---|" + "---:|" * len(cols)]
+    for m in V2_ORDER:
+        r = df[df.method == m]
+        if not len(r):
+            continue
+        r = r.iloc[0]
+        cells = []
+        for k, _, d in cols:
+            x = r.get(k, np.nan)
+            cells.append("–" if pd.isna(x) else (f"{100 * x:.0f} %" if k == "master_opt_share" else f"{x:,.{d}f}"))
+        nm = V2_LABEL[m]
+        lines.append(f"| {'**' + nm + '**' if m.startswith('V2') else nm} | " + " | ".join(cells) + " |")
+    return "\n".join(lines)
+
+
+def write_results_v2(v: dict):
+    d = ROOT / "results" / "v2"
+    if not (d / "benchmark_v2_summary.csv").exists():
+        return
+    s = pd.read_csv(d / "benchmark_v2_summary.csv")
+    b = pd.read_csv(d / "benchmark_v2.csv")
+    meta = json.loads((ROOT / "data" / "processed" / "meta.json").read_text())
+    out = [f"# Results — optimiser v2 (hybrid Benders, 24 h rolling horizon)\n\n> {QUANTUM_LABEL}. "
+           "† QIEA = quantum-inspired evolutionary algorithm, classical CPU — not quantum computing.\n",
+           "_Generated by `scripts/write_results_md.py` from `results/v2/*.csv` (produced by `scripts/run_benchmark_v2.py`); "
+           "do not edit numbers by hand._\n",
+           "## ⚠️ Data status — read first\n",
+           f"Energy prices (price scenario A) and the demand charge (Rs {v.get('v2.demand_rate_month', float('nan')):,.0f}/kVA/month) are "
+           f"**PENDING stand-ins** (tariff v2 status: {v.get('v2.tariff_status', '?')}); daily figures carry 1/30 of the monthly demand "
+           "charge on the day's peak kVA (ASSUMPTION). Rs figures are therefore not headline results; comparisons between methods on "
+           "identical inputs are meaningful. Campus loads are area-based estimates.\n",
+           "## Setup\n",
+           "Every method runs on the same days, data and constraints and is settled by the same `model.settle()`. v2 re-plans 24 h ahead "
+           "every 15-min slot (dispatch: LP + consensus ADMM every slot; commitment master re-optimised at the start of every clock "
+           "hour, carried forward in between). Benders stops at a 0.5 % bound gap or 6 iterations. Rows marked *solar forecast* use the "
+           "clear-sky × clearness forecast instead of actual solar; all other v2 rows see actual solar over the horizon, like the MILP "
+           "baselines. The optimum is the central MILP with the demand charge (B4-DC, 0.1 % MIP gap, 15-min binaries, continuous "
+           "flows); v2's hourly commitments are a restriction of it.\n",
+           "## Six named days (mean per day)\n\n" + table_v2(s[s.day_set == "scenarios"]) + "\n"]
+    if (s.day_set == "eval30_mean").any():
+        out.append("## 30-day evaluation set (mean per day)\n\n" + table_v2(s[s.day_set == "eval30_mean"]) + "\n")
+    for k, sc in meta["days"]["scenarios"].items():
+        sub = b[b.scenario == k]
+        if len(sub):
+            out.append(f"### {k.replace('_', ' ')} — {sc['date']} ({sc['note']})\n\n" + table_v2(sub) + "\n")
+    conv = d / "convergence.csv"
+    if conv.exists():
+        c = pd.read_csv(conv).groupby("method")[["admm_converged_rate", "admm_iters_mean"]].mean()
+        out.append("## Decentralisation: old binary ADMM vs ADMM on the convex LP\n\n| Method | ADMM runs converged | mean iterations |\n|---|---:|---:|")
+        for m, r in c.iterrows():
+            out.append(f"| {V2_LABEL.get(m, m)} | {100 * r.admm_converged_rate:.0f} % | {r.admm_iters_mean:.0f} |")
+        out.append("\nv1's ADMM agrees on discrete tie-line levels (non-convex): 'converged' = all neighbours agreed within the "
+                   "iteration cap in a slot. v2's ADMM runs on the continuous LP subproblem (convex): 'converged' = every cable's "
+                   "copies within 1 kW and the consensus moving < 1 kW per iteration. Each building then fixes the agreed flows and "
+                   "re-solves its own LP so the applied plan balances exactly.\n")
+    fe = d / "forecast_error.csv"
+    if fe.exists():
+        f_ = pd.read_csv(fe)
+        out.append("## Solar forecast error (forecasts issued every slot, lead 15 min – 24 h)\n\n| Day | nMAE % | 1 h | 1–4 h | 4–24 h | bias % |\n|---|---:|---:|---:|---:|---:|")
+        for _, r in f_.iterrows():
+            out.append(f"| {r.scenario} | {r.nmae_pct:.1f} | {r['nmae_1h_pct']:.1f} | {r['nmae_1-4h_pct']:.1f} | {r['nmae_4-24h_pct']:.1f} | {r.bias_pct:+.1f} |")
+        out.append("\nnMAE = mean absolute error / mean actual output over daylight slots. NASA POWER hourly irradiance is satellite-derived "
+                   "and smooth, so real rooftop forecasting error would be larger.\n")
+    hw = d / "hardware.json"
+    if hw.exists():
+        hj = json.loads(hw.read_text())
+        out.append("## Real quantum hardware (optional, experimental)\n")
+        out.append(f"- IBM Quantum: {hj['ibm']['status']}. Qiskit Aer on the same {len(hj['ibm']['rows'])} recorded master blocks: "
+                   f"best measured assignment = exact optimum in {sum(r['aer_found_opt'] for r in hj['ibm']['rows'])} of {len(hj['ibm']['rows'])}.")
+        dw = hj["dwave"]
+        out.append(f"- D-Wave Leap: {dw.get('dwave')}. Whole-campus 24 h commitment QUBO: {dw.get('n_binaries')} binaries; simulated "
+                   f"annealing {dw.get('sa_gap_pct', float('nan')):.2f} % from the exact MILP masters.")
+        out.append("\nHardware results, when run, are noisy and are shown next to simulator and exact results.\n")
+    (ROOT / "docs" / "results_v2.md").write_text("\n".join(out))
 
 
 def render(text: str, v: dict) -> str:
@@ -141,6 +288,7 @@ def main():
             continue
         dest = ROOT / ("README.md" if t.name == "README.md" else f"docs/{t.name}")
         dest.write_text(render(t.read_text(), v))
+    write_results_v2(v)
     missing = sum(p.read_text().count("⟨missing") for p in [ROOT / "README.md", *(ROOT / "docs").glob("*.md")])
     print(f"wrote docs/results.md and rendered templates ({missing} missing placeholders)")
 

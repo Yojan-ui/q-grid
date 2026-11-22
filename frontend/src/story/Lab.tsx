@@ -18,12 +18,24 @@ const TW = 10, TH = 5.2, GAP = 1.0, BLOCK = 3
 /** Tile layout grouped by device: battery (charge row over discharge row), one column per cable, then others. */
 export function tileLayout(names: string[]) {
   const blocks: { title: string; cols: string[][] }[] = []
+  if (names.some(v => v.includes('@'))) {         // v2: one row per device kind, one tile per clock hour
+    for (const kind of [...new Set(names.map(v => v.split('@')[0]))]) {
+      const vs = names.filter(v => v.split('@')[0] === kind)
+      const h = Math.ceil(vs.length / 2)            // two rows (first half of the hours on top) so 12 hours fit on stage
+      blocks.push({ title: kind, cols: vs.slice(0, h).map((v, k) => [v, vs[k + h]].filter(Boolean) as string[]) })
+    }
+    return place(blocks)
+  }
   const c = names.filter(v => /^c\d$/.test(v)), d = names.filter(v => /^d\d$/.test(v))
   if (c.length) blocks.push({ title: 'battery', cols: c.map((v, k) => [v, d[k]].filter(Boolean) as string[]) })
   const lines = [...new Set(names.filter(v => /^[pn]\d+$/.test(v)).map(v => v.slice(1)))]
   for (const l of lines) blocks.push({ title: `cable ${l}`, cols: [[`p${l}`, `n${l}`].filter(v => names.includes(v))] })
   const rest = names.filter(v => !/^[cdpn]\d+$/.test(v))
   if (rest.length) blocks.push({ title: 'other', cols: rest.map(v => [v]) })
+  return place(blocks)
+}
+
+function place(blocks: { title: string; cols: string[][] }[]) {
   const ncol = blocks.reduce((a, b) => a + b.cols.length, 0)
   const width = ncol * TW + (ncol - blocks.length) * GAP + (blocks.length - 1) * BLOCK
   const pos: Record<string, V3> = {}
@@ -314,6 +326,10 @@ const ringLabelOffset = (i: number, n: number): V3 => {
   return [Math.cos(a) * 5.2, Math.sin(a) * 3.4, 0]
 }
 function blockTitle(t: string, zone: string, sc: Scenario) {
+  if (t === 'pump') return 'Borewell pump · hour by hour'
+  if (t === 'dg') return 'Diesel generator · hour by hour'
+  if (t === 'mode') return 'Battery mode · hour by hour'
+  if (t === 'flex') return 'Flexible job · start options'
   if (t === 'battery') return 'Battery · next 45 min'
   if (t.startsWith('cable')) {
     const l = Number(t.split(' ')[1]); const [a, b] = sc.campus.lines[l]

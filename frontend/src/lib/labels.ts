@@ -47,6 +47,7 @@ const hhmm = (sc: Scenario, slot: number) => sc.slots.t[Math.min(95, slot)]
 
 /** One QUBO variable as a yes/no question a person understands. */
 export function varLabel(v: string, zone: string, slot: number, sc: Scenario): { short: string; device: string; yes: string; no: string } {
+  if (v.includes('@')) return v2Label(v, sc)
   const step = sc.campus.line_step_kw
   const k = Number(v.slice(1))
   if (/^c\d$/.test(v)) return { short: k === 0 ? 'Charge battery now' : `Charge at ${hhmm(sc, slot + k)}`, device: 'battery', yes: 'charge', no: 'no charge' }
@@ -66,8 +67,24 @@ export function varLabel(v: string, zone: string, slot: number, sc: Scenario): {
   return { short: v, device: 'other', yes: '1', no: '0' }
 }
 
+/** Clock hour h of the operated day (>= 24: the next morning) as "18:00" / "tomorrow 02:00". */
+export const hourLabel = (h: number) => `${h >= 24 ? 'tomorrow ' : ''}${String(h % 24).padStart(2, '0')}:00`
+
+/** v2 master binaries: one decision per device per clock hour (qgrid/v2/building.py). */
+function v2Label(v: string, sc: Scenario): { short: string; device: string; yes: string; no: string } {
+  const [kind, a, b] = v.split('@')
+  const h = Number(a)
+  if (kind === 'pump') return { short: `Pump on ${hourLabel(h)}`, device: 'tank', yes: 'pump on', no: 'pump off' }
+  if (kind === 'dg') return { short: `Diesel on ${hourLabel(h)}`, device: 'dg', yes: 'diesel on', no: 'diesel off' }
+  if (kind === 'mode') return { short: `Battery may charge ${hourLabel(h)}`, device: 'battery', yes: 'charge allowed', no: 'discharge allowed' }
+  if (kind === 'flex') return { short: `Start ${a.replace(/_/g, ' ')} at ${sc.slots.t[Math.min(95, Number(b))] ?? b}`, device: 'flex', yes: 'start here', no: 'not here' }
+  return { short: v, device: 'other', yes: '1', no: '0' }
+}
+
 /** Structural rule that couples two variables (from qgrid/qubo.py penalty construction). */
 export function pairRule(a: string, b: string): string | null {
+  if (a.startsWith('pump@') && b.startsWith('pump@')) return 'the tank level links every pumping hour'
+  if (a.startsWith('flex@') && b.startsWith('flex@') && a.split('@')[1] === b.split('@')[1]) return 'a job starts exactly once'
   const s = [a, b].sort().join(' ')
   if (/^c(\d) d\1$/.test(s)) return 'battery can’t charge and discharge in the same slot'
   const m = s.match(/^n(\d+) p(\d+)$/)

@@ -1,9 +1,9 @@
 // The guided story: stops, and the facts each stop shows. Every number is read from replay files produced by
 // scripts/make_replay.py (results/*.csv / *.json); this module only selects and formats them.
 import { useEffect, useState } from 'react'
-import { getCSV, getJSON, type LiveSolve, type QaoaFile, type Scenario } from './data'
+import { getCSV, getJSON, type LiveSolve, type QaoaFile, type Scenario, type V2Data, type V2Example } from './data'
 
-export type StopId = '1' | '2' | '3' | '4a' | '4b' | '4c' | '4d' | '4e' | '4f' | '4g' | '5' | '6' | '7a' | '7b'
+export type StopId = '1' | '2' | '3' | '4a' | '4b' | '4c' | '4d' | '4e' | '4f' | '4g' | '5' | '5b' | '6' | '7a' | '7b'
 export const STOPS: { id: StopId; step: number; title: string }[] = [
   { id: '1', step: 1, title: 'The problem' },
   { id: '2', step: 2, title: 'The campus' },
@@ -16,6 +16,7 @@ export const STOPS: { id: StopId; step: number; title: string }[] = [
   { id: '4f', step: 4, title: 'Verify' },
   { id: '4g', step: 4, title: 'Who does what' },
   { id: '5', step: 5, title: 'Buildings agree' },
+  { id: '5b', step: 5, title: 'How the two halves talk' },
   { id: '6', step: 6, title: 'Storage behaviour' },
   { id: '7a', step: 7, title: 'Results' },
   { id: '7b', step: 7, title: 'Scale' },
@@ -38,6 +39,9 @@ export type StoryData = {
   search: SearchSpace | null
   robust: Record<string, string>[]
   admmSlot: number
+  admmRounds: { k: number; r_primal: number; agreed: boolean; proposals: Record<string, number[]> }[]
+  v2: V2Data | null                 // optimiser v2 results for this day (null if the v2 benchmark has not been run)
+  v2ex: V2Example | null            // v2 worked example (headline day only)
 }
 
 /** The worked example: the headline day's server room at the outage evening slot (a live_solve record);
@@ -79,7 +83,14 @@ export function useStoryData(key: string) {
         const search = await getJSON<SearchSpace>('search_space.json').catch(() => null)
         const live = sc.live_solve ?? []
         if (!live.length) throw new Error('scenario has no live_solve records (worked example)')
-        if (!off) setD({ sc, q, example: pickExample(live), miss: pickMiss(live), summary, problem, search, robust, admmSlot: pickAdmmSlot(sc) })
+        // optimiser v2: when its run exists, "Q-Grid" in the story is the v2 run (v1 kept as qgrid_v1 for comparison)
+        if (sc.runs.qgrid_v2) { (sc.runs as any).qgrid_v1 = sc.runs.qgrid; sc.runs.qgrid = sc.runs.qgrid_v2 }
+        const v2ex = sc.v2?.example ?? null
+        const example: LiveSolve = v2ex ? { ...v2ex.block, explanation: [] } : pickExample(live)
+        const admmSlot = v2ex ? v2ex.slot : pickAdmmSlot(sc)
+        const admmRounds = v2ex ? v2ex.admm_rounds : (sc.admm.iterations[String(admmSlot)] ?? [])
+        if (!off) setD({ sc, q, example, miss: v2ex ? null : pickMiss(live), summary, problem, search, robust, admmSlot, admmRounds,
+          v2: sc.v2 ?? null, v2ex })
       } catch (e) { if (!off) setErr(String(e)) }
     })()
     return () => { off = true }

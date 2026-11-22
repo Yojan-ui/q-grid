@@ -47,7 +47,7 @@ export default function App() {
     if (play) { setT(0); setPlaying(!reducedMotion()); if (reducedMotion()) setT(95.99) }
     else {
       setPlaying(false)
-      setT(stop === '2' ? 48 : stop === '5' ? d.admmSlot : stop === '7b' ? 95.99 : d.example.slot)
+      setT(stop === '2' ? 48 : stop === '5' || stop === '5b' ? d.admmSlot : stop === '7b' ? 95.99 : d.example.slot)
     }
     if (stop === '5') setAdmmRound(0)
     if (stop !== '5') setKilled(null)
@@ -68,7 +68,7 @@ export default function App() {
   // step 5: negotiation rounds advance on their own once, then hold
   useEffect(() => {
     if (stop !== '5' || !d) return
-    const n = d.sc.admm.iterations[String(d.admmSlot)]?.length ?? 0
+    const n = d.admmRounds.length
     if (admmRound >= n - 1 || reducedMotion()) { if (reducedMotion() && admmRound < n - 1) setAdmmRound(n - 1); return }
     const id = setTimeout(() => setAdmmRound(k => k + 1), admmRound === 0 ? 1400 : 700)
     return () => clearTimeout(id)

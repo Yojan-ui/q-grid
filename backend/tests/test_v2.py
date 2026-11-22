@@ -17,6 +17,8 @@ DAY, OUT = "2023-06-15", ["18:00", "21:00"]
 
 @pytest.fixture(scope="module")
 def setup():
+    if not (qd.PROC / "pv.parquet").exists():
+        pytest.skip("processed data not built (python scripts/fetch_data.py && make data); raw data is not in git")
     c = load_campus()
     p = qd.load_processed()
     return c, p, YearData(c, p, "A", forecast=False)
@@ -132,3 +134,17 @@ def test_demand_charge_optimum_shaves_peak(setup):
     m1 = settle_v2(c, day, b4_central_milp.solve_dc(c, day))
     assert m1["peak_kva"] <= m0["peak_kva"] + 1e-6
     assert m1["objective_incl_demand_rs"] <= m0["objective_incl_demand_rs"] * (1 + 1e-3)
+
+
+def test_hardware_runs_only_with_token_and_opt_in(monkeypatch):
+    pytest.importorskip("qiskit")
+    import importlib.util
+    import pathlib
+    spec = importlib.util.spec_from_file_location("hw", pathlib.Path(__file__).resolve().parents[2] / "scripts" / "hardware_v2.py")
+    hw = importlib.util.module_from_spec(spec); spec.loader.exec_module(hw)
+    for k in ("QGRID_IBM_TOKEN", "QGRID_ALLOW_IBM", "DWAVE_API_TOKEN", "QGRID_ALLOW_DWAVE"):
+        monkeypatch.delenv(k, raising=False)
+    assert hw._ready("QGRID_IBM_TOKEN", "QGRID_ALLOW_IBM", "qiskit_ibm_runtime") == (False, "no token (QGRID_IBM_TOKEN not set)")
+    monkeypatch.setenv("QGRID_IBM_TOKEN", "x")
+    ok, why = hw._ready("QGRID_IBM_TOKEN", "QGRID_ALLOW_IBM", "qiskit_ibm_runtime")
+    assert not ok and "opted in" in why

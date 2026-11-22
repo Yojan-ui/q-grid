@@ -46,6 +46,7 @@ class V2Config:
     shots: int = 256
     seed: int = 1234
     peak_shaving: bool = True
+    record_slots: tuple = ()          # decision slots whose QAOA master blocks are saved (hardware comparison)
     master_every: int = 4             # Benders master (commitment) re-optimised every N slots; dispatch every slot
     radius0: int = 3
 
@@ -66,6 +67,7 @@ class V2Config:
 @dataclass
 class V2Log:
     steps: list = field(default_factory=list)
+    blocks: list = field(default_factory=list)     # recorded QAOA master blocks (QUBO, shots, exact optimum)
 
     def summary(self) -> dict:
         ms = [s for s in self.steps if s.get("master", True)] or self.steps
@@ -183,8 +185,29 @@ def _best_prices(campus, blp, res, ys, H):
     return lam_b if vb > va else lam_a
 
 
+def _slot_net(campus, yd, gslot, t0, sched, states):
+    """Actual net power of every zone in one slot (actual solar, the applied commands)."""
+    demand = yd.load[:, gslot].copy()
+    for i, b in enumerate(campus.buildings):
+        demand[i] += sum(j.kw for j in b.flex if j.name in states[i].started
+                         and states[i].started[j.name] <= t0 < states[i].started[j.name] + j.slots)
+        if b.tank:
+            demand[i] += sched.pump_on[i, t0] * b.tank.pump_kw
+    net = demand - yd.pv[:, gslot] + sched.p_bat[:, t0] - sched.dg_kw[:, t0]
+    for l, (a, c) in enumerate(campus.lines):
+        net[a] += sched.flows[l, t0]; net[c] -= sched.flows[l, t0]
+    return {"net": net, "demand": demand}
+
+
 def run_day_v2(campus: Campus, yd: YearData, day: str, outage: list[str] | None, cfg: V2Config,
                slots: int = T) -> tuple[Schedule, V2Log]:
+    # numpy on macOS Accelerate emits spurious matmul warnings on finite inputs; results are checked by tests
+    with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
+        return _run_day_v2(campus, yd, day, outage, cfg, slots)
+
+
+def _run_day_v2(campus: Campus, yd: YearData, day: str, outage: list[str] | None, cfg: V2Config,
+                slots: int = T) -> tuple[Schedule, V2Log]:
     tv = campus.cfg["tariff_v2"]
     oc = campus.cfg["outage_costs"]
     demand = {"voll_nc": float(oc["voll_noncritical_rs_kwh"]), "voll_c": float(oc["voll_critical_rs_kwh"]),
@@ -270,8 +293,9 @@ def run_day_v2(campus: Campus, yd: YearData, day: str, outage: list[str] | None,
             else:
                 new = []
                 for i, m in enumerate(masters):
+                    rec = log.blocks if (t0 in cfg.record_slots and k == 0) else None
                     yh, Jh, st = m.heuristic(best[1][i], cfg.solver, int(rng.integers(1 << 30)), cfg.sweeps, cfg.max_q,
-                                             p=cfg.p, shots=cfg.shots)
+                                             p=cfg.p, shots=cfg.shots, record=rec, tag={"zone": campus.names[i], "t0": t0})
                     master_opt.append(bool(Jh <= ex[i][1] + 1e-6 * max(1.0, abs(ex[i][1]))))
                     block_opt += st.block_opt
                     block_solves += st.block_solves if cfg.solver == "qaoa" else 0
@@ -290,6 +314,7 @@ def run_day_v2(campus: Campus, yd: YearData, day: str, outage: list[str] | None,
                 flows0.setdefault(l, float(bl.get(xs[i], f"f{k_}")[0]))
         # ---- apply the first slot through the safety layer, advance with the actual solar
         gslot = d0 + t0
+        e_before = [s_.e for s_ in states]
         for i, b in enumerate(campus.buildings):
             bl, xi, y, lay = blp[i], xs[i], ybest[i], lays[i]
             s = states[i]
@@ -297,7 +322,6 @@ def run_day_v2(campus: Campus, yd: YearData, day: str, outage: list[str] | None,
                 p = float(bl.get(xi, "ch")[0] - bl.get(xi, "dis")[0])
                 p = clamp_battery(b.battery, s.e, p)
                 sched.p_bat[i, t0] = p
-                s.e = float(b.battery.step(s.e, p))
             if b.dg:
                 want = float(lay.D_on[0] @ y) > 0.5
                 run_on = s.dg_run if s.dg_on else 0
@@ -322,16 +346,21 @@ def run_day_v2(campus: Campus, yd: YearData, day: str, outage: list[str] | None,
             prev_pat[i] = _pattern(lay, y)
         for l in range(len(campus.lines)):
             sched.flows[l, t0] = clamp_flow(flows0.get(l, 0.0), campus.step_kw)
+        # critical-load guard (safety layer): in an outage, if a building's actual deficit would reach its
+        # critical load, discharge its battery further (within SoC and power limits) to cover the gap
+        if not w.grid[0]:
+            net = _slot_net(campus, yd, gslot, t0, sched, states)
+            for i, b in enumerate(campus.buildings):
+                dem_i = net["demand"][i]
+                gap_kw = net["net"][i] - max(dem_i - yd.crit[i, gslot], 0.0)
+                if gap_kw > 0 and b.battery.present:
+                    sched.p_bat[i, t0] = clamp_battery(b.battery, e_before[i], sched.p_bat[i, t0] - gap_kw - 1e-3)
+        for i, b in enumerate(campus.buildings):
+            if b.battery.present:
+                states[i].e = float(b.battery.step(e_before[i], sched.p_bat[i, t0]))
         # metered campus import this slot (actual solar) updates the peak already set today
         if w.grid[0]:
-            net = (yd.load[:, gslot] - yd.pv[:, gslot] + sched.p_bat[:, t0] - sched.dg_kw[:, t0])
-            for i, b in enumerate(campus.buildings):
-                net[i] += sum(j.kw for j in b.flex if j.name in states[i].started
-                              and states[i].started[j.name] <= t0 < states[i].started[j.name] + j.slots)
-                if b.tank:
-                    net[i] += sched.pump_on[i, t0] * b.tank.pump_kw
-            for l, (a, c) in enumerate(campus.lines):
-                net[a] += sched.flows[l, t0]; net[c] -= sched.flows[l, t0]
+            net = _slot_net(campus, yd, gslot, t0, sched, states)["net"]
             p_sofar = max(p_sofar, float(np.maximum(net, 0).sum() / dem["pf"]))
         u = _shift_z(u, cfg.H) if u else None
         log.steps.append({"t0": t0, "master": run_master, "iters": len(it_log), "gap": it_log[-1]["gap"] if it_log else np.nan,

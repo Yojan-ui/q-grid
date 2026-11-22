@@ -22,6 +22,14 @@ bench:         ## all methods, both price scenarios, 6 scenarios + 30-day set (~
 	$(PY) scripts/write_results_md.py
 	$(PY) scripts/make_manifest.py
 
+bench-v2:      ## optimiser v2 benchmark (hybrid Benders MPC vs v1 vs baselines, ~1 h on 8 workers)
+	$(PY) scripts/run_benchmark_v2.py
+	$(PY) scripts/run_benchmark_v2.py --retry-failed
+	$(PY) scripts/write_results_md.py
+
+hardware-v2:   ## optional: IBM Quantum / D-Wave comparison; skips unless tokens + opt-in are set
+	$(PY) scripts/hardware_v2.py
+
 replay:        ## replay JSON -> results/replay + frontend/public/replay
 	$(PY) scripts/make_replay.py
 

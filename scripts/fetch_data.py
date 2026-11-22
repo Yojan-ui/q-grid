@@ -69,6 +69,29 @@ def fetch_nasa_clearsky(year: int) -> Path:
     return out
 
 
+BDG2_FILES = {
+    "LICENSE": "https://raw.githubusercontent.com/buds-lab/building-data-genome-project-2/master/LICENSE",
+    "metadata.csv": "https://media.githubusercontent.com/media/buds-lab/building-data-genome-project-2/master/data/metadata/metadata.csv",
+    "electricity_cleaned.csv": "https://media.githubusercontent.com/media/buds-lab/building-data-genome-project-2/master/data/meters/cleaned/electricity_cleaned.csv",
+}
+
+
+def fetch_bdg2() -> Path:
+    """Building Data Genome Project 2 (CC BY-SA 4.0): education-campus hourly electricity meters, 2016-17."""
+    d = RAW / "bdg2"
+    d.mkdir(parents=True, exist_ok=True)
+    for name, url in BDG2_FILES.items():
+        out = d / name
+        if out.exists() and out.stat().st_size > 1000:
+            print(f"[bdg2]    cached {out.relative_to(ROOT)}")
+            continue
+        print(f"[bdg2]    GET {url}")
+        r = requests.get(url, timeout=1200, headers={"User-Agent": "qgrid-data-fetch/0.1"})
+        r.raise_for_status()
+        out.write_bytes(r.content)
+    return d
+
+
 MANUAL = {
     "ausgrid": dict(
         dir=RAW / "ausgrid",
@@ -146,6 +169,7 @@ def main() -> int:
     args = ap.parse_args()
     fetch_nasa(args.year)
     fetch_nasa_clearsky(args.year)
+    fetch_bdg2()
     ok = all([check_manual(n, args.year) for n in MANUAL])
     if not ok:
         print("Some raw data is missing; complete the manual steps above, then re-run.")

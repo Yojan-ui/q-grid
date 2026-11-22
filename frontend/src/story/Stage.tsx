@@ -73,7 +73,7 @@ function Scene({ stop, d, t, zone, onZone, killed, admmRound, pulseKey }: StageP
       case '4e': return { pos: add(A, rotY([0, 76, 116])), target: add(A, rotY([0, 40, 0])) }
       case '4f': return { pos: add(A, rotY([50, 90, 180])), target: add(A, [0, 8, 0]) }
       case '4g': return { pos: [380, 600, 820], target: [-60, 0, 0] }
-      case '5': return { pos: [-20, 1120, 170], target: [-20, 0, 0] }
+      case '5': case '5b': return { pos: [-20, 1120, 170], target: [-20, 0, 0] }
       case '6': return { pos: [150, 250, 400], target: [-40, 0, 0] }
       case '7a': return { pos: [0, 760, 1060], target: [0, 0, 60] }
       case '7b': return { pos: [0, 1450, 1750], target: [0, 0, 60], fov: 36 }
@@ -83,15 +83,18 @@ function Scene({ stop, d, t, zone, onZone, killed, admmRound, pulseKey }: StageP
   // ADMM overlay (step 5): each cable shows both ends' proposals for the chosen round
   const lineViews = useMemo((): LineView[] | null => {
     if (stop !== '5') return null
-    const rounds = sc.admm.iterations[String(d.admmSlot)] ?? []
+    const rounds = d.admmRounds
     const r = rounds[Math.min(admmRound, rounds.length - 1)]
     if (!r) return null
+    // label only the three largest disagreements so the numbers stay readable; colour shows every cable
+    const gaps = sc.campus.lines.map((_, i) => { const [a, b] = r.proposals[String(i)] ?? [0, 0]; return Math.abs(a - b) })
+    const top = new Set(gaps.map((g, i) => [g, i]).filter(([g]) => g >= 1).sort((x, y) => y[0] - x[0]).slice(0, 3).map(([, i]) => i))
     return sc.campus.lines.map((_, i) => {
       const [a, b] = r.proposals[String(i)] ?? [0, 0]
       const ok = Math.abs(a - b) < 1
-      return { color: ok ? C.accent : C.grid, w: ok ? 3.2 : 1.6, label: ok ? undefined : `${Math.round(a)} ≠ ${Math.round(b)}` }
+      return { color: ok ? C.accent : C.grid, w: ok ? 3.2 : 1.6, label: ok || !top.has(i) ? undefined : `${Math.round(a)} ≠ ${Math.round(b)}` }
     })
-  }, [stop, admmRound, d.admmSlot, sc])
+  }, [stop, admmRound, d.admmRounds, sc])
 
   // primary campus: splits right for the side-by-side result (7a/7b)
   const primary = useRef<THREE.Group>(null!)
@@ -121,7 +124,7 @@ function Scene({ stop, d, t, zone, onZone, killed, admmRound, pulseKey }: StageP
       <Ground sc={sc} outline={stop !== '7a'} />
       <group ref={primary}>
         <Campus sc={sc} t={t} run={run} zones={zones} flows={flows} lift={lift} liftStagger={stop === '2' ? 0.07 : 0}
-          focus={focus} dimOthers={dim} killed={stop === '5' ? killed : null} labels={(stop === '2' && !zone) || stop === '5' ? 'names' : 'none'}
+          focus={focus} dimOthers={dim} killed={stop === '5' ? killed : null} labels={stop === '2' && !zone ? 'names' : 'none'}
           lineViews={lineViews} onZone={onZone} interactive={stop === '2'} storage={stop !== '5'}
           subLabel={stop !== '7a' && stop !== '7b' && stop !== '4g'} batteryScale={stop === '6' ? 1.7 : 1} socLabels={stop === '6'} />
         {zones.map(z => <DeviceIcons key={z.name} sc={sc} z={z} slot={slot} show={stop === '2' && zone === z.name} />)}

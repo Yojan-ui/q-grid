@@ -42,7 +42,7 @@ def _edge_slices(H: int, L: int, k: int, peak: bool = True):
 
 def run_admm(campus: Campus, blp: list[BuildingLP], ys: list[np.ndarray], rho: float, max_iter: int,
              tol: float, z0: dict | None = None, u0: dict | None = None, x0: list | None = None,
-             alpha: float = 1.6, balance: bool = True) -> AdmmResult:
+             alpha: float = 1.6, balance: bool = True, trace: list | None = None) -> AdmmResult:
     H = blp[0].H
     n = campus.n
     sl = {}
@@ -82,6 +82,10 @@ def run_admm(campus: Campus, blp: list[BuildingLP], ys: list[np.ndarray], rho: f
             u[(c, l)] += hc - zn
             r_max = max(r_max, float(np.abs(xa - zn).max()), float(np.abs(xc - zn).max()))
         r_hist.append(r_max); s_hist.append(s_max)
+        if trace is not None:        # both ends' proposals for each cable's flow in the current slot
+            trace.append({"k": it, "r": r_max, "proposals": {
+                l: [float(x[a][blp[a].coupled][sl[(a, l)]][0]), float(x[c][blp[c].coupled][sl[(c, l)]][0])]
+                for l, (a, c) in ends.items()}})
         if r_max <= tol and s_max <= tol:
             converged = True
             break

@@ -156,3 +156,23 @@ export function GapBars({ rows }: { rows: { method: string; name: string; gap: n
     </div>
   )
 }
+
+/** Benders bounds per round (step 5b): best upper bound and lower bound, Rs over the 24 h horizon. */
+export function BoundsChart({ iters }: { iters: { k: number; best_UB: number; LB: number }[] }) {
+  const data = iters.map(r => ({ k: r.k, ub: r.best_UB, lb: r.LB }))
+  const lo = Math.min(...data.map(d => d.lb)), hi = Math.max(...data.map(d => d.ub))
+  const pad = (hi - lo) * 0.08 || 1
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ height: 150 }}><ResponsiveContainer>
+        <ComposedChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 8 }}>
+          <XAxis dataKey="k" {...axis} />
+          <YAxis {...axis} width={58} domain={[Math.floor(lo - pad), Math.ceil(hi + pad)]} tickFormatter={(v: number) => `${Math.round(v / 1000)}k`} />
+          <Line dataKey="ub" name="upper bound (best plan)" stroke={C.text} strokeWidth={1.6} isAnimationActive={false} dot={{ r: 2.5 }} />
+          <Line dataKey="lb" name="lower bound (exact master)" stroke={C.quantum} strokeWidth={1.6} isAnimationActive={false} dot={{ r: 2.5 }} />
+        </ComposedChart>
+      </ResponsiveContainer></div>
+      <div className="legend-row small"><span><i style={{ background: C.text, height: 2 }} />upper bound: best plan so far</span><span><i style={{ background: C.quantum, height: 2 }} />lower bound: exact master with all cuts</span></div>
+    </div>
+  )
+}
