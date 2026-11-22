@@ -107,7 +107,7 @@ campus:
              pump_kw: 30, pump_m3_per_slot: 8.0, daily_demand_m3: 320}   # ASSUMPTIONS
 
 loads:
-  source: templates         # bdg2 (real meter shapes, data/raw/bdg2) | templates (configs/profiles.yaml + Ausgrid hostels)
+  source: bdg2              # bdg2 (real meter shapes, data/raw/bdg2) | templates (configs/profiles.yaml + Ausgrid hostels)
 
 bdg2:                       # zone -> BDG2 primary / sub use (metadata.csv); zones not listed keep their profile
   zones:
@@ -136,6 +136,8 @@ outage_costs:                 # ASSUMPTIONS: value of lost load used only inside
 
 economics:                    # ASSUMPTIONS for payback / per-semester figures
   battery_capex_rs_per_kwh: 25000
+  battery_cycle_life: 4000      # ASSUMPTION: full cycles to end of life (LFP datasheet class), for degradation cost
+  discount_rate: 0.08           # ASSUMPTION: for the 10-year NPV of savings
   semester_days: 120
 
 # ----------------------------------------------------------------------------- prices

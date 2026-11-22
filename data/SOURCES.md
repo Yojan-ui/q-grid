@@ -9,7 +9,8 @@ Status legend: **REAL** = official/primary data in `data/raw/` and used for resu
 |---|---|---|---|
 | NASA POWER hourly (ALLSKY_SFC_SW_DWN, T2M), 12.92N 77.50E, 2023 | **REAL** | PV output, sun position | `data/raw/nasa_power/bengaluru_2023_hourly.json` |
 | NASA POWER hourly clear-sky (CLRSKY_SFC_SW_DWN), same site, 2023 | **REAL** | v2 solar forecast (clear-sky envelope) | `data/raw/nasa_power/bengaluru_2023_hourly_clearsky.json` |
-| Ausgrid Solar Home Electricity Data 2012-13 (half-hourly, 300 homes) | **REAL** | building load shapes | `data/raw/ausgrid/Solar home 2012-2013.csv` (+ archive zip, notes PDF) |
+| Building Data Genome Project 2 (BDG2): hourly electricity meters, 1,578 non-residential buildings, 2016-17 | **REAL** | zone load shapes (7 of 9 zones) | `data/raw/bdg2/electricity_cleaned.csv`, `metadata.csv`, `LICENSE` |
+| Ausgrid Solar Home Electricity Data 2012-13 (half-hourly, 300 homes) | REAL, **superseded by BDG2** (used only if `loads.source: templates`) | hostel load shape (v1) | `data/raw/ausgrid/Solar home 2012-2013.csv` (+ archive zip, notes PDF) |
 | BESCOM HT educational tariff with ToD + KERC solar export rate | **PENDING** | price scenario A (headline) | `data/raw/tariff/` |
 | IEX Day-Ahead Market 15-min MCP, 2023 | **PENDING** | price scenario B | `data/raw/iex/` |
 | CEA CO2 Baseline Database (grid weighted-average emission factor) | **PENDING** | CO2 accounting | `data/raw/cea/` |
@@ -35,7 +36,37 @@ Status legend: **REAL** = official/primary data in `data/raw/` and used for resu
   last observed hour, blended towards yesterday's daily clearness for longer lead times). The forecast only
   uses data up to the decision time; its error against the actual (ALLSKY-based) PV is reported.
 
-## Ausgrid Solar Home Electricity Data — REAL
+## Building Data Genome Project 2 (BDG2) — REAL
+- Paper: Miller, C., Kathirgamanathan, A., Picchetti, B. et al. "The Building Data Genome Project 2, energy meter data
+  from the ASHRAE Great Energy Predictor III competition." *Scientific Data* 7, 368 (2020). Repository
+  `https://github.com/buds-lab/building-data-genome-project-2` (Zenodo record 3887306).
+- Files (Git LFS media URLs, fetched 2026-11-22 by `scripts/fetch_data.py`, `fetch_bdg2`):
+  `data/meters/cleaned/electricity_cleaned.csv` (174,977,911 bytes, SHA-256 b6ffc9b4dfcefe5c753594730a08ae822b0d50fec6815abb8f185591e6c630a3),
+  `data/metadata/metadata.csv` (272,024 bytes, SHA-256 992d0b29f24f96ad4332bc4dbb534b7bdd7dd2689aad093f94e93068ecddca02), `LICENSE`.
+- Licence: **Creative Commons Attribution-ShareAlike 4.0** (`data/raw/bdg2/LICENSE`). Derived zone load profiles in
+  `data/processed/load.parquet` are shared under the same licence; attribution as above.
+- Mapping (config.yaml `bdg2.zones`; buildings kept if >= 90 % of hours present, each normalised by its own mean,
+  median across buildings per hour):
+
+  | Zone | BDG2 primary use / sub use | buildings |
+  |---|---|---:|
+  | academic | Education / College Classroom, Academic, Classroom | 130 |
+  | heavy_labs | Education / College Laboratory, Research | 124 |
+  | hostels | Lodging/residential / Dormitory, Residence Hall | 86 |
+  | library | Public services / Library | 48 |
+  | canteen | Education / Student Union | 11 |
+  | admin | Office / Office | 235 |
+  | health_centre | Healthcare / Hospital, Patient Care | 11 |
+  | server_room | none (no data centre in BDG2): flat profile, ASSUMPTION | – |
+
+- Calendar mapping: each 2023 date takes one real 2016/17 source day — RVCE teaching/exam/fest weekdays -> source
+  term-time weekdays (same weekday), RVCE vacation -> source break weekdays (June-August and 20 Dec - 5 Jan,
+  ASSUMPTION), weekends -> source term-time weekends; seeded per zone and date (`qgrid/bdg2.py`).
+- Limitations: the buildings are in North America and Europe (BDG2 sites), so HVAC base load and climate differ from
+  Bengaluru, and the source "break" months are northern summer. Shapes are real; magnitudes are still floor area x EPI
+  (PENDING RVCE meter data / bills).
+
+## Ausgrid Solar Home Electricity Data — REAL (superseded by BDG2 for loads)
 - Original publisher: Ausgrid (dataset page `https://www.ausgrid.com.au/Industry/Our-Research/Data-to-share/Solar-home-electricity-data`,
   no longer online in 2026; metadata record: `https://data.gov.au/data/en/dataset/nsw-solar-home-electricty-data`).
 - Copy used: archive by Pierre Haessig, `https://pierreh.eu/downloads/Ausgrid_solar_home_data.zip`

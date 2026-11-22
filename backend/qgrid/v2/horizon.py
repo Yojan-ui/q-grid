@@ -46,8 +46,9 @@ def _ratio(num: np.ndarray, den: np.ndarray, default: float) -> float:
 
 
 class SolarForecast:
-    def __init__(self, year: int, tau_slots: float = 16.0):
-        self.act, self.cs = _per_kwp(year)
+    def __init__(self, year: int, tau_slots: float = 16.0, arrays: tuple | None = None):
+        """arrays = (actual, clear-sky) PV per kWp for another dataset; default: RVCE files for `year`."""
+        self.act, self.cs = arrays if arrays is not None else _per_kwp(year)
         self.tau = tau_slots
 
     def kt(self, g0: int, H: int) -> np.ndarray:
@@ -101,7 +102,8 @@ class YearData:
         self.pe = pr[f"{scenario}_export"].to_numpy()
         self.index = proc["pv"].index
         self.kwp = np.array([b.pv_kwp for b in campus.buildings])
-        self.fc = SolarForecast(int(self.index[0].year), tau) if forecast else None
+        self.arrays = (proc["per_kwp_act"], proc["per_kwp_cs"]) if "per_kwp_act" in proc else None
+        self.fc = SolarForecast(int(self.index[0].year), tau, self.arrays) if forecast else None
 
     def day_start(self, day: str) -> int:
         return int(np.searchsorted(self.index, pd.Timestamp(day)))

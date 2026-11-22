@@ -27,3 +27,4 @@ frontend/dist/
 results/net/node_*.json
 results/net/
 docs/media/story/*.webm
+results/**/*.pkl
