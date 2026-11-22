@@ -1,300 +1,377 @@
-import { useEffect, useMemo } from 'react'
-import { animate, AnimatePresence, motion, useMotionValue, useTransform } from 'framer-motion'
-import { Area, Bar, BarChart, Cell, ComposedChart, Line, LineChart, ReferenceArea, ReferenceLine, ResponsiveContainer, XAxis, YAxis } from "recharts"
+// Right-hand explanation: "Step X of 7", one sentence, a few lines of support, key numbers, Back / Next.
+// Every figure is read from the replay (StoryData); this file only words and formats them.
+import { useMemo } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
-import type { QaoaFile, Scenario } from '../lib/data'
-import { C, fmtDate, num, pct, rs, SCEN, zn } from '../lib/theme'
-import { type Beat, campusSoc, measure, rulesFor, stepOf, varInfo } from './model'
+import { C, num, pct, reducedMotion, rs } from '../lib/theme'
+import { devices, fmtDate, METHOD, varLabel, zn } from '../lib/labels'
+import { campusSoc, STEP_COUNT, STOPS, subOf, type StopId, type StoryData } from '../lib/story'
+import { CountUp, DayChart, GapBars, outageSpan, ResidualChart, SocChart } from './charts'
+import { FORMULA, N } from '../panels/Prov'
 
-const reduced = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-const STEP_TITLE = ['', 'The problem', 'The campus', 'The decisions', 'How we use quantum', 'Buildings agree', 'Storage through the day', 'Results and scale']
-
-export function CountUp({ to, fmt, dur = 1.2 }: { to: number; fmt: (v: number) => string; dur?: number }) {
-  const mv = useMotionValue(0)
-  const txt = useTransform(mv, v => fmt(v))
-  useEffect(() => { const c = animate(mv, to, { duration: reduced ? 0 : dur, ease: [0.33, 1, 0.68, 1] }); return () => c.stop() }, [to])
-  return <motion.span className="tn">{txt}</motion.span>
+export type PanelProps = {
+  stop: StopId; d: StoryData; t: number; playing: boolean; onPlay: () => void
+  zone: string | null; setZone: (z: string | null) => void
+  killed: string | null; setKilled: (z: string | null) => void
+  admmRound: number; setAdmmRound: (k: number) => void
+  replayPulse: () => void; showMiss: boolean; setShowMiss: (v: boolean) => void
+  onPrev: () => void; onNext: () => void; go: (i: number) => void; index: number
 }
 
-function Fig({ label, children, tone }: { label: string; children: React.ReactNode; tone?: string }) {
-  return <div className="fig"><div className="fig-v" style={{ color: tone }}>{children}</div><div className="fig-l">{label}</div></div>
+const Pending = ({ what }: { what: string }) => <span className="pending" title={`${what} is a labelled stand-in until the official data arrives`}>stand-in</span>
+
+function Key({ label, children, pending, note }: { label: string; children: React.ReactNode; pending?: string; note?: string }) {
+  return <div className="key"><span className="kl">{label}{pending && <Pending what={pending} />}</span><b className="kv">{children}</b>{note && <span className="kn">{note}</span>}</div>
 }
 
-function Tex({ src }: { src: string }) {
-  const html = useMemo(() => katex.renderToString(src, { throwOnError: false, displayMode: true }), [src])
-  return <div className="tex" dangerouslySetInnerHTML={{ __html: html }} />
+export function Panel(p: PanelProps) {
+  const s = STOPS[p.index]
+  const subs = subOf(p.stop)
+  const subIdx = subs.findIndex(x => x.id === p.stop)
+  const body = useMemo(() => content(p), [p.stop, p.t, p.zone, p.killed, p.admmRound, p.showMiss, p.playing, p.d])
+  const fade = reducedMotion() ? { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 } }
+    : { initial: { opacity: 0, y: 14 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -10 } }
+  return (
+    <aside className="panel" aria-live="polite">
+      <div className="stepnums" role="tablist" aria-label="steps">
+        {Array.from({ length: STEP_COUNT }, (_, k) => k + 1).map(n => (
+          <button key={n} role="tab" aria-selected={s.step === n} className={s.step === n ? 'on' : n < s.step ? 'done' : ''}
+            onClick={() => p.go(STOPS.findIndex(x => x.step === n))} title={STOPS.find(x => x.step === n)!.title}>{n}</button>))}
+        <div className="stepno"><span>Step {s.step} of {STEP_COUNT}</span><span className="muted">· {s.title}</span>
+          {subs.length > 1 && <span className="subdots" aria-label={`part ${subIdx + 1} of ${subs.length}`}>{subs.map((x, i) => <i key={x.id} className={i === subIdx ? 'on' : i < subIdx ? 'done' : ''} />)}</span>}
+        </div>
+      </div>
+      <div className="panel-scroll">
+        <AnimatePresence mode="wait">
+          <motion.section key={p.stop} {...fade} transition={{ duration: reducedMotion() ? 0.15 : 0.45, ease: [0.65, 0, 0.35, 1] }}>
+            <h1 className="answer">{body.answer}</h1>
+            {body.support && <div className="support">{body.support}</div>}
+            {body.keys && <div className={`keys-row ${p.stop === '7a' ? 'k4' : ''}`}>{body.keys}</div>}
+            {body.extra}
+          </motion.section>
+        </AnimatePresence>
+      </div>
+      <nav className="pager" aria-label="story navigation">
+        <div className="progress" role="progressbar" aria-valuemin={1} aria-valuemax={STOPS.length} aria-valuenow={p.index + 1}>
+          {STOPS.map((x, i) => <button key={x.id} className={`${i === p.index ? 'on' : ''} ${i < p.index ? 'done' : ''} ${x.step !== STOPS[i - 1]?.step ? 'first' : ''}`}
+            onClick={() => p.go(i)} aria-label={`Step ${x.step}: ${x.title}`} title={`${x.step} · ${x.title}`} />)}
+        </div>
+        <div className="pager-row">
+          <button className="btn ghost" onClick={p.onPrev} disabled={p.index === 0}>← Back</button>
+          <span className="muted small">← → keys or scroll</span>
+          <button className="btn primary" onClick={p.onNext} disabled={p.index === STOPS.length - 1}>Next →</button>
+        </div>
+      </nav>
+    </aside>
+  )
 }
 
-type Props = { beat: Beat; sc: Scenario; q: QaoaFile; idx: any; t: number; focus: string; round: number; setRound: (r: number) => void;
-  admmT: number; removed: string | null; setRemoved: (z: string | null) => void; robust: Record<string, string>[]; search: any }
+type Body = { answer: React.ReactNode; support?: React.ReactNode; keys?: React.ReactNode; extra?: React.ReactNode }
 
-export function StoryText(p: Props) {
-  const { beat, sc, q } = p
-  const step = stepOf(beat)
-  const meas = useMemo(() => measure(q), [q])
-  const n = q.n_qubits
-  const pending = sc.price_status !== 'REAL'
-  const body = (() => {
-    switch (beat) {
-      case '1': {
-        const pr = (sc as any).problem
-        return {
-          answer: 'On an ordinary day RVCE sells its noon solar cheaply and buys power back in the evening; in an outage every building fends for itself.',
-          support: [`${SCEN[sc.scenario.key]}, ${fmtDate(sc.scenario.date)}. Watch the green ribbons leave for the BESCOM substation at noon and the red ones return after dark.`,
-            sc.scenario.outage ? `BESCOM supply fails from ${sc.scenario.outage[0]} to ${sc.scenario.outage[1]}; only the hostels and admin block have diesel generators.` : 'Each building acts alone: no battery strategy, no sharing.'],
-          figs: pr && <div className="figs">
-            <Fig label="value lost per day" tone={C.grid}><CountUp to={pr.rs_lost} fmt={rs} /></Fig>
-            <Fig label="CO₂ per day"><CountUp to={pr.co2_kg} fmt={v => `${num(v)} kg`} /></Fig>
-            <Fig label="diesel hours"><CountUp to={pr.dg_hours} fmt={v => `${v.toFixed(1)} h`} /></Fig>
-          </div>,
-          extra: <DayProblem sc={sc} t={p.t} />,
-          note: pending ? 'Prices are stand-ins until the official BESCOM/KERC tariff is added (PENDING).' : '',
-        }
-      }
-      case '2': {
-        const z = sc.campus.zones.find(x => x.name === p.focus)!
-        return {
-          answer: 'Every 15 minutes we decide what each of these devices does.',
-          support: ['Nine zones, mapped from OpenStreetMap. Hover a zone to lift it; click to see its devices.'],
-          extra: <Asset z={z} />,
-        }
-      }
-      case '3': {
-        const zones = p.search?.local_qubo_qubits ?? {}
-        return {
-          answer: `In the ${zn(q.zone)} at ${sc.slots.t[q.slot]} that is ${n} yes/no decisions.`,
-          support: ['Each tile is one decision for the next 45 minutes: charge or not, diesel on or off, start a load or wait, share power or not.'],
-          figs: <div className="figs">
-            <Fig label="decisions in this building"><CountUp to={n} fmt={v => num(v)} /></Fig>
-            <Fig label="possible plans for this building"><CountUp to={2 ** n} fmt={v => num(v)} /></Fig>
-            <Fig label="plans for the whole campus, one day" tone={C.quantum}><span className="tn">2<sup>{num(p.search?.centralised_full_day?.N_binary ?? 0)}</sup></span></Fig>
-          </div>,
-          note: `Decisions per zone: ${Object.entries(zones).map(([k, v]) => `${zn(k)} ${v}`).join(', ')}.`,
-        }
-      }
-      case '4a': return { answer: 'Each yes/no decision becomes one qubit.',
-        support: [`${n} qubits can hold all ${num(2 ** n)} plans at once (a superposition), so the algorithm weighs them together instead of one by one.`] }
-      case '4b': return { answer: 'The goals and rules become one cost formula that links the qubits.',
-        support: ['Lines show which decisions affect each other; thicker means a stronger effect on cost.'],
-        extra: <><ul className="rules">{rulesFor(q).map(r => <li key={r.text}><i className={`k-${r.kind}`} />{r.text}</li>)}</ul>
-          <Tex src={'E(x)=\\sum_i Q_{ii}\\,x_i+\\sum_{i<j} Q_{ij}\\,x_i x_j,\\quad x_i\\in\\{0,1\\}'} />
-          <p className="muted small">This is a QUBO: the cheapest valid plan has the lowest E. Broken rules add a large penalty.</p></> }
-      case '4c': return { answer: `QAOA repeats two moves ${q.gammas.length} times: favour cheap plans, then mix.`,
-        support: ['Start: every plan equally likely. Cost layer: plans are tilted by how much they cost. Mix layer: likelihood flows between neighbouring plans.'],
-        extra: <p className="muted small">Angles learned on separate training days: γ = {q.gammas.map(g => g.toFixed(2)).join(', ')}; β = {q.betas.map(b => b.toFixed(2)).join(', ')}. Simulated on a laptop with qiskit-aer (ideal, noiseless).</p> }
-      case '4d': return { answer: 'Measuring the circuit many times gives a histogram; the best plan seen wins.',
-        support: ['We take 256 measurements and keep the cheapest valid plan among them.'],
-        figs: <div className="figs">
-          <Fig label="chance of the optimum per shot" tone={C.quantum}><span className="tn">{(100 * q.optimum.p_opt).toFixed(2)}%</span></Fig>
-          <Fig label="by pure guessing"><span className="tn">{(100 * q.uniform_p).toFixed(3)}%</span></Fig>
-        </div> }
-      case '4e': {
-        const acts = q.var_names.map((v, i) => ({ v, info: varInfo(v, sc, q.zone), b: Number((meas.winBits ?? q.optimum.bits)[i]) }))
-          .filter(a => a.b === 1 || ['g', 'w', 'c0', 'd0'].includes(a.v))
-        return { answer: 'The winning bits are turned back into device actions.',
-          support: [`For the next 15 minutes the ${zn(q.zone)}:`],
-          extra: <ul className="acts">{acts.map(a => <li key={a.v}><b>{a.b ? a.info.on : a.info.off}</b><span className="muted"> — {a.info.label.toLowerCase()}</span></li>)}</ul> }
-      }
-      case '4f': {
-        const live = sc.live_solve?.find(l => l.zone === q.zone && l.slot === q.slot)
-        const ours = sc.benchmark.find(r => r.method === 'OURS' && r.price_scenario === 'A')
-        const tot = ours ? ['tier_qaoa', 'tier_qiea', 'tier_anneal', 'tier_exact'].reduce((a, k) => a + (ours[k] ?? 0), 0) : 0
-        return { answer: `Every quantum answer is checked against an exact search of all ${num(2 ** n)} plans.`,
-          support: ['If the quantum plan is not the true optimum, the building falls back to a quantum-inspired search, then annealing, then the exact answer — so no schedule ever depends on the quantum result being right.'],
-          extra: <div className="verify">
-            <div><span className="muted">Quantum (QAOA)</span><code>{meas.winBits ?? '—'}</code></div>
-            <div><span className="muted">Exact search</span><code>{q.optimum.bits}</code></div>
-            <div className={meas.gap !== null && meas.gap <= 1e-9 ? 'ok' : 'gap'}>{meas.gap === null ? 'no valid sample — fallback used' : meas.gap <= 1e-9 ? '✓ identical — verified optimal' : `gap ${(100 * meas.gap).toFixed(2)}% — fallback used`}</div>
-            {live && <div className="muted small">Time on a laptop: simulated QAOA {(live.qaoa.time_s * 1000).toFixed(1)} ms, exact search {(live.exact.time_s * 1000).toFixed(1)} ms. At {n} qubits both are instant; simulation cost doubles with every extra qubit.</div>}
-            {ours && tot > 0 && <div className="muted small">Across this whole day: QAOA's answer was verified optimal in {pct(100 * ours.tier_qaoa / tot)} of {num(tot)} building-level solves.</div>}
-          </div> }
-      }
-      case '4g': return { answer: 'Quantum chooses the yes/no plan inside each building. Everything else is classical.',
-        extra: <div className="who">
-          <div className="col q"><h4>Quantum circuit (simulated)</h4><p>QAOA picks each building's on/off plan for the next 45 minutes.</p></div>
-          <div className="col c"><h4>Classical</h4><p>Negotiation between buildings, battery cost-to-go, safety limits, exact verification, fallbacks.</p></div>
-          <p className="muted small">QAOA runs on a local simulator and is verified against exact solutions; no quantum advantage is claimed. QIEA is quantum-inspired and runs on an ordinary CPU.</p>
-        </div> }
-      case '5': return { answer: 'Neighbouring buildings agree on how much power to share by trading proposals — there is no central computer.',
-        support: ['Each round, both ends of a tie-line propose a flow; they move towards each other until they match.'], extra: <AdmmPanel {...p} /> }
-      case '6': {
-        const qs = campusSoc(sc, 'qgrid'), d = qs.slice(1).map((v, i) => v - qs[i])
-        const mid = Math.max(...d.slice(36, 64)), eve = Math.min(...d.slice(68, 92))
-        const answer = mid > 0.5 && eve < -0.5 ? 'Batteries now charge from noon solar and discharge at the evening peak.'
-          : mid > 0.5 ? 'Batteries now charge from noon solar and hold that energy for later.'
-          : 'Batteries follow the cost-to-go plan; on this day they move little.'
-        return { answer, extra: <Storage sc={sc} t={p.t} /> }
-      }
-      case '7': {
-        const g = (m: string) => sc.benchmark.find(r => r.method === m && r.price_scenario === 'A')
-        const o = g('OURS'), b0 = g('B0')
-        const cheaper = o && b0 && o.cost_rs < b0.cost_rs, safer = o && b0 && o.critical_downtime_h < b0.critical_downtime_h - 1e-9
-        const answer = !o || !b0 ? 'The same day, coordinated.'
-          : safer && cheaper ? `The same day, coordinated: cheaper and with less critical downtime, ${o.gap_to_B4_pct.toFixed(1)}% from the best possible plan.`
-          : safer ? `Critical downtime falls from ${b0.critical_downtime_h.toFixed(1)} h to ${o.critical_downtime_h.toFixed(1)} h; cost rises because diesel covers it.`
-          : cheaper ? `The same day, coordinated: ${rs(b0.cost_rs - o.cost_rs)} cheaper than today, ${o.gap_to_B4_pct.toFixed(1)}% from the best possible plan.`
-          : 'The same day, coordinated: no cheaper than today on this day — see the table.'
-        return { answer, extra: <Results sc={sc} /> }
+function content(p: PanelProps): Body {
+  const { d } = p
+  const { sc, example: ex, q } = d
+  const out = outageSpan(sc)
+  const slotT = (i: number) => sc.slots.t[Math.min(95, i)]
+  const zi = sc.campus.zones.findIndex(z => z.name === ex.zone)
+  const priceStatus = sc.price_status !== 'REAL'
+  const cea = sc.data_status?.cea !== 'REAL'
+  switch (p.stop) {
+    case '1': {
+      const pr = d.problem
+      const noonPrice = sc.slots.price_export[48], evePrice = Math.max(...sc.slots.price_import)
+      return {
+        answer: out ? <>Today the campus sells noon solar cheaply, buys power back expensively in the evening, and runs diesel when the grid fails.</>
+          : <>Today the campus sells noon solar cheaply and buys power back expensively in the evening.</>,
+        support: <>
+          <p>A modelled {SCENARIO(sc)} day ({fmtDate(sc.scenario.date)}){out ? `, with BESCOM supply down ${slotT(out[0])}–${slotT(out[1])}` : ''}. Every building acts on its own.</p>
+          {pr && <p>Around noon it exported <b className="tn">{num(Number(pr.noon_export_kwh))} kWh</b> at Rs {noonPrice}/kWh; in the evening it imported <b className="tn">{num(Number(pr.evening_import_kwh))} kWh</b> at up to Rs {evePrice}/kWh.</p>}
+        </>,
+        keys: sc.problem && <>
+          <Key label="Value lost per day" pending={priceStatus ? 'Tariff' : undefined}><CountUp value={sc.problem.rs_lost} format={rs} /></Key>
+          <Key label="CO₂ per day" pending={cea ? 'CEA CO₂ factor' : undefined}><CountUp value={sc.problem.co2_kg} format={v => `${num(v)} kg`} delay={0.1} /></Key>
+          <Key label="Diesel running" note={`critical loads unserved ${sc.problem.critical_downtime_h.toFixed(1)} h`}><CountUp value={sc.problem.dg_hours} format={v => `${v.toFixed(1)} h`} delay={0.2} /></Key>
+        </>,
+        extra: <>
+          <DayChart sc={sc} t={p.t} />
+          {sc.problem && <p className="muted small defn">Value lost = Σ over zones of min(kWh exported by day, kWh bought back later) × (average later import price − average export price). {num(sc.problem.reusable_kwh)} kWh qualify on this day.</p>}
+          <div className="row"><button className="btn ghost small" onClick={p.onPlay}>{p.playing ? 'Pause the day' : 'Replay the day'}</button></div>
+        </>,
       }
     }
-  })()!
-  return (
-    <AnimatePresence mode="wait">
-      <motion.div key={beat} className="story-text" initial={{ opacity: 0, y: reduced ? 0 : 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: reduced ? 0 : -8 }}
-        transition={{ duration: reduced ? 0.15 : 0.45, ease: [0.65, 0, 0.35, 1] }}>
-        <div className="kicker">Step {beat.length > 1 ? beat : step} of 7 · {STEP_TITLE[step]}</div>
-        <h1>{body.answer}</h1>
-        {body.support?.map((s, i) => <p key={i} className="support">{s}</p>)}
-        {body.figs}
-        {body.extra}
-        {body.note && <p className="note">{body.note}</p>}
-      </motion.div>
-    </AnimatePresence>
-  )
+    case '2': {
+      const zs = sc.campus.zones
+      const sel = zs.find(z => z.name === p.zone)
+      return {
+        answer: <>Every 15 minutes we decide what each of these does.</>,
+        support: <p>RVCE as {zs.length} zones traced from OpenStreetMap, joined by {sc.campus.lines.length} cables. Click a building to see what it can control.</p>,
+        keys: <>
+          <Key label="Rooftop solar">{num(zs.reduce((a, z) => a + z.pv_kwp, 0))} kWp</Key>
+          <Key label="Batteries">{num(zs.reduce((a, z) => a + z.battery_kwh, 0))} kWh</Key>
+          <Key label="Diesel sets">{num(zs.reduce((a, z) => a + z.dg_kw, 0))} kW</Key>
+        </>,
+        extra: <>
+          <div className="chips">{zs.map(z => <button key={z.name} className={`chip ${p.zone === z.name ? 'on' : ''}`} onClick={() => p.setZone(p.zone === z.name ? null : z.name)}>{zn(z.name)}</button>)}</div>
+          {sel ? (
+            <div className="card">
+              <h3>{zn(sel.name)}</h3>
+              <ul className="devlist">{devices(sel, sc).map(dv => <li key={dv.id ?? dv.key}><i className={`dot ${dv.key}`} /><span>{dv.label}</span><span className="muted tn">{dv.detail}</span></li>)}</ul>
+              <p className="muted small">Loads are area-based estimates until RVCE meter data arrives.</p>
+            </div>
+          ) : <p className="muted small">Tip: hover lifts a building; click focuses it.</p>}
+        </>,
+      }
+    }
+    case '3': {
+      const n = ex.n_qubits
+      const ss = d.search?.centralised_full_day
+      return {
+        answer: <>Each choice is a yes/no question, and the questions multiply fast.</>,
+        support: <p>The {zn(ex.zone).toLowerCase()} at {ex.time}{out && ex.slot >= out[0] && ex.slot < out[1] ? ', during the outage' : ''}: its battery over the next 45 minutes and its {ex.var_names.filter(v => v[0] === 'p').length} cables. Each tile is one decision.</p>,
+        extra: <Multiply n={n} N={ss?.N_binary} log10={ss?.log10_states} zones={sc.campus.zones.length} slots={ss?.slots ?? 96} />,
+      }
+    }
+    case '4a': {
+      const maxQ = d.search ? Math.max(...Object.values(d.search.local_qubo_qubits)) : null
+      return {
+        answer: <>Each yes/no decision becomes one qubit.</>,
+        support: <>
+          <p>{ex.n_qubits} decisions, {ex.n_qubits} qubits. A qubit can be 0 and 1 at once, so the circuit works on all {num(2 ** ex.n_qubits)} plans together.</p>
+          <p>We never need more than 16 qubits per building{maxQ ? ` (the largest on this campus is ${maxQ})` : ''}, because each building only solves its own problem.</p>
+        </>,
+        keys: <><Key label="Qubits here">{ex.n_qubits}</Key><Key label="Plans held at once">{num(2 ** ex.n_qubits)}</Key></>,
+      }
+    }
+    case '4b': {
+      const rules = rulesFor(d)
+      const tex = katex.renderToString(String.raw`E(\mathbf{x}) = \sum_i Q_{ii}\,x_i + \sum_{i<j} 2\,Q_{ij}\,x_i x_j + c,\qquad x_i \in \{0,1\}`, { throwOnError: false, displayMode: true })
+      return {
+        answer: <>The building’s goals and rules become one cost. Lower is better.</>,
+        support: <p>A line joins two qubits whose choices affect each other. Thicker means a stronger effect.</p>,
+        extra: <>
+          <ul className="rules">{rules.map(r => <li key={r.text}><i style={{ background: r.kind === 'rule' ? C.grid : C.quantum }} />{r.text}</li>)}</ul>
+          <div className="legend-row small muted"><span><i style={{ background: C.grid }} />can’t do both (penalty)</span><span><i style={{ background: C.quantum }} />costs that interact</span></div>
+          <div className="formula" dangerouslySetInnerHTML={{ __html: tex }} />
+          <p className="muted small">This is a QUBO. Breaking a rule adds a large penalty, so plans that break rules are never the cheapest.</p>
+        </>,
+      }
+    }
+    case '4c': return {
+      answer: <>QAOA turns that cost into a circuit that makes cheap plans more likely.</>,
+      support: <ol className="steps">
+        <li><b>H</b>: start with every plan equally likely.</li>
+        <li><b>Cost layer γ</b>: give each plan a phase set by its cost.</li>
+        <li><b>Mixer β</b>: move probability towards the cheaper plans.</li>
+        <li>Repeat (p = {q.gammas.length}), then <b>measure</b>.</li>
+      </ol>,
+      keys: <>
+        <Key label="Layers (p)">{q.gammas.length}</Key>
+        <Key label="γ" note="trained once, reused"><span className="tn small-kv">{q.gammas.map(g => g.toFixed(2)).join(' · ')}</span></Key>
+        <Key label="β"><span className="tn small-kv">{q.betas.map(b => b.toFixed(2)).join(' · ')}</span></Key>
+      </>,
+      extra: <div className="row"><button className="btn ghost small" onClick={p.replayPulse}>Run the circuit again</button>
+        <span className="muted small">{q.simulator}</span></div>,
+    }
+    case '4d': {
+      const shots = ex.qaoa.shots ?? []
+      const total = shots.reduce((a, s) => a + s.count, 0)
+      const win = shots.find(s => s.bits === ex.qaoa.best_bits)
+      const valid = shots.filter(s => s.feasible).reduce((a, s) => a + s.count, 0)
+      return {
+        answer: <>We measure the circuit {total} times and keep the cheapest plan that breaks no rule.</>,
+        support: <p>Each bar is a plan that came up in the measurements; taller means it came up more often. Grey bars break a rule, for example charging and discharging together, and are thrown away. The cheapest valid plan wins even if it is not the tallest bar.</p>,
+        extra: <>
+          <div className="legend-row"><span><i style={{ background: C.quantum }} />chosen plan</span><span><i style={{ background: '#C9BFFB' }} />other valid plans</span><span><i style={{ background: '#E2E1DB' }} />✕ breaks a rule</span><span><i style={{ background: C.muted, height: 2 }} />random guess</span></div>
+          <p className="muted small">Shots measured by the pipeline: {ex.qaoa.backend ?? 'replay'}. Nothing here is re-sampled in the browser.</p>
+        </>,
+        keys: <>
+          <Key label="Chosen plan came up">{win ? `${win.count} of ${total}` : 'not measured'}</Key>
+          <Key label="Valid measurements">{valid} of {total}</Key>
+          <Key label="Distinct plans seen">{shots.length}</Key>
+        </>,
+      }
+    }
+    case '4e': {
+      const best = ex.qaoa.best_bits ?? ex.exact.bits
+      const yes = ex.var_names.map((v, i) => ({ v, on: best[i] === '1', l: varLabel(v, ex.zone, ex.slot, sc) }))
+      const bat = yes.filter(y => y.l.device === 'battery')
+      const soc = sc.runs.qgrid.soc[zi]?.[ex.slot]
+      return {
+        answer: <>The winning bitstring decodes back into what each device does.</>,
+        support: <>
+          <ul className="actions">
+            {yes.filter(y => y.on).map(y => <li key={y.v}><code>q{ex.var_names.indexOf(y.v)}=1</code>{y.l.short}</li>)}
+            {bat.length > 0 && bat.every(b => !b.on) && <li><code>battery 0s</code>Battery holds{soc !== undefined ? ` (${Math.round(100 * soc)}% full)` : ''}</li>}
+          </ul>
+          <p className="muted small">Then the tiles drop back into the {zn(ex.zone).toLowerCase()}: on the map, its cables now carry the agreed flows.</p>
+        </>,
+        keys: <Key label={`Plan, q0 → q${ex.n_qubits - 1}`}><code className="bits">{best}</code></Key>,
+      }
+    }
+    case '4f': {
+      const show = p.showMiss && d.miss ? d.miss : ex
+      const ok = show.qaoa.best_bits === show.exact.bits
+      const tiers = sc.admm.summary.tiers as Record<string, number> | undefined
+      const total = sc.admm.summary.n_local_solves as number | undefined
+      return {
+        answer: <>Every QAOA answer is checked against an exact search of all {num(2 ** ex.n_qubits)} plans.</>,
+        support: <p>If QAOA’s plan isn’t the exact optimum, the next solver takes over: QIEA, then annealing, then exact search. A safety layer checks every command before it reaches a device.</p>,
+        extra: <>
+          <div className={`card verify ${ok ? 'ok' : 'gap'}`}>
+            <div className="vrow head"><span>{zn(show.zone)} · {show.time}</span><span className={`badge ${ok ? 'ok' : 'gap'}`}>{ok ? '✓ match' : 'miss → fallback'}</span></div>
+            <div className="vrow"><span className="muted">QAOA plan (cheapest valid of {(show.qaoa.shots ?? []).reduce((a, x) => a + x.count, 0) || 256} shots)</span><code className="bits">{show.qaoa.best_bits ?? 'none feasible'}</code></div>
+            <div className="vrow"><span className="muted">Exact optimum</span><code className="bits">{show.exact.bits}</code></div>
+            <div className="vrow"><span className="muted">Cost vs optimum</span><span className="tn">{ok ? 'equal' : `${(100 * Math.abs(1 - show.qaoa.approx_ratio)).toFixed(1)}% off`}</span></div>
+            <div className="vrow"><span className="muted">Time (Qiskit Aer simulation / exact)</span><span className="tn">{(show.qaoa.time_s * 1000).toFixed(1)} ms / {(show.exact.time_s * 1000).toFixed(1)} ms</span></div>
+          </div>
+          {d.miss && <button className="btn ghost small" onClick={() => p.setShowMiss(!p.showMiss)}>{p.showMiss ? 'Back to the matching example' : 'Show a case where QAOA misses'}</button>}
+          {tiers && total && <p className="small">On this day, whose answer was used: QAOA <b className="tn">{num(tiers.qaoa ?? 0)}</b>, QIEA <b className="tn">{num(tiers.qiea ?? 0)}</b>, annealing <b className="tn">{num(tiers.anneal ?? 0)}</b>, exact <b className="tn">{num(tiers.exact ?? 0)}</b>, out of {num(total)} local solves.</p>}
+          <p className="muted small">{show.exact.time_s <= show.qaoa.time_s ? `At ${show.n_qubits} qubits exact search on a laptop is faster than simulating the circuit` : `At ${show.n_qubits} qubits both take milliseconds`}. We claim correctness, not speed.</p>
+        </>,
+      }
+    }
+    case '4g': return {
+      answer: <>Quantum picks each building’s yes/no plan. Everything around it is classical.</>,
+      support: <>
+        <p><b style={{ color: C.quantum }}>Quantum (QAOA):</b> choosing the plan inside each building, up to 16 qubits.</p>
+        <p><b>Classical:</b> agreement between buildings, checking each answer, fallback solvers and the safety layer.</p>
+      </>,
+      extra: <div className="honest">{sc.label}. {sc.qiea_label}.</div>,
+    }
+    case '5': {
+      const rounds = sc.admm.iterations[String(d.admmSlot)] ?? []
+      const r = rounds[Math.min(p.admmRound, rounds.length - 1)]
+      const agreed = r ? Object.values(r.proposals).filter(([a, b]) => Math.abs(a - b) < 1).length : 0
+      const sm = sc.admm.summary
+      const kill = d.robust.find(x => x.mode === 'in-process' && x.scenario === sc.scenario.key)
+      const net = d.robust.find(x => x.mode === 'networked' && x.scenario === sc.scenario.key && x.method === 'OURS')
+      return {
+        answer: <>Buildings agree on what each cable carries by talking only to their neighbours.</>,
+        support: <p>At {slotT(d.admmSlot)}, both ends of each cable propose a flow every round. Red means they disagree; blue means they agree. There is no central computer.</p>,
+        keys: <>
+          <Key label="Round"><span className="tn">{(r?.k ?? 0) + 1} / {rounds.length}</span></Key>
+          <Key label="Cables agreed"><span className="tn">{agreed} / {sc.campus.lines.length}</span></Key>
+        </>,
+        extra: <>
+          <ResidualChart rounds={rounds} k={p.admmRound} />
+          <div className="row">
+            <button className="btn ghost small" onClick={() => p.setAdmmRound(Math.max(0, p.admmRound - 1))} disabled={p.admmRound === 0}>‹ round</button>
+            <button className="btn ghost small" onClick={() => p.setAdmmRound(Math.min(rounds.length - 1, p.admmRound + 1))} disabled={p.admmRound >= rounds.length - 1}>round ›</button>
+            <button className="btn ghost small" onClick={() => p.setAdmmRound(0)}>replay</button>
+          </div>
+          <p className="small muted">Disagreement (kW) per round. Over the whole day, all cables agreed in {Math.round(96 * (sm.admm_convergence_rate ?? 0))} of 96 slots. In the rest, each remaining cable was settled between its two buildings ({num(sm.resolved_bilateral ?? 0)} times), which is always safe.</p>
+          <div className="card">
+            <div className="row"><b>Remove a building</b><button className={`btn small ${p.killed ? 'primary' : 'ghost'}`} onClick={() => p.setKilled(p.killed ? null : 'heavy_labs')}>{p.killed ? `Bring ${zn('heavy_labs').toLowerCase()} back` : `Take ${zn('heavy_labs').toLowerCase()} offline`}</button></div>
+            {p.killed && <p className="small">Its cables go dark and the others carry on. Measured in the replay: the schedule stayed {kill?.feasible === 'True' ? 'feasible' : kill ? 'infeasible' : 'untested'}{net?.recovery_time_s ? `, neighbours noticed in ${Number(net.recovery_time_s).toFixed(1)} s (networked run)` : ''}{kill?.slots_to_reconverge ? `, and full agreement returned after ${Math.round(Number(kill.slots_to_reconverge))} slots` : ''}.</p>}
+          </div>
+        </>,
+      }
+    }
+    case '6': {
+      const qg = campusSoc(sc, 'qgrid'), sq = campusSoc(sc, 'status_quo')
+      const o = out?.[0] ?? 72
+      return {
+        answer: <>Q-Grid fills the batteries before the evening outage and uses them while the grid is down.</>,
+        support: <p>Batteries next to each building fill and empty through the day. The chart shows the campus battery level, status quo against Q-Grid, with diesel and the pump on the same time axis.</p>,
+        keys: <>
+          <Key label={`Battery at ${slotT(o)}`}><span className="tn">{pct(100 * qg[o])}</span><span className="vs tn"> vs {sq.length ? pct(100 * sq[o]) : '–'}</span></Key>
+          {(() => { const o6 = sc.benchmark.find(r => r.method === 'OURS' && r.price_scenario === 'A'), z6 = sc.benchmark.find(r => r.method === 'B0' && r.price_scenario === 'A'); return o6 && z6 && <Key label="Diesel hours"><span className="tn">{o6.dg_hours.toFixed(2)}</span><span className="vs tn"> vs {z6.dg_hours.toFixed(2)}</span></Key> })()}
+        </>,
+        extra: <>
+          <SocChart sc={sc} t={p.t} />
+          <div className="row"><button className="btn ghost small" onClick={p.onPlay}>{p.playing ? 'Pause' : 'Replay the day'}</button><span className="muted small tn">{slotT(Math.floor(p.t))}</span></div>
+        </>,
+      }
+    }
+    case '7a': {
+      const rows = d.summary.filter(r => r.day_set === 'eval30_mean' && r.price_scenario === 'A')
+      const get = (m: string) => rows.find(r => r.method === m)
+      const ours30 = get('OURS')
+      const order = ['B0', 'B1', 'B3', 'B5', 'OURS', 'OURS-QIEA']
+      const bars = order.map(m => get(m)).filter(Boolean).map(r => ({ method: r!.method, name: METHOD[r!.method] ?? r!.method, gap: Number(r!.gap_to_B4_pct), ours: r!.method.startsWith('OURS') }))
+      const bm = (m: string) => sc.benchmark.find(r => r.method === m && r.price_scenario === 'A')
+      const B0 = bm('B0'), OU = bm('OURS'), B4 = bm('B4')
+      const tiers = sc.admm.summary.tiers as Record<string, number> | undefined
+      const solves = sc.admm.summary.n_local_solves as number | undefined
+      const src = `results/benchmark.csv: scenario=${sc.scenario.key}, price_scenario=A`
+      const prov = (m: string, k: string) => ({ label: `${METHOD[m] ?? m} · ${k}`, unit: '', formula: FORMULA[k] ?? k, file: 'results/benchmark.csv', fn: 'scripts/run_benchmark.py', row: `${src}, method=${m}` })
+      if (!B0 || !OU || !B4) return { answer: <>Results for this day are in the Verify tab.</> }
+      const dCost = 100 * (OU.cost_rs / B0.cost_rs - 1)
+      const outage = B0.critical_downtime_h > 0 || OU.critical_downtime_h > 0
+      return {
+        answer: outage
+          ? <>{out ? 'In the outage' : 'On this day'}, critical loads go without power for {OU.critical_downtime_h.toFixed(1)} h instead of {B0.critical_downtime_h.toFixed(1)} h.</>
+          : <>No critical load is lost on this day{B0.dg_hours > 0 || OU.dg_hours > 0 ? `; Q-Grid runs diesel ${OU.dg_hours.toFixed(1)} h instead of ${B0.dg_hours.toFixed(1)} h` : ''}, and Q-Grid lands {Number(OU.gap_to_B4_pct).toFixed(1)}% from the best possible plan.</>,
+        support: <p>Every method ran on the same day, data and constraints ({fmtDate(sc.scenario.date)}{out ? `, BESCOM down ${slotT(out[0])}–${slotT(out[1])}` : ''}).</p>,
+        keys: <>
+          <Key label="Critical-load downtime" note={`optimum ${B4.critical_downtime_h.toFixed(1)} h`}><N v={`${B0.critical_downtime_h.toFixed(1)} → ${OU.critical_downtime_h.toFixed(1)} h`} info={prov('OURS', 'critical_downtime_h')} /></Key>
+          <Key label="Diesel running"><N v={`${B0.dg_hours.toFixed(2)} → ${OU.dg_hours.toFixed(2)} h`} info={prov('OURS', 'dg_hours')} /></Key>
+          <Key label="Gap to optimum" note="this day"><N v={`${Number(OU.gap_to_B4_pct).toFixed(1)}%`} info={prov('OURS', 'gap_to_B4_pct')} /></Key>
+          {tiers && solves && <Key label="QAOA answer used" note={`all ${num(solves)} checked vs exact`}>{pct(100 * (tiers.qaoa ?? 0) / solves)}</Key>}
+        </>,
+        extra: <>
+          <p className="secondary small">Cost of the day {priceStatus && <Pending what="Tariff" />}: <span className="tn"><N v={rs(B0.cost_rs)} info={prov('B0', 'cost_rs')} /> → <N v={rs(OU.cost_rs)} info={prov('OURS', 'cost_rs')} /> ({dCost >= 0 ? '+' : ''}{dCost.toFixed(1)}%)</span>{dCost > 0 && outage ? ', because diesel and batteries are spent keeping critical loads on' : ''}. Final once the official BESCOM/KERC tariff is added.</p>
+          <h3 className="sub">Gap to the central optimum, 30-day mean {priceStatus && <Pending what="Tariff" />}</h3>
+          <GapBars rows={bars} />
+          <p className="muted small">Q-Grid {ours30 ? `${Number(ours30.gap_to_B4_pct).toFixed(1)}%` : '–'} above optimum over 30 modelled days. GA/PSO, CO₂ and run times are in the Verify tab; click any figure for its source.</p>
+        </>,
+      }
+    }
+    case '7b': {
+      const qs = d.search ? Object.values(d.search.local_qubo_qubits) : []
+      return {
+        answer: <>As the network grows, each building’s problem stays the same size.</>,
+        support: <>
+          <p>More buildings means more neighbours to agree with, not more qubits per building. On this campus each zone needs {qs.length ? `${Math.min(...qs)}–${Math.max(...qs)}` : '≤16'} qubits.</p>
+          <ul className="levels">
+            <li><b>RVCE</b> {sc.campus.zones.length} zones, {sc.campus.lines.length} cables: the modelled campus.</li>
+            <li><b>Cluster of campuses</b>: more zones, the same per-zone qubit count.</li>
+            <li><b>City feeder</b>: campuses agree flows over the feeder the way zones agree over cables.</li>
+          </ul>
+        </>,
+        extra: <p className="honest">The cluster and feeder views are an illustration, not results. New campuses can be modelled with <code>scripts/new_campus.py</code>.</p>,
+      }
+    }
+  }
 }
 
-function DayProblem({ sc, t }: { sc: Scenario; t: number }) {
-  const r = sc.runs.status_quo!
-  const data = sc.slots.t.map((_, i) => ({ i, solar: sc.slots.pv_kw.reduce((a, z) => a + z[i], 0), load: (r as any).demand_kw ? (r as any).demand_kw.reduce((a: number, z: number[]) => a + z[i], 0) : 0,
-    price: sc.slots.price_import[i], exp: r.grid_export_kw[i], imp: r.grid_import_kw[i] }))
-  const expSpan = data.filter(d => d.exp > 1), impSpan = data.filter(d => d.imp > 1 && d.i >= 68)
-  const out = sc.slots.grid_up.indexOf(0)
+const SCENARIO = (sc: StoryData['sc']) => ({ outage_fest: 'fest', fest: 'fest', teaching: 'teaching', exam_week: 'exam-week', vacation: 'vacation', monsoon: 'monsoon' } as Record<string, string>)[sc.scenario.key] ?? sc.scenario.key
+
+/** Plain-English rules present in the worked example's QUBO (from the variable structure in qgrid/qubo.py). */
+function rulesFor(d: StoryData): { text: string; kind: 'rule' | 'cost' }[] {
+  const { sc, example: ex } = d
+  const names = ex.var_names
+  const zone = sc.campus.zones.find(z => z.name === ex.zone)!
+  const up = sc.slots.grid_up[ex.slot] === 1
+  const out: { text: string; kind: 'rule' | 'cost' }[] = []
+  if (up) out.push({ text: `Buying grid power costs Rs ${sc.slots.price_import[ex.slot]}/kWh; selling earns Rs ${sc.slots.price_export[ex.slot]}/kWh`, kind: 'cost' })
+  else out.push({ text: zone.critical_frac > 0 ? 'Grid is down: critical load must be served' : 'Grid is down: unserved load costs the most', kind: 'rule' })
+  if (names.some(v => /^c\d$/.test(v))) {
+    out.push({ text: 'Battery can’t charge and discharge in the same slot', kind: 'rule' })
+    out.push({ text: 'Battery stays between its minimum and maximum charge', kind: 'rule' })
+    out.push({ text: 'Energy kept in the battery is worth money later today', kind: 'cost' })
+  }
+  if (names.some(v => /^p\d+$/.test(v))) {
+    out.push({ text: 'A cable can’t send and receive at once', kind: 'rule' })
+    out.push({ text: 'Stay close to what the neighbours proposed', kind: 'cost' })
+  }
+  if (names.includes('g')) out.push({ text: 'Running diesel costs fuel', kind: 'cost' })
+  if (names.includes('w')) out.push({ text: 'Keep the tank within its levels', kind: 'rule' })
+  return out
+}
+
+/** Step 3 counter: decisions -> plans for one building -> plans for the campus day. */
+function Multiply({ n, N: Nb, log10, zones, slots }: { n: number; N?: number; log10?: number; zones: number; slots: number }) {
+  const r = reducedMotion()
+  const item = (k: number) => ({ initial: { opacity: 0, y: 8 }, animate: { opacity: 1, y: 0 }, transition: { delay: r ? 0 : 0.5 + k * 0.7, duration: r ? 0 : 0.5 } })
   return (
-    <div className="chart">
-      <div style={{ height: 120 }}>
-        <ResponsiveContainer><ComposedChart data={data} margin={{ top: 6, right: 0, left: 0, bottom: 0 }}>
-          <XAxis dataKey="i" ticks={[0, 24, 48, 72, 95]} tickFormatter={i => sc.slots.t[i]} stroke={C.muted} fontSize={11} tickLine={false} axisLine={{ stroke: C.hair }} />
-          <YAxis yAxisId="kw" hide /><YAxis yAxisId="rs" hide orientation="right" />
-          {expSpan.length > 0 && <ReferenceArea yAxisId="kw" x1={expSpan[0].i} x2={expSpan[expSpan.length - 1].i} fill={C.solar} fillOpacity={0.07} label={{ value: 'sold cheap', position: 'insideTop', fill: C.solar, fontSize: 11 }} />}
-          {impSpan.length > 0 && <ReferenceArea yAxisId="kw" x1={impSpan[0].i} x2={impSpan[impSpan.length - 1].i} fill={C.grid} fillOpacity={0.07} label={{ value: 'bought expensive', position: 'insideTop', fill: C.grid, fontSize: 11 }} />}
-          {out >= 0 && <ReferenceArea yAxisId="kw" x1={out} x2={sc.slots.grid_up.lastIndexOf(0)} fill={C.text} fillOpacity={0.06} />}
-          <Area yAxisId="kw" dataKey="solar" stroke={C.solar} fill={C.solar} fillOpacity={0.12} strokeWidth={1.5} isAnimationActive={false} />
-          <Line yAxisId="kw" dataKey="load" stroke={C.text} dot={false} strokeWidth={1.5} isAnimationActive={false} />
-          <Line yAxisId="rs" dataKey="price" stroke={C.muted} dot={false} strokeWidth={1} strokeDasharray="4 3" type="stepAfter" isAnimationActive={false} />
-          <ReferenceLine yAxisId="kw" x={Math.min(95, Math.floor(t))} stroke={C.accent} />
-        </ComposedChart></ResponsiveContainer>
-      </div>
-      <div className="keys"><span><i style={{ background: C.solar }} />solar</span><span><i style={{ background: C.text }} />campus load</span><span><i className="dash" />import price</span>{out >= 0 && <span><i style={{ background: '#DDD' }} />outage</span>}</div>
+    <div className="multiply">
+      <motion.div {...item(0)} className="mrow"><b className="big tn">{n}</b><span>yes/no decisions for one building, one slot</span></motion.div>
+      <motion.div {...item(1)} className="mrow"><b className="big tn">2<sup>{n}</sup> = {num(2 ** n)}</b><span>possible plans for that building</span></motion.div>
+      {Nb && log10 && <motion.div {...item(2)} className="mrow"><b className="big tn">2<sup>{num(Nb)}</sup> ≈ 10<sup>{num(Math.floor(log10))}</sup></b>
+        <span>plans for the whole campus over one day ({zones} zones × {slots} slots, solved together)</span></motion.div>}
+      <motion.p {...item(3)} className="muted small">Checking them one by one is impossible, so each building solves only its own {num(2 ** n)} and then agrees with its neighbours.</motion.p>
     </div>
   )
 }
-
-function Asset({ z }: { z: any }) {
-  const rows: [string, string][] = [['Rooftop solar', `${num(z.pv_kwp)} kWp`]]
-  if (z.battery_kwh) rows.push(['Battery', `${num(z.battery_kwh)} kWh · ${num(z.battery_kw)} kW`])
-  if (z.dg_kw) rows.push(['Diesel generator', `${num(z.dg_kw)} kW`])
-  if (z.tank_m3) rows.push(['Borewell pump + tank', `${num(z.tank_m3)} m³`])
-  for (const f of z.flex ?? []) rows.push([f.name.replace(/_/g, ' ').replace(/^\w/, (c: string) => c.toUpperCase()), `${num(f.kw)} kW · ${f.slots * 15} min`])
-  rows.push(['Critical share of load', pct(100 * z.critical_frac)])
-  return (
-    <div className="asset">
-      <h3>{zn(z.name)}</h3>
-      <table><tbody>{rows.map(([a, b]) => <tr key={a}><td>{a}</td><td className="tn">{b}</td></tr>)}</tbody></table>
-      <p className="muted small">Capacities are engineering assumptions until RVCE asset data arrives.</p>
-    </div>
-  )
-}
-
-function AdmmPanel({ sc, round, setRound, admmT, removed, setRemoved, robust }: Props) {
-  const its = sc.admm.iterations[String(admmT)] ?? []
-  useEffect(() => {
-    setRound(0)
-    if (reduced) { setRound(its.length - 1); return }
-    let k = 0
-    const id = setInterval(() => { k = Math.min(its.length - 1, k + 1); setRound(k); if (k >= its.length - 1) clearInterval(id) }, 900)
-    return () => clearInterval(id)
-  }, [admmT, sc])
-  const data = its.map(r => ({ k: r.k + 1, r: r.r_primal }))
-  const kill = robust.find(r => r.mode === 'in-process' && r.scenario === sc.scenario.key)
-  return (
-    <div>
-      <div className="rounds">Round <b className="tn">{Math.min(round + 1, its.length)}</b> of {its.length} at {sc.slots.t[admmT]} {its[round]?.agreed ? <span className="ok">· all agreed</span> : null}</div>
-      <Residual data={data} round={round} />
-      <p className="muted small">Largest disagreement on any tie-line, in kW, per round.</p>
-      <button className="ghost" onClick={() => setRemoved(removed ? null : 'heavy_labs')}>{removed ? 'Put the mechanical labs back' : 'Remove a building (mechanical labs)'}</button>
-      {removed && kill && <p className="small">Its neighbours stop hearing from it within 3 seconds and cut their lines to it; the rest carry on. In the recorded failure run the schedule stayed feasible ({kill.feasible}) and full agreement returned after {kill.slots_to_reconverge || '–'} slots.</p>}
-    </div>
-  )
-}
-
-function Residual({ data, round }: { data: { k: number; r: number }[]; round: number }) {
-  const W = 320, H = 96, mx = Math.max(...data.map(d => d.r), 1), n = Math.max(data.length - 1, 1)
-  const x = (i: number) => 24 + (i / n) * (W - 32), y = (v: number) => 8 + (1 - v / mx) * (H - 28)
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="residual" role="img" aria-label="disagreement per round">
-      <line x1={24} x2={W - 8} y1={H - 20} y2={H - 20} stroke={C.hair} />
-      <text x={20} y={y(mx) + 4} fontSize={10} fill={C.muted} textAnchor="end">{Math.round(mx)}</text>
-      <text x={20} y={H - 16} fontSize={10} fill={C.muted} textAnchor="end">0</text>
-      <polyline fill="none" stroke={C.quantum} strokeWidth={1.5} points={data.map((d, i) => `${x(i)},${y(d.r)}`).join(' ')} />
-      {data.map((d, i) => <circle key={i} cx={x(i)} cy={y(d.r)} r={i === round ? 4 : 2.5} fill={i <= round ? C.quantum : '#fff'} stroke={C.quantum} />)}
-      {data.map((d, i) => <text key={`t${i}`} x={x(i)} y={H - 4} fontSize={10} fill={C.muted} textAnchor="middle">{d.k}</text>)}
-    </svg>
-  )
-}
-
-function Storage({ sc, t }: { sc: Scenario; t: number }) {
-  const q = campusSoc(sc, 'qgrid'), s = campusSoc(sc, 'status_quo')
-  const data = q.slice(0, 96).map((v, i) => ({ i, q: v, s: s[i] }))
-  const dq = q.slice(1).map((v, i) => v - q[i])
-  const argmax = (lo: number, hi: number, f: (i: number) => number) => { let b = lo; for (let i = lo; i < hi; i++) if (f(i) > f(b)) b = i; return b }
-  const ch = argmax(36, 64, i => dq[i]), dis = argmax(68, 92, i => -dq[i])
-  const out = sc.slots.grid_up.indexOf(0)
-  const ann = [{ i: ch, text: 'charged from noon solar' }, { i: dis, text: 'discharged at the evening peak' }]
-  if (out > 0) ann.push({ i: out, text: `${Math.round(q[out])}% in reserve when the outage starts` })
-  const tank = sc.campus.zones.find(z => z.tank_m3 > 0)
-  const dg = sc.campus.zones.map((z, i) => ({ z, i })).filter(x => x.z.dg_kw > 0)
-  return (
-    <div className="chart">
-      <div style={{ height: 150 }}><ResponsiveContainer><LineChart data={data} margin={{ top: 18, right: 4, left: -18, bottom: 0 }}>
-        <XAxis dataKey="i" ticks={[0, 24, 48, 72, 95]} tickFormatter={i => sc.slots.t[i]} stroke={C.muted} fontSize={11} tickLine={false} axisLine={{ stroke: C.hair }} />
-        <YAxis domain={[0, 100]} ticks={[20, 50, 95]} stroke={C.muted} fontSize={11} tickLine={false} axisLine={false} unit="%" />
-        <Line dataKey="s" stroke={C.muted} strokeDasharray="4 3" dot={false} isAnimationActive={false} name="status quo" />
-        <Line dataKey="q" stroke={C.battery} strokeWidth={2} dot={false} isAnimationActive={false} name="Q-Grid" />
-        {ann.map((a, k) => <ReferenceLine key={a.text} x={a.i} stroke={C.muted} strokeDasharray="2 3" label={{ value: String(k + 1), position: 'top', fontSize: 11, fill: C.text }} />)}
-        <ReferenceLine x={Math.min(95, Math.floor(t))} stroke={C.accent} />
-      </LineChart></ResponsiveContainer></div>
-      <div className="keys"><span><i style={{ background: C.battery }} />Q-Grid battery charge (campus)</span><span><i className="dash" />status quo</span></div>
-      <ol className="anns">{ann.map(a => <li key={a.text}><span className="tn">{sc.slots.t[a.i]}</span> {a.text}</li>)}</ol>
-      <div className="strip">
-        {tank && <div><span className="muted small">Tank</span><Spark v={sc.runs.qgrid.tank_m3[tank.name].slice(0, 96).map(x => x / tank.tank_m3)} color={C.water} /></div>}
-        {dg.map(({ z, i }) => <div key={z.name}><span className="muted small">Diesel · {zn(z.name)}</span><Strip on={sc.runs.qgrid.dg_kw[i].map(x => x > 0)} /></div>)}
-      </div>
-    </div>
-  )
-}
-function Spark({ v, color }: { v: number[]; color: string }) {
-  const d = v.map((x, i) => `${i ? 'L' : 'M'}${(i / 95) * 100},${20 - x * 18}`).join('')
-  return <svg viewBox="0 0 100 20" preserveAspectRatio="none" className="spark"><path d={d} stroke={color} fill="none" strokeWidth={1.2} vectorEffect="non-scaling-stroke" /></svg>
-}
-function Strip({ on }: { on: boolean[] }) {
-  return <svg viewBox="0 0 96 4" preserveAspectRatio="none" className="spark">{on.map((x, i) => x ? <rect key={i} x={i} y={0} width={1} height={4} fill={C.text} /> : null)}</svg>
-}
-
-const ORDER = ['B0', 'B1', 'B2-GA', 'B2-PSO', 'B3', 'B5', 'C-QIEA', 'OURS-QIEA', 'OURS', 'B4']
-const LBL: Record<string, string> = { B0: 'Status quo', B1: 'Rule-based', 'B2-GA': 'Genetic alg.', 'B2-PSO': 'Particle swarm', B3: 'Per-building MILP',
-  B5: 'ADMM + exact', 'C-QIEA': 'Central QIEA*', 'OURS-QIEA': 'ADMM + QIEA*', OURS: 'Q-Grid (ADMM + QAOA)', B4: 'Central optimum' }
-function Results({ sc }: { sc: Scenario }) {
-  const rows = ORDER.map(m => sc.benchmark.find(r => r.method === m && r.price_scenario === 'A')).filter(Boolean) as any[]
-  const b4 = rows.find(r => r.method === 'B4')?.objective_rs ?? 0
-  const h = sc.headline
-  return (
-    <div>
-      <div style={{ height: 150 }}><ResponsiveContainer><BarChart data={rows} layout="vertical" margin={{ top: 0, right: 40, left: 10, bottom: 0 }}>
-        <XAxis type="number" hide domain={[0, 'dataMax']} /><YAxis type="category" dataKey="method" interval={0} tickFormatter={m => LBL[m]} width={140} stroke={C.muted} fontSize={11} tickLine={false} axisLine={false} />
-        <ReferenceLine x={b4} stroke={C.text} strokeDasharray="3 3" label={{ value: 'optimum', fontSize: 10, fill: C.muted, position: 'top' }} />
-        <Bar dataKey="objective_rs" isAnimationActive={!reduced} animationDuration={900} label={{ position: 'right', fontSize: 10, fill: C.muted, formatter: (v: any) => `${Math.round(v / 1000)}k` }}>
-          {rows.map(r => <Cell key={r.method} fill={r.method === 'OURS' ? C.quantum : r.method === 'B4' ? C.text : '#D7D6CF'} />)}
-        </Bar>
-      </BarChart></ResponsiveContainer></div>
-      <p className="muted small">Daily cost in Rs thousands, including the value of unserved load (lower is better). *QIEA = quantum-inspired, classical CPU.</p>
-      <table className="res"><thead><tr><th></th><th>Rs/day</th><th>CO₂ kg</th><th>Diesel h</th><th>Gap to optimum</th><th>Run time</th></tr></thead>
-        <tbody>{rows.filter(r => ['B0', 'B3', 'B5', 'OURS', 'B4'].includes(r.method)).map(r => (
-          <tr key={r.method} className={r.method === 'OURS' ? 'ours' : ''}><td>{LBL[r.method]}</td><td className="tn">{rs(r.cost_rs)}</td><td className="tn">{num(r.co2_kg)}</td>
-            <td className="tn">{(r.dg_hours ?? 0).toFixed(1)}</td><td className="tn">{(r.gap_to_B4_pct ?? 0).toFixed(1)}%</td><td className="tn">{(r.runtime_s ?? 0).toFixed(0)} s</td></tr>))}</tbody></table>
-      {h && <p className="muted small">Outage during the fest: critical energy unserved <b className="tn">{Math.round(h.before.critical_unserved_kwh)} → {Math.round(h.after.critical_unserved_kwh)} kWh</b>; re-planning takes <b className="tn">{(h.after.replan_time_s * 1000).toFixed(0)} ms</b> per slot; the central optimum reaches {h.optimum_B4.critical_downtime_h.toFixed(2)} h of critical downtime.</p>}
-    </div>
-  )
-}
-
-export { STEP_TITLE }

@@ -197,6 +197,9 @@ def build_scenario(key: str) -> dict:
     if key == campus.cfg["headline_scenario"]:
         hj = ROOT / "results" / "headline.json"
         out["headline"] = json.loads(hj.read_text()) if hj.exists() else None
+    # worked examples (QAOA measured with Qiskit Aer + exact check) for every scenario, so each day in the demo's
+    # scenario picker shows pipeline results
+    if True:
         live = []
         soc = runs["qgrid"]["soc"]
         for i, b in enumerate(campus.buildings):
@@ -217,7 +220,7 @@ def build_scenario(key: str) -> dict:
                 total, *_ = Q.auto_tune(lp, qubos, enum=en)
                 import time as _t
                 t0 = _t.perf_counter(); ex_sol = solve_local(lp, "exact", use_cache=False); t_ex = _t.perf_counter() - t0
-                t0 = _t.perf_counter(); qr = run_qaoa(total, p=2, shots=256, seed=1234, total_energies=en["total"]); t_q = _t.perf_counter() - t0
+                t0 = _t.perf_counter(); qr = run_qaoa(total, p=2, shots=256, seed=1234, backend="aer"); t_q = _t.perf_counter() - t0
                 from qgrid.solvers.exact import solve_exact
                 exr = solve_exact(lp, qubos, enum=en)
                 feas = Q.feasible_mask(lp, qr.samples)
@@ -233,11 +236,27 @@ def build_scenario(key: str) -> dict:
                                       "approx_ratio": round(approx_ratio(float(qubos[0].energy(best)[0]), exr), 4) if best is not None else 0,
                                       "p_opt": round(float(qr.probs[exr.opt_mask].sum()), 5), "time_s": round(t_q, 4),
                                       "top": [{"bits": bits(en["X"][k]), "p": round(float(qr.probs[k]), 5),
-                                               "feasible": bool(en["feas"][k]), "optimal": bool(exr.opt_mask[k])} for k in order]},
+                                               "feasible": bool(en["feas"][k]), "optimal": bool(exr.opt_mask[k])} for k in order],
+                                      # the 256 measured shots (Qiskit Aer), grouped by bitstring: the demo's histogram
+                                      "backend": "qiskit-aer AerSimulator (ideal, noiseless), 256 shots, seed 1234",
+                                      "shots": shot_table(qr.samples, lp, qubos, exr)},
                              "explanation": [e["text"] for e in __import__("qgrid.explain", fromlist=["explain"]).explain(lp, ex_sol.x, b.name)
                                              if not e["var"].startswith("line")]})
         out["live_solve"] = live
     return out
+
+
+def shot_table(samples, lp, qubos, exr):
+    """Distinct measured bitstrings with their counts, true objective (Rs), feasibility and optimality."""
+    from qgrid import qubo as Q
+    keys, cnt = np.unique(samples.astype(int), axis=0, return_counts=True)
+    feas = Q.feasible_mask(lp, keys.astype(float))
+    obj = qubos[0].energy(keys.astype(float))
+    n = keys.shape[1]
+    opt = exr.opt_mask[(keys * (1 << np.arange(n))).sum(1)]
+    rows = [{"bits": "".join(map(str, k)), "count": int(c), "feasible": bool(f), "optimal": bool(o), "objective": round(float(e), 3)}
+            for k, c, f, o, e in zip(keys, cnt, feas, opt, obj)]
+    return sorted(rows, key=lambda r: (-r["count"], r["bits"]))
 
 
 def main():
@@ -264,7 +283,7 @@ def main():
                                    "replay_matches_benchmark": o["replay_matches_benchmark"]})
         print(f"{k}: replay matches benchmark: {o['replay_matches_benchmark']}")
     for f in ["benchmark_summary.csv", "headline.json", "economics.json", "search_space.json", "robustness.csv",
-              "qaoa_scaling.csv"]:
+              "qaoa_scaling.csv", "problem_day.json"]:
         p = ROOT / "results" / f
         if p.exists():
             index.setdefault("files", []).append(f)
