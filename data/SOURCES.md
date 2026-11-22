@@ -8,6 +8,7 @@ Status legend: **REAL** = official/primary data in `data/raw/` and used for resu
 | Dataset | Status | Used for | Raw file(s) |
 |---|---|---|---|
 | NASA POWER hourly (ALLSKY_SFC_SW_DWN, T2M), 12.92N 77.50E, 2023 | **REAL** | PV output, sun position | `data/raw/nasa_power/bengaluru_2023_hourly.json` |
+| NASA POWER hourly clear-sky (CLRSKY_SFC_SW_DWN), same site, 2023 | **REAL** | v2 solar forecast (clear-sky envelope) | `data/raw/nasa_power/bengaluru_2023_hourly_clearsky.json` |
 | Ausgrid Solar Home Electricity Data 2012-13 (half-hourly, 300 homes) | **REAL** | building load shapes | `data/raw/ausgrid/Solar home 2012-2013.csv` (+ archive zip, notes PDF) |
 | BESCOM HT educational tariff with ToD + KERC solar export rate | **PENDING** | price scenario A (headline) | `data/raw/tariff/` |
 | IEX Day-Ahead Market 15-min MCP, 2023 | **PENDING** | price scenario B | `data/raw/iex/` |
@@ -25,6 +26,14 @@ Status legend: **REAL** = official/primary data in `data/raw/` and used for resu
 - Processing: hourly means in local solar time repeated to 4 x 15-min slots (energy preserving);
   PV = kWp · G/1000 · (1 + γ(T_cell − 25)) · derate, T_cell = T_air + (NOCT − 20)/800 · G
   (γ = −0.4 %/°C, NOCT 45 °C, derate 0.86 — config.yaml).
+
+## NASA POWER clear-sky — REAL
+- URL: `https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=CLRSKY_SFC_SW_DWN&community=RE&longitude=77.5&latitude=12.92&start=20230101&end=20231231&format=JSON&time-standard=LST`
+- Fetched: 2026-11-22 by `scripts/fetch_data.py` (`fetch_nasa_clearsky`; timestamp inside the JSON under `_qgrid_fetch`).
+- Licence: as NASA POWER above.
+- Use: the v2 rolling-horizon optimiser forecasts PV as clear-sky PV x a clearness index (persistence of the
+  last observed hour, blended towards yesterday's daily clearness for longer lead times). The forecast only
+  uses data up to the decision time; its error against the actual (ALLSKY-based) PV is reported.
 
 ## Ausgrid Solar Home Electricity Data — REAL
 - Original publisher: Ausgrid (dataset page `https://www.ausgrid.com.au/Industry/Our-Research/Data-to-share/Solar-home-electricity-data`,

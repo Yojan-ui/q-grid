@@ -18,11 +18,14 @@ def _solver(time_limit=120):
     return s if s.available() else pulp.PULP_CBC_CMD(msg=False, timeLimit=time_limit, gapRel=MIP_GAP)
 
 
-def solve_milp(campus: Campus, day: DayData, zones: list[int], with_lines: bool, time_limit: int = 120) -> dict:
+def solve_milp(campus: Campus, day: DayData, zones: list[int], with_lines: bool, time_limit: int = 120,
+               demand_charge: dict | None = None) -> dict:
+    """demand_charge = {rate_day, pf}: adds rate_day * campus peak kVA (v2 tariff) to the objective."""
     m = pulp.LpProblem("qgrid", pulp.LpMinimize)
     V = pulp.LpVariable
     pi, pe, grid = day.obj_imp, day.price_exp, day.grid
     obj, bal, vars_ = [], {}, {}
+    imps: dict = {}
     for i in zones:
         b = campus.buildings[i]
         bat = b.battery
@@ -80,6 +83,7 @@ def solve_milp(campus: Campus, day: DayData, zones: list[int], with_lines: bool,
                 imp, exp = V(f"imp_{i}_{t}", 0), V(f"exp_{i}_{t}", 0)
                 ex = ex - imp + exp
                 obj.append((pi[t] * imp - pe[t] * exp) * DT)
+                imps.setdefault(t, []).append(imp)
             else:
                 snc, sc, sp = V(f"snc_{i}_{t}", 0), V(f"sc_{i}_{t}", 0), V(f"sp_{i}_{t}", 0)
                 m += snc <= demand - float(day.crit[i, t])
@@ -98,6 +102,11 @@ def solve_milp(campus: Campus, day: DayData, zones: list[int], with_lines: bool,
                 bal[(c, t)] = bal[(c, t)] - f
     for k, expr in bal.items():
         m += expr == 0
+    if demand_charge and demand_charge.get("rate_day", 0) > 0:
+        Pk = V("peak_kva", 0)
+        for t, lst in imps.items():
+            m += pulp.lpSum(lst) * (1.0 / demand_charge["pf"]) <= Pk
+        obj.append(demand_charge["rate_day"] * Pk)
     m += pulp.lpSum(obj)
     status = m.solve(_solver(time_limit))
     return {"status": pulp.LpStatus[status], "vars": vars_, "flows": flows, "objective": pulp.value(m.objective)}

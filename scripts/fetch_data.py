@@ -48,6 +48,27 @@ def fetch_nasa(year: int) -> Path:
     return out
 
 
+NASA_CS_URL = NASA_URL.replace("ALLSKY_SFC_SW_DWN,T2M", "CLRSKY_SFC_SW_DWN")
+
+
+def fetch_nasa_clearsky(year: int) -> Path:
+    """Clear-sky surface shortwave (NASA POWER CLRSKY_SFC_SW_DWN), used by the v2 solar forecast."""
+    out = RAW / "nasa_power" / f"bengaluru_{year}_hourly_clearsky.json"
+    if out.exists():
+        print(f"[nasa-cs] cached {out.relative_to(ROOT)}")
+        return out
+    url = NASA_CS_URL.format(lat=LAT, lon=LON, y=year)
+    print(f"[nasa-cs] GET {url}")
+    r = requests.get(url, timeout=120, headers={"User-Agent": "qgrid-data-fetch/0.1"})
+    r.raise_for_status()
+    data = r.json()
+    assert "CLRSKY_SFC_SW_DWN" in data["properties"]["parameter"]
+    data["_qgrid_fetch"] = {"url": url, "fetched_utc": dt.datetime.now(dt.UTC).isoformat()}
+    out.write_text(json.dumps(data))
+    print(f"[nasa-cs] saved {out.relative_to(ROOT)}")
+    return out
+
+
 MANUAL = {
     "ausgrid": dict(
         dir=RAW / "ausgrid",
@@ -124,6 +145,7 @@ def main() -> int:
     ap.add_argument("--year", type=int, default=2023)
     args = ap.parse_args()
     fetch_nasa(args.year)
+    fetch_nasa_clearsky(args.year)
     ok = all([check_manual(n, args.year) for n in MANUAL])
     if not ok:
         print("Some raw data is missing; complete the manual steps above, then re-run.")

@@ -199,3 +199,26 @@ qaoa:
   warm_start_iters: 6         # COBYLA refinement steps from the zone's previous parameters
 
 rules_dir: rules
+
+# ----------------------------------------------------------------------------- optimiser v2
+tariff_v2:                    # demand charge on the campus peak (one HT connection; kVA = kW / pf)
+  status: PENDING
+  source: "BESCOM HT educational institutions: demand charge Rs/kVA/month on recorded maximum demand (KERC tariff order)"
+  standin_note: "STAND-IN placeholder demand charge, NOT taken from a BESCOM/KERC document"
+  demand_rs_per_kva_month: 350.0
+  power_factor: 0.95          # ASSUMPTION
+  days_per_month: 30          # ASSUMPTION: daily figures carry 1/30 of the monthly charge on the day's peak kVA
+  pages: {}
+
+v2:
+  horizon_slots: 96           # 24 h rolling horizon, re-planned every slot (MPC)
+  block_slots: 4              # one on/off decision per device per hour of the horizon
+  dg_min_off_slots: 4         # ASSUMPTION: 1 h minimum down time (min up time: diesel.min_on_slots per zone)
+  benders: {rel_gap: 0.005, max_iter: 6, master_every_slots: 4, trust_radius0: 3}
+  admm: {rho: 0.02, max_iter: 300, tol_kw: 1.0, tol_rel: 0.001}
+  forecast: {blend_tau_slots: 16}
+  master: {max_block_qubits: 16, sweeps: 2}
+  qaoa: {p: 2, shots: 256, seed: 1234}
+  hardware:                   # optional, needs the team lead's tokens; never runs without explicit opt-in
+    ibm: {env_token: QGRID_IBM_TOKEN, opt_in: QGRID_ALLOW_IBM, n_samples: 8}
+    dwave: {env_token: DWAVE_API_TOKEN, opt_in: QGRID_ALLOW_DWAVE}
