@@ -71,6 +71,8 @@ def export_distributions(proc, zone: str = "hostels", slot: int = 76):
             "penalties": {"A_x": A_x, "A_s": A_s},
             "probs": np.round(r.probs, 7).tolist(), "energies": np.round(en["total"], 3).tolist(),
             "feasible": en["feas"].astype(int).tolist(), "top_states": top,
+            # pure objective (Rs, no penalties) of every bitstring: the exact check and the demo's winner use this
+            "objectives": np.round(en["ob"], 3).tolist(),
             "optimum": {"bits": bits(opt_idx), "objective": ex.objective,
                         "p_opt": round(float(r.probs[ex.opt_mask].sum()), 6)},
             "uniform_p": 2.0 ** -lp.n, "simulator": "qiskit-aer statevector (ideal, noiseless)",
@@ -171,5 +173,6 @@ def scaling_study(proc, n_per_size: int = 6, seed: int = 11):
 if __name__ == "__main__":
     proc = qdata.load_processed()
     export_distributions(proc)
-    scaling_study(proc)
+    if "--distributions-only" not in sys.argv:
+        scaling_study(proc)
     print("saved results/qaoa_scaling.csv, results/plots/qaoa_scaling.png")

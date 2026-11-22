@@ -126,6 +126,34 @@ def build_scenario(key: str) -> dict:
                 "cum_cost_rs": np.round(np.cumsum(cost_t + fuel_t), 1).tolist(), "cum_co2_kg": np.round(np.cumsum(co2_t), 1).tolist(),
                 "metrics": {k: (round(v, 3) if isinstance(v, float) else v) for k, v in metrics.items() if k != "net_kw"}}
 
+    def problem_numbers():
+        """Status-quo 'problem' figures (B0). Rs lost: per zone, surplus exported during the day that is bought
+        back later: reusable = min(exported kWh, later-imported kWh); loss = reusable x (mean later import price -
+        mean export price). Same definition as scripts/problem_day.py (v1)."""
+        if not sq:
+            return None
+        net = np.array(sq["net_kw"])
+        lost = reuse_t = 0.0
+        for z in range(net.shape[0]):
+            g = day.grid
+            exp_ = np.where(g, np.maximum(-net[z], 0), 0) * DT
+            imp_ = np.where(g, np.maximum(net[z], 0), 0) * DT
+            if exp_.sum() <= 0:
+                continue
+            last = int(np.nonzero(exp_)[0].max())
+            later = imp_[last + 1:]
+            reuse = min(exp_.sum(), later.sum())
+            if reuse <= 0:
+                continue
+            pe_ = (exp_ * day.price_exp).sum() / exp_.sum()
+            pi_ = (later * day.price_imp[last + 1:]).sum() / later.sum()
+            lost += reuse * max(pi_ - pe_, 0.0)
+            reuse_t += reuse
+        m = sq["metrics"]
+        return {"rs_lost": round(lost, 1), "reusable_kwh": round(reuse_t, 1), "co2_kg": round(m["co2_kg"], 1),
+                "dg_hours": m["dg_hours"], "cost_rs": round(m["cost_rs"], 1), "critical_downtime_h": m["critical_downtime_h"],
+                "definition": "Rs lost = sum over zones of min(kWh exported in the day, kWh imported later) x (mean later import price - mean export price)"}
+
     runs = {"qgrid": run_block(s_q.p_bat, s_q.flows, s_q.dg_kw, s_q.pump_on, s_q.flex_start, m_q, m_q["net_kw"])}
     if sq:
         runs["status_quo"] = run_block(np.array(sq["p_bat"]), np.array(sq["flows"]), np.array(sq["dg_kw"]),
@@ -145,6 +173,7 @@ def build_scenario(key: str) -> dict:
                               "pv_kwp": b.pv_kwp, "battery_kwh": b.battery.kwh, "battery_kw": b.battery.kw,
                               "dg_kw": b.dg.kw if b.dg else 0, "tank_m3": b.tank.capacity if b.tank else 0,
                               "critical_frac": b.critical_frac, "source": campus.layout["zones"][b.name]["source"],
+                              "flex": [{"name": j.name, "kw": j.kw, "slots": j.slots} for j in b.flex],
                               "buildings": [{"name": x["name"], "levels": x["levels"], "polygon": x["polygon"]}
                                             for x in campus.layout["zones"][b.name]["buildings"]]}
                              for b in campus.buildings],
@@ -154,7 +183,7 @@ def build_scenario(key: str) -> dict:
                   "crit_kw": np.round(day.crit, 2).tolist(), "price_import": np.round(day.price_imp, 3).tolist(),
                   "price_export": np.round(day.price_exp, 3).tolist(), "grid_up": day.grid.astype(int).tolist(),
                   "co2_kg_per_kwh": day.ef},
-        "runs": runs, "replay_matches_benchmark": consistent,
+        "runs": runs, "replay_matches_benchmark": consistent, "problem": problem_numbers(),
         "admm": {"iterations": admm, "summary": st.summary(), "lines": [[campus.names[a], campus.names[b]] for a, b in campus.lines]},
         "explanations": {str(t): {z: [e["text"] for e in ex if not e["var"].startswith("line")] for z, ex in d.items()}
                          for t, d in st.explanations.items()},
