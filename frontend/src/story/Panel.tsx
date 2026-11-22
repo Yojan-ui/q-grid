@@ -132,7 +132,7 @@ export function StoryText(p: Props) {
         const cheaper = o && b0 && o.cost_rs < b0.cost_rs, safer = o && b0 && o.critical_downtime_h < b0.critical_downtime_h - 1e-9
         const answer = !o || !b0 ? 'The same day, coordinated.'
           : safer && cheaper ? `The same day, coordinated: cheaper and with less critical downtime, ${o.gap_to_B4_pct.toFixed(1)}% from the best possible plan.`
-          : safer ? `The same day, coordinated: critical loads protected better (${b0.critical_downtime_h.toFixed(1)} h → ${o.critical_downtime_h.toFixed(1)} h of downtime), at a higher cost because diesel runs to cover them.`
+          : safer ? `Critical downtime falls from ${b0.critical_downtime_h.toFixed(1)} h to ${o.critical_downtime_h.toFixed(1)} h; cost rises because diesel covers it.`
           : cheaper ? `The same day, coordinated: ${rs(b0.cost_rs - o.cost_rs)} cheaper than today, ${o.gap_to_B4_pct.toFixed(1)}% from the best possible plan.`
           : 'The same day, coordinated: no cheaper than today on this day — see the table.'
         return { answer, extra: <Results sc={sc} /> }
@@ -280,7 +280,7 @@ function Results({ sc }: { sc: Scenario }) {
   const h = sc.headline
   return (
     <div>
-      <div style={{ height: 176 }}><ResponsiveContainer><BarChart data={rows} layout="vertical" margin={{ top: 0, right: 40, left: 10, bottom: 0 }}>
+      <div style={{ height: 150 }}><ResponsiveContainer><BarChart data={rows} layout="vertical" margin={{ top: 0, right: 40, left: 10, bottom: 0 }}>
         <XAxis type="number" hide domain={[0, 'dataMax']} /><YAxis type="category" dataKey="method" interval={0} tickFormatter={m => LBL[m]} width={140} stroke={C.muted} fontSize={11} tickLine={false} axisLine={false} />
         <ReferenceLine x={b4} stroke={C.text} strokeDasharray="3 3" label={{ value: 'optimum', fontSize: 10, fill: C.muted, position: 'top' }} />
         <Bar dataKey="objective_rs" isAnimationActive={!reduced} animationDuration={900} label={{ position: 'right', fontSize: 10, fill: C.muted, formatter: (v: any) => `${Math.round(v / 1000)}k` }}>
@@ -292,8 +292,7 @@ function Results({ sc }: { sc: Scenario }) {
         <tbody>{rows.filter(r => ['B0', 'B3', 'B5', 'OURS', 'B4'].includes(r.method)).map(r => (
           <tr key={r.method} className={r.method === 'OURS' ? 'ours' : ''}><td>{LBL[r.method]}</td><td className="tn">{rs(r.cost_rs)}</td><td className="tn">{num(r.co2_kg)}</td>
             <td className="tn">{(r.dg_hours ?? 0).toFixed(1)}</td><td className="tn">{(r.gap_to_B4_pct ?? 0).toFixed(1)}%</td><td className="tn">{(r.runtime_s ?? 0).toFixed(0)} s</td></tr>))}</tbody></table>
-      {h && <div className="headline-card"><h3>Outage during the fest</h3>
-        <p>Critical-load downtime <b className="tn">{h.before.critical_downtime_h.toFixed(2)} h → {h.after.critical_downtime_h.toFixed(2)} h</b>; critical energy unserved <b className="tn">{Math.round(h.before.critical_unserved_kwh)} → {Math.round(h.after.critical_unserved_kwh)} kWh</b>; re-planning <b className="tn">{(h.after.replan_time_s * 1000).toFixed(0)} ms</b> per slot. The central optimum reaches {h.optimum_B4.critical_downtime_h.toFixed(2)} h.</p></div>}
+      {h && <p className="muted small">Outage during the fest: critical energy unserved <b className="tn">{Math.round(h.before.critical_unserved_kwh)} → {Math.round(h.after.critical_unserved_kwh)} kWh</b>; re-planning takes <b className="tn">{(h.after.replan_time_s * 1000).toFixed(0)} ms</b> per slot; the central optimum reaches {h.optimum_B4.critical_downtime_h.toFixed(2)} h of critical downtime.</p>}
     </div>
   )
 }

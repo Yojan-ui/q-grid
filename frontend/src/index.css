@@ -69,7 +69,7 @@ main.guided { display: grid; grid-template-columns: 60% 40%; min-height: 0; }
 .asset { margin-top: 16px; }
 .asset h3, .headline-card h3 { font-size: var(--f-m); font-weight: 600; margin: 0 0 8px; }
 .asset table, .res { width: 100%; border-collapse: collapse; font-size: var(--f-s); }
-.asset td, .res td, .res th { padding: 7px 0; border-bottom: 1px solid var(--hair); text-align: left; font-weight: 400; }
+.asset td, .res td, .res th { padding: 5px 0; border-bottom: 1px solid var(--hair); text-align: left; font-weight: 400; }
 .asset td:last-child { text-align: right; }
 .res th { color: var(--muted); } .res td + td, .res th + th { text-align: right; }
 .res tr.ours td { color: var(--quantum); font-weight: 500; }
