@@ -34,15 +34,20 @@ export function Panel(p: PanelProps) {
     : { initial: { opacity: 0, y: 14 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -10 } }
   return (
     <aside className="panel" aria-live="polite">
+      <div className="stepnums" role="tablist" aria-label="steps">
+        {Array.from({ length: STEP_COUNT }, (_, k) => k + 1).map(n => (
+          <button key={n} role="tab" aria-selected={s.step === n} className={s.step === n ? 'on' : n < s.step ? 'done' : ''}
+            onClick={() => p.go(STOPS.findIndex(x => x.step === n))} title={STOPS.find(x => x.step === n)!.title}>{n}</button>))}
+        <div className="stepno"><span>Step {s.step} of {STEP_COUNT}</span><span className="muted">· {s.title}</span>
+          {subs.length > 1 && <span className="subdots" aria-label={`part ${subIdx + 1} of ${subs.length}`}>{subs.map((x, i) => <i key={x.id} className={i === subIdx ? 'on' : i < subIdx ? 'done' : ''} />)}</span>}
+        </div>
+      </div>
       <div className="panel-scroll">
         <AnimatePresence mode="wait">
           <motion.section key={p.stop} {...fade} transition={{ duration: reducedMotion() ? 0.15 : 0.45, ease: [0.65, 0, 0.35, 1] }}>
-            <div className="stepno"><span>Step {s.step} of {STEP_COUNT}</span><span className="muted">· {s.title}</span>
-              {subs.length > 1 && <span className="subdots" aria-label={`part ${subIdx + 1} of ${subs.length}`}>{subs.map((x, i) => <i key={x.id} className={i === subIdx ? 'on' : i < subIdx ? 'done' : ''} />)}</span>}
-            </div>
             <h1 className="answer">{body.answer}</h1>
             {body.support && <div className="support">{body.support}</div>}
-            {body.keys && <div className="keys-row">{body.keys}</div>}
+            {body.keys && <div className={`keys-row ${p.stop === '7a' ? 'k4' : ''}`}>{body.keys}</div>}
             {body.extra}
           </motion.section>
         </AnimatePresence>
@@ -67,7 +72,6 @@ type Body = { answer: React.ReactNode; support?: React.ReactNode; keys?: React.R
 function content(p: PanelProps): Body {
   const { d } = p
   const { sc, example: ex, q } = d
-  const h = sc.headline
   const out = outageSpan(sc)
   const slotT = (i: number) => sc.slots.t[Math.min(95, i)]
   const zi = sc.campus.zones.findIndex(z => z.name === ex.zone)
@@ -78,20 +82,21 @@ function content(p: PanelProps): Body {
       const pr = d.problem
       const noonPrice = sc.slots.price_export[48], evePrice = Math.max(...sc.slots.price_import)
       return {
-        answer: <>Today the campus sells noon solar cheaply, buys power back expensively in the evening, and runs diesel when the grid fails.</>,
+        answer: out ? <>Today the campus sells noon solar cheaply, buys power back expensively in the evening, and runs diesel when the grid fails.</>
+          : <>Today the campus sells noon solar cheaply and buys power back expensively in the evening.</>,
         support: <>
           <p>A modelled {SCENARIO(sc)} day ({fmtDate(sc.scenario.date)}){out ? `, with BESCOM supply down ${slotT(out[0])}–${slotT(out[1])}` : ''}. Every building acts on its own.</p>
           {pr && <p>Around noon it exported <b className="tn">{num(Number(pr.noon_export_kwh))} kWh</b> at Rs {noonPrice}/kWh; in the evening it imported <b className="tn">{num(Number(pr.evening_import_kwh))} kWh</b> at up to Rs {evePrice}/kWh.</p>}
         </>,
-        keys: h && <>
-          <Key label="Cost of the day" pending={priceStatus ? 'Tariff' : undefined}><CountUp value={h.before.cost_rs} format={rs} /></Key>
-          <Key label="CO₂ per day" pending={cea ? 'CEA CO₂ factor' : undefined}><CountUp value={Number(pr?.co2_kg ?? sc.runs.status_quo?.metrics.co2_kg ?? 0)} format={v => `${num(v)} kg`} delay={0.1} /></Key>
-          <Key label="Diesel running" note={`critical loads unserved ${h.before.critical_downtime_h.toFixed(1)} h`}><CountUp value={h.before.dg_hours} format={v => `${v.toFixed(1)} h`} delay={0.2} /></Key>
+        keys: sc.problem && <>
+          <Key label="Value lost per day" pending={priceStatus ? 'Tariff' : undefined}><CountUp value={sc.problem.rs_lost} format={rs} /></Key>
+          <Key label="CO₂ per day" pending={cea ? 'CEA CO₂ factor' : undefined}><CountUp value={sc.problem.co2_kg} format={v => `${num(v)} kg`} delay={0.1} /></Key>
+          <Key label="Diesel running" note={`critical loads unserved ${sc.problem.critical_downtime_h.toFixed(1)} h`}><CountUp value={sc.problem.dg_hours} format={v => `${v.toFixed(1)} h`} delay={0.2} /></Key>
         </>,
         extra: <>
           <DayChart sc={sc} t={p.t} />
-          <div className="row"><button className="btn ghost small" onClick={p.onPlay}>{p.playing ? 'Pause the day' : 'Replay the day'}</button>
-            <span className="muted small tn">{slotT(Math.floor(p.t))} · {sc.slots.grid_up[Math.floor(Math.min(95, p.t))] ? 'grid up' : 'grid down'}</span></div>
+          {sc.problem && <p className="muted small defn">Value lost = Σ over zones of min(kWh exported by day, kWh bought back later) × (average later import price − average export price). {num(sc.problem.reusable_kwh)} kWh qualify on this day.</p>}
+          <div className="row"><button className="btn ghost small" onClick={p.onPlay}>{p.playing ? 'Pause the day' : 'Replay the day'}</button></div>
         </>,
       }
     }
@@ -111,7 +116,7 @@ function content(p: PanelProps): Body {
           {sel ? (
             <div className="card">
               <h3>{zn(sel.name)}</h3>
-              <ul className="devlist">{devices(sel, sc).map(dv => <li key={dv.key}><i className={`dot ${dv.key}`} /><span>{dv.label}</span><span className="muted tn">{dv.detail}</span></li>)}</ul>
+              <ul className="devlist">{devices(sel, sc).map(dv => <li key={dv.id ?? dv.key}><i className={`dot ${dv.key}`} /><span>{dv.label}</span><span className="muted tn">{dv.detail}</span></li>)}</ul>
               <p className="muted small">Loads are area-based estimates until RVCE meter data arrives.</p>
             </div>
           ) : <p className="muted small">Tip: hover lifts a building; click focuses it.</p>}
@@ -169,16 +174,21 @@ function content(p: PanelProps): Body {
         <span className="muted small">{q.simulator}</span></div>,
     }
     case '4d': {
-      const uni = 1 / 2 ** ex.n_qubits
-      const bestP = ex.qaoa.top.find(s => s.bits === ex.qaoa.best_bits)?.p ?? ex.qaoa.p_opt
+      const shots = ex.qaoa.shots ?? []
+      const total = shots.reduce((a, s) => a + s.count, 0)
+      const win = shots.find(s => s.bits === ex.qaoa.best_bits)
+      const valid = shots.filter(s => s.feasible).reduce((a, s) => a + s.count, 0)
       return {
-        answer: <>We measure the circuit 256 times and keep the cheapest plan that breaks no rule.</>,
-        support: <p>Taller bars are plans that came up more often. Grey bars break a rule, for example charging and discharging together, and are thrown away.</p>,
-        extra: <div className="legend-row"><span><i style={{ background: C.quantum }} />chosen plan</span><span><i style={{ background: '#C9BFFB' }} />other valid plans</span><span><i style={{ background: '#E2E1DB' }} />✕ breaks a rule</span><span><i style={{ background: C.muted, height: 2 }} />random guess</span></div>,
+        answer: <>We measure the circuit {total} times and keep the cheapest plan that breaks no rule.</>,
+        support: <p>Each bar is a plan that came up in the measurements; taller means it came up more often. Grey bars break a rule, for example charging and discharging together, and are thrown away. The cheapest valid plan wins even if it is not the tallest bar.</p>,
+        extra: <>
+          <div className="legend-row"><span><i style={{ background: C.quantum }} />chosen plan</span><span><i style={{ background: '#C9BFFB' }} />other valid plans</span><span><i style={{ background: '#E2E1DB' }} />✕ breaks a rule</span><span><i style={{ background: C.muted, height: 2 }} />random guess</span></div>
+          <p className="muted small">Shots measured by the pipeline: {ex.qaoa.backend ?? 'replay'}. Nothing here is re-sampled in the browser.</p>
+        </>,
         keys: <>
-          <Key label="Best plan came up">{pct(100 * bestP, 2)}</Key>
-          <Key label="Random guess">{pct(100 * uni, 3)}</Key>
-          <Key label="More likely than chance">{Math.round(bestP / uni)}×</Key>
+          <Key label="Chosen plan came up">{win ? `${win.count} of ${total}` : 'not measured'}</Key>
+          <Key label="Valid measurements">{valid} of {total}</Key>
+          <Key label="Distinct plans seen">{shots.length}</Key>
         </>,
       }
     }
@@ -210,14 +220,14 @@ function content(p: PanelProps): Body {
         extra: <>
           <div className={`card verify ${ok ? 'ok' : 'gap'}`}>
             <div className="vrow head"><span>{zn(show.zone)} · {show.time}</span><span className={`badge ${ok ? 'ok' : 'gap'}`}>{ok ? '✓ match' : 'miss → fallback'}</span></div>
-            <div className="vrow"><span className="muted">QAOA plan (best of 256)</span><code className="bits">{show.qaoa.best_bits ?? 'none feasible'}</code></div>
+            <div className="vrow"><span className="muted">QAOA plan (cheapest valid of {(show.qaoa.shots ?? []).reduce((a, x) => a + x.count, 0) || 256} shots)</span><code className="bits">{show.qaoa.best_bits ?? 'none feasible'}</code></div>
             <div className="vrow"><span className="muted">Exact optimum</span><code className="bits">{show.exact.bits}</code></div>
             <div className="vrow"><span className="muted">Cost vs optimum</span><span className="tn">{ok ? 'equal' : `${(100 * Math.abs(1 - show.qaoa.approx_ratio)).toFixed(1)}% off`}</span></div>
-            <div className="vrow"><span className="muted">Time (simulated QAOA / exact)</span><span className="tn">{(show.qaoa.time_s * 1000).toFixed(1)} ms / {(show.exact.time_s * 1000).toFixed(1)} ms</span></div>
+            <div className="vrow"><span className="muted">Time (Qiskit Aer simulation / exact)</span><span className="tn">{(show.qaoa.time_s * 1000).toFixed(1)} ms / {(show.exact.time_s * 1000).toFixed(1)} ms</span></div>
           </div>
           {d.miss && <button className="btn ghost small" onClick={() => p.setShowMiss(!p.showMiss)}>{p.showMiss ? 'Back to the matching example' : 'Show a case where QAOA misses'}</button>}
           {tiers && total && <p className="small">On this day, whose answer was used: QAOA <b className="tn">{num(tiers.qaoa ?? 0)}</b>, QIEA <b className="tn">{num(tiers.qiea ?? 0)}</b>, annealing <b className="tn">{num(tiers.anneal ?? 0)}</b>, exact <b className="tn">{num(tiers.exact ?? 0)}</b>, out of {num(total)} local solves.</p>}
-          <p className="muted small">At this size exact search is just as fast. We claim correctness, not speed.</p>
+          <p className="muted small">{show.exact.time_s <= show.qaoa.time_s ? `At ${show.n_qubits} qubits exact search on a laptop is faster than simulating the circuit` : `At ${show.n_qubits} qubits both take milliseconds`}. We claim correctness, not speed.</p>
         </>,
       }
     }
@@ -266,7 +276,7 @@ function content(p: PanelProps): Body {
         support: <p>Batteries next to each building fill and empty through the day. The chart shows the campus battery level, status quo against Q-Grid, with diesel and the pump on the same time axis.</p>,
         keys: <>
           <Key label={`Battery at ${slotT(o)}`}><span className="tn">{pct(100 * qg[o])}</span><span className="vs tn"> vs {sq.length ? pct(100 * sq[o]) : '–'}</span></Key>
-          {h && <Key label="Diesel hours"><span className="tn">{h.after.dg_hours.toFixed(2)}</span><span className="vs tn"> vs {h.before.dg_hours.toFixed(2)}</span></Key>}
+          {(() => { const o6 = sc.benchmark.find(r => r.method === 'OURS' && r.price_scenario === 'A'), z6 = sc.benchmark.find(r => r.method === 'B0' && r.price_scenario === 'A'); return o6 && z6 && <Key label="Diesel hours"><span className="tn">{o6.dg_hours.toFixed(2)}</span><span className="vs tn"> vs {z6.dg_hours.toFixed(2)}</span></Key> })()}
         </>,
         extra: <>
           <SocChart sc={sc} t={p.t} />
@@ -277,37 +287,34 @@ function content(p: PanelProps): Body {
     case '7a': {
       const rows = d.summary.filter(r => r.day_set === 'eval30_mean' && r.price_scenario === 'A')
       const get = (m: string) => rows.find(r => r.method === m)
-      const b0 = get('B0'), ours = get('OURS'), b4 = get('B4')
-      const order = ['B0', 'B1', 'B2-GA', 'B2-PSO', 'B3', 'B5', 'OURS', 'OURS-QIEA']
+      const ours30 = get('OURS')
+      const order = ['B0', 'B1', 'B3', 'B5', 'OURS', 'OURS-QIEA']
       const bars = order.map(m => get(m)).filter(Boolean).map(r => ({ method: r!.method, name: METHOD[r!.method] ?? r!.method, gap: Number(r!.gap_to_B4_pct), ours: r!.method.startsWith('OURS') }))
-      const saving = b0 && ours ? 100 * (1 - Number(ours.cost_rs) / Number(b0.cost_rs)) : null
-      const prov = (m: string, k: string) => ({ label: `${METHOD[m] ?? m} · ${k}`, unit: '', formula: FORMULA[k] ?? k, file: 'results/benchmark.csv', fn: 'scripts/run_benchmark.py', row: `method=${m}, day_set=eval30_mean, price_scenario=A` })
-      const tableM = ['B0', 'B3', 'OURS', 'B4']
+      const bm = (m: string) => sc.benchmark.find(r => r.method === m && r.price_scenario === 'A')
+      const B0 = bm('B0'), OU = bm('OURS'), B4 = bm('B4')
+      const tiers = sc.admm.summary.tiers as Record<string, number> | undefined
+      const solves = sc.admm.summary.n_local_solves as number | undefined
+      const src = `results/benchmark.csv: scenario=${sc.scenario.key}, price_scenario=A`
+      const prov = (m: string, k: string) => ({ label: `${METHOD[m] ?? m} · ${k}`, unit: '', formula: FORMULA[k] ?? k, file: 'results/benchmark.csv', fn: 'scripts/run_benchmark.py', row: `${src}, method=${m}` })
+      if (!B0 || !OU || !B4) return { answer: <>Results for this day are in the Verify tab.</> }
+      const dCost = 100 * (OU.cost_rs / B0.cost_rs - 1)
+      const outage = B0.critical_downtime_h > 0 || OU.critical_downtime_h > 0
       return {
-        answer: <>Over 30 modelled days, Q-Grid costs {saving !== null ? `${saving.toFixed(1)}% less` : 'less'} than today and lands {ours ? `${Number(ours.gap_to_B4_pct).toFixed(1)}%` : '–'} above the best possible central plan.</>,
-        support: h && <div className="card headline">
-          <div className="vrow head"><span>Outage during the fest ({fmtDate(h.day)})</span><span className="muted small">status quo → Q-Grid</span></div>
-          <div className="vrow"><span className="muted">Critical loads unserved</span><span className="tn"><N v={`${h.before.critical_downtime_h.toFixed(2)} h`} info={{ ...prov('B0', 'critical_downtime_h'), row: h.source }} /> → <b><N v={`${h.after.critical_downtime_h.toFixed(2)} h`} info={{ ...prov('OURS', 'critical_downtime_h'), row: h.source }} /></b> <span className="muted">(optimum {h.optimum_B4.critical_downtime_h.toFixed(2)} h)</span></span></div>
-          <div className="vrow"><span className="muted">Cost of the day {priceStatus && <Pending what="Tariff" />}</span><span className="tn"><N v={rs(h.before.cost_rs)} info={{ ...prov('B0', 'cost_rs'), row: h.source }} /> → <b><N v={rs(h.after.cost_rs)} info={{ ...prov('OURS', 'cost_rs'), row: h.source }} /></b></span></div>
-          <div className="vrow"><span className="muted">Diesel hours</span><span className="tn">{h.before.dg_hours.toFixed(2)} → <b>{h.after.dg_hours.toFixed(2)}</b></span></div>
-          <p className="muted small">On the outage day Q-Grid spends more (diesel and battery) to keep more critical load running.</p>
-        </div>,
+        answer: outage
+          ? <>{out ? 'In the outage' : 'On this day'}, critical loads go without power for {OU.critical_downtime_h.toFixed(1)} h instead of {B0.critical_downtime_h.toFixed(1)} h.</>
+          : <>No critical load is lost on this day{B0.dg_hours > 0 || OU.dg_hours > 0 ? `; Q-Grid runs diesel ${OU.dg_hours.toFixed(1)} h instead of ${B0.dg_hours.toFixed(1)} h` : ''}, and Q-Grid lands {Number(OU.gap_to_B4_pct).toFixed(1)}% from the best possible plan.</>,
+        support: <p>Every method ran on the same day, data and constraints ({fmtDate(sc.scenario.date)}{out ? `, BESCOM down ${slotT(out[0])}–${slotT(out[1])}` : ''}).</p>,
+        keys: <>
+          <Key label="Critical-load downtime" note={`optimum ${B4.critical_downtime_h.toFixed(1)} h`}><N v={`${B0.critical_downtime_h.toFixed(1)} → ${OU.critical_downtime_h.toFixed(1)} h`} info={prov('OURS', 'critical_downtime_h')} /></Key>
+          <Key label="Diesel running"><N v={`${B0.dg_hours.toFixed(2)} → ${OU.dg_hours.toFixed(2)} h`} info={prov('OURS', 'dg_hours')} /></Key>
+          <Key label="Gap to optimum" note="this day"><N v={`${Number(OU.gap_to_B4_pct).toFixed(1)}%`} info={prov('OURS', 'gap_to_B4_pct')} /></Key>
+          {tiers && solves && <Key label="QAOA answer used" note={`all ${num(solves)} checked vs exact`}>{pct(100 * (tiers.qaoa ?? 0) / solves)}</Key>}
+        </>,
         extra: <>
-          <h3 className="sub">Cost above the central optimum, 30-day mean</h3>
+          <p className="secondary small">Cost of the day {priceStatus && <Pending what="Tariff" />}: <span className="tn"><N v={rs(B0.cost_rs)} info={prov('B0', 'cost_rs')} /> → <N v={rs(OU.cost_rs)} info={prov('OURS', 'cost_rs')} /> ({dCost >= 0 ? '+' : ''}{dCost.toFixed(1)}%)</span>{dCost > 0 && outage ? ', because diesel and batteries are spent keeping critical loads on' : ''}. Final once the official BESCOM/KERC tariff is added.</p>
+          <h3 className="sub">Gap to the central optimum, 30-day mean {priceStatus && <Pending what="Tariff" />}</h3>
           <GapBars rows={bars} />
-          <div className="tablewrap"><table className="tbl">
-            <thead><tr><th>Method</th><th>Rs/day</th><th>CO₂ kg/day</th><th>Diesel h</th><th>Gap</th><th>Re-plan s/slot</th></tr></thead>
-            <tbody>{tableM.map(m => get(m)).filter(Boolean).map(r => (
-              <tr key={r!.method} className={r!.method === 'OURS' ? 'ours' : ''}>
-                <td>{METHOD[r!.method] ?? r!.method}</td>
-                <td className="tn"><N v={num(Number(r!.cost_rs))} info={prov(r!.method, 'cost_rs')} /></td>
-                <td className="tn"><N v={num(Number(r!.co2_kg))} info={prov(r!.method, 'co2_kg')} /></td>
-                <td className="tn">{Number(r!.dg_hours).toFixed(1)}</td>
-                <td className="tn">{Number(r!.gap_to_B4_pct).toFixed(1)}%</td>
-                <td className="tn">{r!.replan_time_s ? Number(r!.replan_time_s).toFixed(2) : '–'}</td>
-              </tr>))}</tbody>
-          </table></div>
-          <p className="muted small">Prices and the CO₂ factor are labelled stand-ins (PENDING), so these figures are not final. Q-Grid’s CO₂ is {b0 && ours && Number(ours.co2_kg) > Number(b0.co2_kg) ? 'slightly higher' : 'lower'} than the status quo’s. Central optimum (B4): {b4 ? rs(Number(b4.cost_rs)) : '–'}/day. Click any figure to see where it comes from.</p>
+          <p className="muted small">Q-Grid {ours30 ? `${Number(ours30.gap_to_B4_pct).toFixed(1)}%` : '–'} above optimum over 30 modelled days. GA/PSO, CO₂ and run times are in the Verify tab; click any figure for its source.</p>
         </>,
       }
     }

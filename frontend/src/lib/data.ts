@@ -21,10 +21,12 @@ export type Scenario = {
   admm: { iterations: Record<string, { k: number; r_primal: number; r_dual: number; agreed: boolean; proposals: Record<string, number[]> }[]>; summary: Record<string, any>; lines: [string, string][] }
   explanations: Record<string, Record<string, string[]>>; qaoa_file: string; benchmark: Record<string, any>[]
   headline?: any; live_solve?: LiveSolve[]; provenance: Provenance
+  problem?: { rs_lost: number; reusable_kwh: number; co2_kg: number; dg_hours: number; cost_rs: number; critical_downtime_h: number; definition: string } | null
 }
 export type LiveSolve = { zone: string; slot: number; time: string; n_qubits: number; var_names: string[]; qubo_matrix: number[][];
   exact: { bits: string; objective: number; time_s: number }
   qaoa: { best_bits: string | null; best_objective: number | null; feasible: boolean; approx_ratio: number; p_opt: number; time_s: number;
+    backend?: string; shots?: { bits: string; count: number; feasible: boolean; optimal: boolean; objective: number }[];
     top: { bits: string; p: number; feasible: boolean; optimal: boolean }[] }; explanation: string[] }
 export type Provenance = { git_commit: string; seeds: Record<string, number>; files: Record<string, string | null> }
 export type QaoaFile = { n_qubits: number; var_names: string[]; gammas: number[]; betas: number[]; qubo_matrix: number[][];

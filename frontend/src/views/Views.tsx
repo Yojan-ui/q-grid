@@ -47,7 +47,7 @@ export function VerifyView({ d, idx, online }: { d: StoryData; idx: Index; onlin
       <section className="card">
         <h3>Solve a slot live</h3>
         <p className="muted small">Pick a zone and slot: the QUBO, QAOA’s best-of-256 plan, and the exact optimum. With <code>?live</code> and a running backend, it re-solves on the server.</p>
-        {d.sc.live_solve && <SolveLive live={d.sc.live_solve} online={online} scenario={d.sc.scenario.key} params={[d.q.gammas, d.q.betas]} />}
+        {d.sc.live_solve && <SolveLive live={d.sc.live_solve} online={online} scenario={d.sc.scenario.key} />}
       </section>
       <section className="card">
         <h3>Provenance</h3>

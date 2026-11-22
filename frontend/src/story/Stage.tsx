@@ -121,7 +121,7 @@ function Scene({ stop, d, t, zone, onZone, killed, admmRound, pulseKey }: StageP
       <Ground sc={sc} outline={stop !== '7a'} />
       <group ref={primary}>
         <Campus sc={sc} t={t} run={run} zones={zones} flows={flows} lift={lift} liftStagger={stop === '2' ? 0.07 : 0}
-          focus={focus} dimOthers={dim} killed={stop === '5' ? killed : null} labels={stop === '2' || stop === '5' ? 'names' : 'none'}
+          focus={focus} dimOthers={dim} killed={stop === '5' ? killed : null} labels={(stop === '2' && !zone) || stop === '5' ? 'names' : 'none'}
           lineViews={lineViews} onZone={onZone} interactive={stop === '2'} storage={stop !== '5'}
           subLabel={stop !== '7a' && stop !== '7b' && stop !== '4g'} batteryScale={stop === '6' ? 1.7 : 1} socLabels={stop === '6'} />
         {zones.map(z => <DeviceIcons key={z.name} sc={sc} z={z} slot={slot} show={stop === '2' && zone === z.name} />)}
@@ -147,7 +147,9 @@ function Scene({ stop, d, t, zone, onZone, killed, admmRound, pulseKey }: StageP
 function DeviceIcons({ sc, z, slot, show }: { sc: Scenario; z: ZoneGeo; slot: number; show: boolean }) {
   const zi = sc.campus.zones.findIndex(q => q.name === z.name)
   const zone = sc.campus.zones[zi]
-  const list = devices(zone, sc)
+  // one 3D icon per device type; the panel lists each flexible load with its power and run length
+  const all = devices(zone, sc), flex = all.filter(x => x.key === 'flex')
+  const list = [...all.filter(x => x.key !== 'flex'), ...(flex.length ? [{ key: 'flex' as const, label: flex.length > 1 ? `${flex.length} flexible loads` : flex[0].label, detail: flex.map(f => f.detail.split(',')[0]).join(' + ') }] : [])]
   const ref = useRef<(THREE.Group | null)[]>([])
   useEffect(() => {
     ref.current.forEach((g, i) => {
@@ -208,7 +210,7 @@ function Cluster({ zones, show }: { zones: ZoneGeo[]; show: boolean }) {
         )
       })}
       <Label3D show={show} position={[0, 160, -1050]} center><div className="duotag ill">Illustration — not a result</div></Label3D>
-      <Label3D show={show} position={[620, 90, 380]} center><div className="duotag">another campus</div></Label3D>
+      <Label3D show={show} position={[0, 110, -760]} center><div className="duotag">another campus</div></Label3D>
       <Label3D show={show} position={[-560, 30, 230]} center><div className="duotag">city feeder</div></Label3D>
     </group>
   )

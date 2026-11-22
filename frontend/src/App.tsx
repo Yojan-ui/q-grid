@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getJSON, liveAvailable, missingReplayFiles, MissingReplay, type Index } from './lib/data'
 import { reducedMotion } from './lib/theme'
+import { fmtDate } from './lib/labels'
 import { STOPS, useStoryData } from './lib/story'
 import { Stage } from './story/Stage'
 import { Panel } from './story/Panel'
@@ -9,6 +10,7 @@ import { ProvProvider } from './panels/Prov'
 import { VerifyView, TryView, DataBadge } from './views/Views'
 
 type Tab = 'story' | 'verify' | 'try'
+const SCEN_NAME: Record<string, string> = { outage_fest: 'Outage during the fest', fest: 'Fest', teaching: 'Teaching day', exam_week: 'Exam week', vacation: 'Vacation', monsoon: 'Monsoon' }
 const DAY_SECONDS = 18
 
 export default function App() {
@@ -24,6 +26,7 @@ export default function App() {
   const [pulseKey, setPulseKey] = useState(0)
   const [showMiss, setShowMiss] = useState(false)
   const [online, setOnline] = useState(false)
+  const [scen, setScen] = useState<string>(() => new URLSearchParams(location.search).get('scenario') ?? '')
 
   useEffect(() => {
     getJSON<Index>('index.json').then(async x => {
@@ -32,7 +35,8 @@ export default function App() {
     }).catch(e => setMissing(e instanceof MissingReplay ? e.files : [String(e)]))
     if (new URLSearchParams(location.search).has('live')) liveAvailable().then(setOnline)
   }, [])
-  const { d, err } = useStoryData(idx?.headline ?? '')
+  const key = scen && idx?.scenarios.some(x => x.key === scen) ? scen : idx?.headline ?? ''
+  const { d, err } = useStoryData(key)
   const stop = STOPS[i].id
 
   // each stop sets its clock: the day plays in steps 1, 6 and 7; otherwise it holds the slot being explained
@@ -90,8 +94,8 @@ export default function App() {
     if (e.deltaY > 0) next(); else prev()
   }
   useEffect(() => {
-    const u = new URL(location.href); u.searchParams.set('stop', stop); history.replaceState(null, '', u)
-  }, [stop])
+    const u = new URL(location.href); u.searchParams.set('stop', stop); if (key) u.searchParams.set('scenario', key); history.replaceState(null, '', u)
+  }, [stop, key])
 
   if (missing) return (
     <div className="empty"><div className="card">
@@ -113,13 +117,19 @@ export default function App() {
             {([['story', 'Story'], ['verify', 'Verify'], ['try', 'Try it']] as [Tab, string][]).map(([k, l]) =>
               <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>)}
           </nav>
-          <div className="right"><DataBadge idx={idx} /></div>
+          <div className="right">
+            <select className="scenpick" value={key} onChange={e => setScen(e.target.value)} aria-label="scenario day">
+              {idx.scenarios.map(x => <option key={x.key} value={x.key}>{SCEN_NAME[x.key] ?? x.key}, {fmtDate(x.date)}</option>)}
+            </select>
+            <DataBadge idx={idx} />
+          </div>
         </header>
         {tab === 'story' ? (
           <main className="story">
             <div className="stage" onWheel={onWheel}>
               <Stage stop={stop} d={d} t={t} zone={zone} onZone={setZone} killed={killed} admmRound={admmRound} pulseKey={pulseKey} showMiss={showMiss} />
               {stop === '4g' && <WhoDoesWhat />}
+              <div className="clock tn" aria-live="off">{d.sc.slots.t[Math.min(95, Math.floor(t))]}{d.sc.slots.grid_up[Math.min(95, Math.floor(t))] ? '' : <span className="down"> · grid down</span>}</div>
               <div className="stage-foot">
                 <span>{d.sc.label}</span>
               </div>

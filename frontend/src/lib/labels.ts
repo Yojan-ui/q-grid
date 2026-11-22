@@ -19,9 +19,12 @@ export const SCENARIO_NAME: Record<string, string> = {
 }
 export const fmtDate = (d: string) => new Date(d + 'T00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
 
-export type Device = { key: 'pv' | 'battery' | 'dg' | 'tank' | 'critical' | 'flex'; label: string; detail: string }
+export type Device = { key: 'pv' | 'battery' | 'dg' | 'tank' | 'critical' | 'flex'; id?: string; label: string; detail: string }
 
 /** Devices of a zone, straight from the campus model in the replay. */
+const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1)
+const num0 = (v: number) => Math.round(v).toLocaleString('en-IN')
+
 export function devices(z: Zone, sc: Scenario): Device[] {
   const out: Device[] = []
   if (z.pv_kwp > 0) out.push({ key: 'pv', label: 'Rooftop solar', detail: `${Math.round(z.pv_kwp).toLocaleString('en-IN')} kWp` })
@@ -29,9 +32,14 @@ export function devices(z: Zone, sc: Scenario): Device[] {
   if (z.dg_kw > 0) out.push({ key: 'dg', label: 'Diesel generator', detail: `${z.dg_kw} kW` })
   if (z.tank_m3 > 0) out.push({ key: 'tank', label: 'Borewell pump + tank', detail: `${z.tank_m3} m³` })
   if (z.critical_frac > 0) out.push({ key: 'critical', label: 'Critical load', detail: `${Math.round(z.critical_frac * 100)}% of demand` })
-  const zi = sc.campus.zones.indexOf(z)
-  const fs = sc.runs.qgrid.flex_start?.[zi]
-  if (fs && Object.keys(fs).length) out.push({ key: 'flex', label: 'Flexible loads', detail: Object.keys(fs).map(k => k.replace(/_/g, ' ')).join(', ') })
+  if (z.flex?.length) {
+    // per flexible load: power and run length (one 15-min slot each), from the replay's zone export
+    for (const f of z.flex) out.push({ key: 'flex', id: `flex-${f.name}`, label: cap(f.name.replace(/_/g, ' ')) + ' (flexible)', detail: `${num0(f.kw)} kW · ${f.slots * 15} min, start time chosen` })
+  } else {
+    const zi = sc.campus.zones.indexOf(z)
+    const fs = sc.runs.qgrid.flex_start?.[zi]
+    if (fs && Object.keys(fs).length) out.push({ key: 'flex', label: 'Flexible loads', detail: Object.keys(fs).map(k => k.replace(/_/g, ' ')).join(', ') })
+  }
   return out
 }
 

@@ -50,7 +50,7 @@ p { margin: 0 0 8px; }
 .stage-foot { position: absolute; left: 20px; top: 14px; font-size: var(--s13); color: var(--muted); background: rgba(250,250,247,.86); padding: 4px 10px; border-radius: 999px; pointer-events: none; }
 
 .panel { border-left: 1px solid var(--hair); background: var(--bg); display: flex; flex-direction: column; min-height: 0; }
-.panel-scroll { flex: 1; overflow-y: auto; padding: 32px 36px 16px; }
+.panel-scroll { flex: 1; overflow-y: auto; padding: 18px 36px 12px; }
 .panel-scroll > section { max-width: 640px; }
 .stepno { display: flex; align-items: center; gap: 8px; font-size: var(--s13); font-weight: 500; letter-spacing: .02em; text-transform: uppercase; margin-bottom: 14px; }
 .stepno .muted { text-transform: none; letter-spacing: 0; font-weight: 400; }
@@ -234,3 +234,17 @@ table.kv td, table.kv th { padding: 4px 12px 4px 0; text-align: left; vertical-a
   .panel { border-left: 0; border-top: 1px solid var(--hair); }
   .brand span { display: none; }
 }
+
+/* ported from build B: numbered steps, on-stage clock, scenario picker */
+.stepnums { display: flex; align-items: center; gap: 6px; padding: 14px 36px 0; flex: none; }
+.stepnums .stepno { margin: 0 0 0 10px; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; }
+.stepnums button { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--hair); background: #fff; color: var(--muted); font: inherit; font-size: var(--s13); cursor: pointer; font-variant-numeric: tabular-nums; }
+.stepnums button.done { color: var(--text); }
+.stepnums button.on { background: var(--text); border-color: var(--text); color: #fff; }
+.stepnums button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.clock { position: absolute; left: 20px; top: 14px; font-size: 28px; font-weight: 600; color: var(--text); pointer-events: none; text-shadow: 0 0 6px var(--bg); }
+.clock .down { color: var(--grid); font-weight: 500; font-size: 20px; }
+.stage .stage-foot { left: auto; right: 16px; top: auto; bottom: 14px; max-width: 44%; white-space: normal; text-align: right; }
+.scenpick { font: inherit; font-size: var(--s13); padding: 6px 8px; border: 1px solid var(--hair); border-radius: 8px; background: #fff; color: var(--text); margin-right: 8px; }
+.secondary { color: var(--text); margin: 4px 0 16px; line-height: 1.5; }
+.keys-row.k4 { grid-template-columns: 1fr 1fr; }

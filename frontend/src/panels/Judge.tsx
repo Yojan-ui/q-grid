@@ -1,7 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import type { LiveSolve, Scenario } from '../lib/data'
 import { fmt, post } from '../lib/data'
-import { bits, energies, isingNormalised, qaoaLayers, sample } from '../lib/qaoa'
 import { FORMULA, N } from './Prov'
 
 const METRICS: [string, string, number][] = [['cost_rs', 'Rs/day', 0], ['objective_rs', 'Rs/day', 0], ['critical_downtime_h', 'h', 2],
@@ -41,22 +40,11 @@ function Heatmap({ M, names }: { M: number[][]; names: string[] }) {
   )
 }
 
-export function SolveLive({ live, online, scenario, params }: { live: LiveSolve[]; online: boolean; scenario: string; params: [number[], number[]] }) {
+export function SolveLive({ live, online, scenario }: { live: LiveSolve[]; online: boolean; scenario: string }) {
   const [i, setI] = useState(0)
   const [res, setRes] = useState<any>(null)
   const [busy, setBusy] = useState(false)
   const L = live[i]
-  const browser = useMemo(() => {
-    if (!L || L.n_qubits > 14) return null
-    const t0 = performance.now()
-    const E = energies({ M: L.qubo_matrix }); const En = isingNormalised({ M: L.qubo_matrix }, E)
-    let z0 = 0; for (let z = 1; z < E.length; z++) if (E[z] < E[z0]) z0 = z
-    const P = qaoaLayers(En, params[0], params[1])
-    const fin = P[P.length - 1]
-    const s = sample(fin, 256)
-    const best = s.reduce((b, z) => (E[z] < E[b] ? z : b), s[0])
-    return { exact: bits(z0, L.n_qubits), best: bits(best, L.n_qubits), pOpt: fin[z0], verified: best === z0, ms: performance.now() - t0 }
-  }, [L, params])
   if (!L) return <div className="small">No live-solve instances in this replay.</div>
   const run = async () => {
     setBusy(true)
@@ -85,7 +73,7 @@ export function SolveLive({ live, online, scenario, params }: { live: LiveSolve[
             <tr><td>time</td><td>{(q.time_s * 1000).toFixed(1)} ms</td><td>{(ex.time_s * 1000).toFixed(1)} ms</td></tr>
           </tbody></table>
           <div className="small muted">{res ? 'live backend result' : 'precomputed in replay'} · simulated QAOA, verified vs exact, no quantum advantage claimed</div>
-          {browser && <div className="small">In-browser re-run: exact {browser.exact}, QAOA best-of-256 {browser.best} → {browser.verified ? 'verified = exact optimum' : 'not optimal → fallback tier'}, P(opt) {(browser.pOpt * 100).toFixed(3)}% ({browser.ms.toFixed(0)} ms)</div>}
+          <div className="small muted">Measured on {q.backend ?? 'the pipeline simulator'}.</div>
           <ul className="small">{L.explanation.map((t, k) => <li key={k}>{t}</li>)}</ul>
         </div>
       </div>

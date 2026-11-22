@@ -64,7 +64,8 @@ export function Lab({ stop, ex, sc, anchor, yaw, buildingH, pulseKey }: {
   const best = ex.qaoa.best_bits ?? ex.exact.bits
   const mode = modeOf(stop)
   const reduced = reducedMotion()
-  const top = useMemo(() => ex.qaoa.top.slice(0, 10), [ex])
+  // 4d: the pipeline's measured shots (Qiskit Aer, replay), ten most frequent, winner always included
+  const top = useMemo(() => topShots(ex), [ex])
 
   const grp = useRef<(THREE.Group | null)[]>([])
   const tile = useRef<(THREE.Group | null)[]>([])
@@ -166,19 +167,20 @@ export function Lab({ stop, ex, sc, anchor, yaw, buildingH, pulseKey }: {
   }, [ex])
   const ruleLabelAt = useMemo(() => { const seen = new Set<string>(); return edges.map(e => (e.rule && !seen.has(e.rule) ? (seen.add(e.rule), true) : false)) }, [edges])
 
-  // 4d: QAOA output distribution, top states as bars (probabilities from the replay)
-  const pmax = Math.max(...top.map(s => s.p), 1e-9)
+  // 4d: measured shot counts as bars (from the replay)
+  const pmax = Math.max(...top.map(s => s.count), 1e-9)
   const bars = useRef<(THREE.Group | null)[]>([])
   useEffect(() => {
     top.forEach((s, k) => {
       const m = bars.current[k]
       if (!m) return
       gsap.killTweensOf(m.scale)
-      const h = stop === '4d' ? Math.max(0.05, (s.p / pmax) * 24) : 0.001
+      const h = stop === '4d' ? Math.max(0.05, (s.count / pmax) * 24) : 0.001
       gsap.to(m.scale, { y: h, duration: reduced ? 0 : 0.8, ease: 'power3.out', delay: (reduced ? 0 : 0.06) * k + (stop === '4d' && !reduced ? 0.4 : 0) })
     })
   }, [stop])
-  const uniform = 1 / 2 ** n
+  const shots = shotTotal(ex)
+  const uniform = shots / 2 ** n   // expected count of any one plan under random guessing
   const wireY = (i: number) => wirePos(i, n)[1]
   const spread = (n - 1) * 2.5
 
@@ -266,7 +268,7 @@ export function Lab({ stop, ex, sc, anchor, yaw, buildingH, pulseKey }: {
       <group visible={stop === '4d'}>
         {top.map((s, k) => {
           const isBest = s.bits === best
-          const h = Math.max(0.05, (s.p / pmax) * 24)
+          const h = Math.max(0.05, (s.count / pmax) * 24)
           return (
             <group key={s.bits} position={[histX(k), 37, 4]}>
               <group ref={g => { bars.current[k] = g }} scale={[1, 0.001, 1]}>
@@ -276,7 +278,7 @@ export function Lab({ stop, ex, sc, anchor, yaw, buildingH, pulseKey }: {
                 </mesh>
               </group>
               <Label3D show={stop === '4d'} position={[0, h + 1.4, 0]} center>
-                <div className={`barlab tn ${isBest ? 'best' : ''} ${s.feasible ? '' : 'bad'}`}>{s.feasible ? '' : '✕ '}{(s.p * 100).toFixed(2)}%</div>
+                <div className={`barlab tn ${isBest ? 'best' : ''} ${s.feasible ? '' : 'bad'}`}>{s.feasible ? '' : '✕ '}{s.count}</div>
               </Label3D>
               {isBest && (
                 <Label3D show={stop === '4d'} position={[0, -1.8, 0]} center>
@@ -288,14 +290,25 @@ export function Lab({ stop, ex, sc, anchor, yaw, buildingH, pulseKey }: {
         })}
         <mesh position={[0, 37 + (uniform / pmax) * 24, 4]} scale={[56, 0.12, 0.12]}><boxGeometry /><meshBasicMaterial color={C.muted} /></mesh>
         <Label3D show={stop === '4d'} position={[29, 37 + (uniform / pmax) * 24 + 1.2, 4]}>
-          <div className="barref">random guess ({(uniform * 100).toFixed(3)}%)</div>
+          <div className="barref">random guess ({uniform.toFixed(2)} of {shots})</div>
         </Label3D>
       </group>
     </group>
   )
 }
 
-const histX = (k: number) => -24 + k * 5.3
+const histX = (k: number) => -28 + k * 5.3
+
+export type Shot = { bits: string; count: number; feasible: boolean; optimal: boolean; objective: number }
+/** Ten most frequent measured bitstrings from the replay's shot table; the chosen plan is always shown. */
+export function topShots(ex: LiveSolve): Shot[] {
+  const all = ex.qaoa.shots ?? []
+  const top = all.slice(0, 10)
+  const win = all.find(s => s.bits === ex.qaoa.best_bits)
+  if (win && !top.includes(win)) top[top.length - 1] = win
+  return top
+}
+export const shotTotal = (ex: LiveSolve) => (ex.qaoa.shots ?? []).reduce((a, s) => a + s.count, 0)
 const ringLabelOffset = (i: number, n: number): V3 => {
   const a = Math.PI / 2 - (2 * Math.PI * i) / n
   return [Math.cos(a) * 5.2, Math.sin(a) * 3.4, 0]

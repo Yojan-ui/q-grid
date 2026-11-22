@@ -160,14 +160,28 @@ def run_qaoa(total: Q.QUBO, p: int = 2, shots: int = 256, seed: int = 0, backend
     if warm_iters > 0 and total_energies is not None:
         g, b = warm_start_params((total_energies - c) / sigma, (np.asarray(g), np.asarray(b)), warm_iters)
     if backend == "aer":
+        # Qiskit Aer: exact probabilities from the statevector, and the shots themselves measured on the
+        # simulated circuit (not re-drawn from the probabilities)
         probs = probabilities_aer(h, J, g, b, seed=seed)
-    else:
-        E = None if total_energies is None else (total_energies - c) / sigma
-        probs = np.abs(statevector_numpy(h, J, g, b, energies=E)) ** 2
+        probs = probs / probs.sum()
+        samples = shots_from_counts(counts_aer(h, J, g, b, shots=shots, seed=seed), len(h))
+        return QAOAResult(probs, samples, np.asarray(g), np.asarray(b), sigma)
+    E = None if total_energies is None else (total_energies - c) / sigma
+    probs = np.abs(statevector_numpy(h, J, g, b, energies=E)) ** 2
     probs = probs / probs.sum()
     rng = np.random.default_rng(seed)
     idx = rng.choice(len(probs), size=shots, p=probs)
     return QAOAResult(probs, Q.all_bitstrings(len(h))[idx], np.asarray(g), np.asarray(b), sigma)
+
+
+def shots_from_counts(counts: dict[str, int], n: int) -> np.ndarray:
+    """Qiskit count keys are big-endian (qubit 0 is the rightmost character); variable i is qubit i.
+    Returns one row per shot, columns in variable order."""
+    rows = []
+    for key, c in sorted(counts.items()):
+        k = key.replace(" ", "")[-n:]
+        rows += [[int(ch) for ch in reversed(k)]] * int(c)
+    return np.asarray(rows, dtype=np.float64)
 
 
 def warm_start_params(E_norm: np.ndarray, params0, iters: int):

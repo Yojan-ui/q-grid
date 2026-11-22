@@ -10,6 +10,7 @@ import { tmpdir } from 'node:os'
 
 const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i > 0 ? process.argv[i + 1] : d }
 const URL0 = arg('url', 'http://localhost:5173')
+const QS = arg('scenario', '') ? `&scenario=${arg('scenario', '')}` : ''
 const OUT = resolve(arg('out', 'shots'))
 const SIZES = arg('sizes', '1440x900,1920x1080').split(',').map(s => s.split('x').map(Number))
 const ONLY = arg('only', '')
@@ -25,7 +26,7 @@ const WAIT = { '1': 9000, '3': 3600, '4c': 4200, '4d': 2600, '4e': 2200, '5': 90
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 
 const OVERLAP_JS = `(() => {
-  const sel = ['.zlabel', '.linelabel', '.devlabel', '.tile', '.qlabel', '.rulechip', '.barlab', '.colhead', '.verifytag', '.duotag', '.blockhead'];
+  const sel = ['.zlabel', '.linelabel', '.devlabel', '.tile', '.qlabel', '.rulechip', '.barlab', '.colhead', '.verifytag', '.duotag', '.blockhead', '.clock', '.stage-foot'];
   const vis = e => { const r = e.getBoundingClientRect(); const s = getComputedStyle(e); return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && +s.opacity > 0.05 && r.right > 0 && r.left < innerWidth };
   const els = sel.flatMap(s => [...document.querySelectorAll(s)].filter(vis).map(e => ({ s, r: e.getBoundingClientRect(), t: (e.textContent || '').trim().slice(0, 28) })));
   const out = [];
@@ -60,7 +61,7 @@ async function main() {
       const errs = []
       cdp.on('Runtime.exceptionThrown', p => errs.push(p.exceptionDetails?.exception?.description ?? p.exceptionDetails?.text))
       cdp.on('Runtime.consoleAPICalled', p => { if (p.type === 'error') errs.push(p.args.map(a => a.value ?? a.description).join(' ').slice(0, 200)) })
-      await cdp.send('Page.navigate', { url: `${URL0}/?stop=1` })
+      await cdp.send('Page.navigate', { url: `${URL0}/?stop=1${QS}` })
       await waitFor(cdp, `!!document.querySelector('.panel .answer')`, 30000)
       const list = ONLY ? STOPS.filter(s => ONLY.split(',').includes(s)) : STOPS
       let cur = 0
@@ -113,7 +114,7 @@ async function record(cdp) {
   await cdp.send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 1, mobile: false })
   const [a, b] = VIDEO.split('-')
   const list = STOPS.slice(STOPS.indexOf(a), STOPS.indexOf(b) + 1)
-  await cdp.send('Page.navigate', { url: `${URL0}/?stop=${a}` })
+  await cdp.send('Page.navigate', { url: `${URL0}/?stop=${a}${QS}` })
   await waitFor(cdp, `!!document.querySelector('.panel .answer')`, 30000)
   await sleep(1500)
   const frames = []

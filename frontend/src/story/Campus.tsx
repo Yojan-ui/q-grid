@@ -10,6 +10,7 @@ import type { Run, Scenario } from '../lib/data'
 import { C, reducedMotion, signed } from '../lib/theme'
 import { zn } from '../lib/labels'
 
+// schematic grid connection point west of the campus (not a surveyed location)
 export const SUBSTATION = new THREE.Vector3(-385, 0, 40)
 const at = (arr: number[], t: number) => arr[Math.max(0, Math.min(Math.floor(t), arr.length - 1))] ?? 0
 
@@ -172,6 +173,16 @@ type Props = {
 
 export function Campus({ sc, t, run, zones, flows = 'both', lift = {}, liftStagger = 0, focus, dimOthers, killed, storage = true, labels = 'none',
   lineViews, onZone, interactive = false, opacity = 1, subLabel = true, batteryScale = 1, socLabels = false }: Props) {
+  // the substation label opens to the right of its anchor; show it only while the anchor (and room for the
+  // label) is inside the stage, so it never sits clipped at the stage edge
+  const [subOnStage, setSubOnStage] = useState(true)
+  const subPt = useMemo(() => SUBSTATION.clone().setY(16), [])
+  const ndc = useMemo(() => new THREE.Vector3(), [])
+  useFrame(({ camera }) => {
+    ndc.copy(subPt).project(camera)
+    const ok = ndc.z < 1 && ndc.x > -0.97 && ndc.x < 0.55 && ndc.y > -0.9 && ndc.y < 0.85
+    if (ok !== subOnStage) setSubOnStage(ok)
+  })
   const r: Run = (run === 'status_quo' ? sc.runs.status_quo : sc.runs.qgrid) ?? sc.runs.qgrid
   const slot = Math.max(0, Math.min(95, Math.floor(t)))
   const gridUp = sc.slots.grid_up[slot] === 1
@@ -263,7 +274,8 @@ export function Campus({ sc, t, run, zones, flows = 'both', lift = {}, liftStagg
         <mesh position-y={4} castShadow receiveShadow><boxGeometry args={[18, 8, 14]} />
           <meshStandardMaterial color={gridUp ? '#E9E8E2' : '#CFCEC8'} roughness={0.9} transparent={opacity < 1} opacity={opacity} /></mesh>
         <mesh position={[0, 8.2, 0]}><boxGeometry args={[18.4, 0.5, 14.4]} /><meshStandardMaterial color={gridUp ? C.grid : C.offline} transparent={opacity < 1} opacity={opacity} /></mesh>
-        <Label3D show={subLabel} position={[0, 16, 0]} center>
+        {/* anchored at its left end and opening towards the campus, so it never runs off the stage's left edge */}
+        <Label3D show={subLabel && subOnStage} position={[-6, 16, 0]} style={{ transform: 'translateY(-50%)' }}>
           <div className={`zlabel sub ${gridUp ? '' : 'off'}`}>BESCOM substation{gridUp ? '' : ' · outage'}</div>
         </Label3D>
       </group>
