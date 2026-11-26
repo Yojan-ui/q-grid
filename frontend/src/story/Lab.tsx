@@ -8,7 +8,7 @@ import { RoundedBox } from '@react-three/drei'
 import { Label3D } from './Label3D'
 import gsap from 'gsap'
 import type { LiveSolve, Scenario } from '../lib/data'
-import { C, reducedMotion } from '../lib/theme'
+import { reducedMotion, useC } from '../lib/theme'
 import { pairRule, varLabel, zn } from '../lib/labels'
 import type { StopId } from '../lib/story'
 
@@ -70,6 +70,7 @@ const modeOf = (s: StopId): Mode =>
 export function Lab({ stop, ex, sc, anchor, yaw, buildingH, pulseKey }: {
   stop: StopId; ex: LiveSolve; sc: Scenario; anchor: THREE.Vector3; yaw: number; buildingH: number; pulseKey: number
 }) {
+  const C = useC()
   const n = ex.n_qubits
   const names = ex.var_names
   const { pos: tpos, heads } = useMemo(() => tileLayout(names), [names])
@@ -138,12 +139,12 @@ export function Lab({ stop, ex, sc, anchor, yaw, buildingH, pulseKey }: {
   const mats = useMemo(() => ({
     edgeRule: new THREE.MeshBasicMaterial({ color: C.grid, transparent: true, opacity: 0, depthWrite: false }),
     edgeCost: new THREE.MeshBasicMaterial({ color: C.quantum, transparent: true, opacity: 0, depthWrite: false }),
-    wire: new THREE.MeshBasicMaterial({ color: '#BDBCB5', transparent: true, opacity: 0 }),
+    wire: new THREE.MeshBasicMaterial({ color: C.wire, transparent: true, opacity: 0 }),
     slab: new THREE.MeshStandardMaterial({ color: C.quantum, transparent: true, opacity: 0, roughness: 0.6, depthWrite: false }),
-    gate: new THREE.MeshStandardMaterial({ color: '#FFFFFF', transparent: true, opacity: 0, roughness: 0.6 }),
+    gate: new THREE.MeshStandardMaterial({ color: C.tile, transparent: true, opacity: 0, roughness: 0.6 }),
     meas: new THREE.MeshStandardMaterial({ color: C.text, transparent: true, opacity: 0, roughness: 0.6 }),
     pulse: new THREE.MeshBasicMaterial({ color: C.quantum, transparent: true, opacity: 0, depthWrite: false }),
-  }), [])
+  }), [C])
   const pulse = useRef<THREE.Mesh>(null!)
   const pulseT = useRef(1)
   useEffect(() => { pulseT.current = stop === '4c' ? 0 : 1 }, [stop, pulseKey])
@@ -207,14 +208,15 @@ export function Lab({ stop, ex, sc, anchor, yaw, buildingH, pulseKey }: {
       ))}
       {names.map((v, i) => {
         const on = best[i] === '1'
+        const tileCol = mode === 'decoded' && on ? C.tileOn : C.tile
         return (
           <group key={v} ref={g => { grp.current[i] = g }} position={home} scale={0.02}>
             <group ref={g => { tile.current[i] = g }}>
               <RoundedBox args={[TW, TH, 0.8]} radius={0.45} smoothness={3} castShadow>
-                <meshStandardMaterial color={mode === 'decoded' && on ? '#EEEAFF' : '#FFFFFF'} emissive={mode === 'decoded' && on ? '#EEEAFF' : '#FFFFFF'} emissiveIntensity={0.25} roughness={0.8} />
+                <meshStandardMaterial color={tileCol} emissive={tileCol} emissiveIntensity={0.25} roughness={0.8} />
               </RoundedBox>
               <Label3D show={mode === 'tiles' || (mode === 'decoded' && phase === 'a')} transform distanceFactor={18} position={[0, 0, 0.45]}>
-                <div className={`tile ${labels[i].device} ${mode === 'decoded' ? (on ? 'yes' : 'no') : ''}`}>
+                <div className={`tile ${labels[i].device} ${mode === 'decoded' ? (on ? 'yes' : 'no') : ''}`} data-bg={tileCol}>
                   <span className="q tn">q{i}</span>
                   <span className="t">{labels[i].short}</span>
                   {mode === 'decoded' && <span className="a">{on ? `YES · ${labels[i].yes}` : 'no'}</span>}
@@ -237,8 +239,8 @@ export function Lab({ stop, ex, sc, anchor, yaw, buildingH, pulseKey }: {
       {/* bits of the winning plan (4e) */}
       {names.map((v, i) => (
         <group key={`b${v}`} ref={g => { bit.current[i] = g }} scale={0.001}>
-          <mesh><boxGeometry args={[1.5, 1.5, 1.5]} /><meshStandardMaterial color={best[i] === '1' ? C.quantum : '#FFFFFF'} roughness={0.5} /></mesh>
-          <Label3D show={mode === 'decoded' && phase === 'a'} center zIndexRange={[31, 0]}><span className={`bitch tn ${best[i] === '1' ? 'one' : ''}`}>{best[i]}</span></Label3D>
+          <mesh><boxGeometry args={[1.5, 1.5, 1.5]} /><meshStandardMaterial color={best[i] === '1' ? C.quantum : C.tile} roughness={0.5} /></mesh>
+          <Label3D show={mode === 'decoded' && phase === 'a'} center zIndexRange={[31, 0]}><span className={`bitch tn ${best[i] === '1' ? 'one' : ''}`} data-bg={best[i] === '1' ? C.quantum : C.tile}>{best[i]}</span></Label3D>
         </group>
       ))}
       {/* 4b: interactions */}
@@ -287,7 +289,7 @@ export function Lab({ stop, ex, sc, anchor, yaw, buildingH, pulseKey }: {
               <group ref={g => { bars.current[k] = g }} scale={[1, 0.001, 1]}>
                 <mesh position-y={0.5} castShadow>
                   <boxGeometry args={[2.8, 1, 2.8]} />
-                  <meshStandardMaterial color={isBest ? C.quantum : s.feasible ? '#C9BFFB' : '#E2E1DB'} roughness={0.7} />
+                  <meshStandardMaterial color={isBest ? C.quantum : s.feasible ? C.quantumMid : C.barMuted} roughness={0.7} />
                 </mesh>
               </group>
               <Label3D show={stop === '4d'} position={[0, h + 1.4, 0]} center>

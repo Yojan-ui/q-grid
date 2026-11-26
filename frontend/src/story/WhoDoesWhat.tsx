@@ -1,11 +1,12 @@
 // Step 4g: where quantum is used and where it is not. Structure only (from the README architecture), no numbers.
 import { motion } from 'framer-motion'
-import { C, reducedMotion } from '../lib/theme'
+import { reducedMotion, useC } from '../lib/theme'
 
 const box = (k: number) => ({ initial: { opacity: 0, y: 10 }, animate: { opacity: 1, y: 0 },
   transition: { delay: reducedMotion() ? 0 : 0.15 + k * 0.06, duration: reducedMotion() ? 0 : 0.5, ease: [0.65, 0, 0.35, 1] as const } })
 
 export function WhoDoesWhat() {
+  const C = useC()
   return (
     <div className="wdw" role="img" aria-label="Who does what: quantum inside each building, classical around it">
       <motion.div className="wdw-card" {...box(0)}>
@@ -19,28 +20,28 @@ export function WhoDoesWhat() {
           <rect x="16" y="16" width="608" height="232" rx="14" fill="none" stroke={C.hair} />
           <text x="32" y="40" className="wl">Inside each building, every 15 minutes</text>
           <g>
-            <rect x="32" y="60" width="132" height="64" rx="10" fill="#fff" stroke={C.hair} />
+            <rect x="32" y="60" width="132" height="64" rx="10" fill={C.surface} stroke={C.hair} />
             <text x="98" y="88" textAnchor="middle" className="wt">Yes/no decisions</text>
             <text x="98" y="106" textAnchor="middle" className="ws">→ QUBO cost</text>
           </g>
           <g>
-            <rect x="188" y="52" width="168" height="80" rx="10" fill="#F1EEFF" stroke={C.quantum} strokeWidth="1.5" />
-            <text x="272" y="78" textAnchor="middle" className="wt" fill={C.quantum}>QUANTUM</text>
+            <rect x="188" y="52" width="168" height="80" rx="10" fill={C.quantumSoft} stroke={C.quantum} strokeWidth="1.5" />
+            <text x="272" y="78" textAnchor="middle" className="wt" fill={C.quantumInk}>QUANTUM</text>
             <text x="272" y="97" textAnchor="middle" className="ws">QAOA circuit, ≤16 qubits</text>
             <text x="272" y="114" textAnchor="middle" className="ws">measure 256× → best plan</text>
           </g>
           <g>
-            <rect x="380" y="60" width="112" height="64" rx="10" fill="#fff" stroke={C.hair} />
+            <rect x="380" y="60" width="112" height="64" rx="10" fill={C.surface} stroke={C.hair} />
             <text x="436" y="88" textAnchor="middle" className="wt">Verify</text>
             <text x="436" y="106" textAnchor="middle" className="ws">vs exact search</text>
           </g>
           <g>
-            <rect x="516" y="60" width="92" height="64" rx="10" fill="#fff" stroke={C.hair} />
+            <rect x="516" y="60" width="92" height="64" rx="10" fill={C.surface} stroke={C.hair} />
             <text x="562" y="88" textAnchor="middle" className="wt">Safety</text>
             <text x="562" y="106" textAnchor="middle" className="ws">clamp, then act</text>
           </g>
           <g>
-            <rect x="380" y="160" width="228" height="64" rx="10" fill="#fff" stroke={C.hair} strokeDasharray="4 3" />
+            <rect x="380" y="160" width="228" height="64" rx="10" fill={C.surface} stroke={C.hair} strokeDasharray="4 3" />
             <text x="494" y="188" textAnchor="middle" className="wt">Fallback if it misses</text>
             <text x="494" y="206" textAnchor="middle" className="ws">QIEA → annealing → exact</text>
           </g>
@@ -54,9 +55,9 @@ export function WhoDoesWhat() {
           <rect x="16" y="266" width="608" height="98" rx="14" fill="none" stroke={C.hair} />
           <text x="32" y="290" className="wl">Between buildings</text>
           <g>
-            <rect x="32" y="304" width="120" height="44" rx="10" fill="#fff" stroke={C.hair} />
+            <rect x="32" y="304" width="120" height="44" rx="10" fill={C.surface} stroke={C.hair} />
             <text x="92" y="331" textAnchor="middle" className="wt">Building A</text>
-            <rect x="488" y="304" width="120" height="44" rx="10" fill="#fff" stroke={C.hair} />
+            <rect x="488" y="304" width="120" height="44" rx="10" fill={C.surface} stroke={C.hair} />
             <text x="548" y="331" textAnchor="middle" className="wt">Building B</text>
             <path d="M156 318 L484 318" stroke={C.accent} markerEnd="url(#ar)" markerStart="url(#ar)" />
             <text x="320" y="310" textAnchor="middle" className="ws">propose cable flow ↔ agree (ADMM, classical)</text>
@@ -66,7 +67,7 @@ export function WhoDoesWhat() {
         </svg>
       </motion.div>
       <motion.div className="wdw-legend" {...box(3)}>
-        <span><i style={{ background: C.quantum }} />Quantum (simulated)</span><span><i style={{ background: '#fff', border: `1px solid ${C.faint}` }} />Classical</span>
+        <span><i style={{ background: C.quantum }} />Quantum (simulated)</span><span><i style={{ background: C.surface, border: `1px solid ${C.muted}` }} />Classical</span>
         <span className="muted">QIEA is quantum-inspired and runs on a classical CPU.</span>
       </motion.div>
     </div>

@@ -2,13 +2,12 @@
 // Every figure is read from the replay (StoryData); this file only words and formats them.
 import { useMemo } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import katex from 'katex'
-import 'katex/dist/katex.min.css'
-import { C, num, pct, reducedMotion, rs } from '../lib/theme'
+import { num, pct, reducedMotion, rs } from '../lib/theme'
 import { devices, fmtDate, varLabel, zn } from '../lib/labels'
 import { campusSoc, STEP_COUNT, STOPS, subOf, type StopId, type StoryData } from '../lib/story'
 import { CountUp, DayChart, outageSpan, ResidualChart, SocChart } from './charts'
 import { CommsChart, SmallMultiples } from './Scorecard'
+import { Tex } from './Tex'
 
 
 export type PanelProps = {
@@ -35,7 +34,7 @@ export function Panel(p: PanelProps) {
   const fade = reducedMotion() ? { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 } }
     : { initial: { opacity: 0, y: 14 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -10 } }
   return (
-    <aside className="panel" aria-live="polite">
+    <aside className="panel" id="panel" tabIndex={-1} aria-label="explanation">
       <div className="stepnums" role="tablist" aria-label="steps">
         {Array.from({ length: STEP_COUNT }, (_, k) => k + 1).map(n => (
           <button key={n} role="tab" aria-selected={s.step === n} className={s.step === n ? 'on' : n < s.step ? 'done' : ''}
@@ -46,7 +45,7 @@ export function Panel(p: PanelProps) {
       </div>
       <div className="panel-scroll">
         <AnimatePresence mode="wait">
-          <motion.section key={p.stop} {...fade} transition={{ duration: reducedMotion() ? 0.15 : 0.45, ease: [0.65, 0, 0.35, 1] }}>
+          <motion.section key={p.stop} aria-live="polite" {...fade} transition={{ duration: reducedMotion() ? 0.15 : 0.45, ease: [0.65, 0, 0.35, 1] }}>
             <h1 className="answer">{body.answer}</h1>
             {body.support && <div className="support">{body.support}</div>}
             {body.keys && <div className={`keys-row ${p.stop === '7a' ? 'k4' : ''}`}>{body.keys}</div>}
@@ -60,9 +59,9 @@ export function Panel(p: PanelProps) {
             onClick={() => p.go(i)} aria-label={`Step ${x.step}: ${x.title}`} title={`${x.step} · ${x.title}`} />)}
         </div>
         <div className="pager-row">
-          <button className="btn ghost" onClick={p.onPrev} disabled={p.index === 0}>← Back</button>
-          <span className="muted small">← → keys or scroll</span>
-          <button className="btn primary" onClick={p.onNext} disabled={p.index === STOPS.length - 1}>Next →</button>
+          <button className="btn ghost" onClick={p.onPrev} disabled={p.index === 0} aria-label="Back to the previous step">← Back</button>
+          <span className="muted small devonly">← → keys or scroll · <kbd>P</kbd> present · <kbd>D</kbd> theme</span>
+          <button className="btn primary" onClick={p.onNext} disabled={p.index === STOPS.length - 1} aria-label="Next step">Next →</button>
         </div>
       </nav>
     </aside>
@@ -149,14 +148,14 @@ function content(p: PanelProps): Body {
     }
     case '4b': {
       const rules = rulesFor(d)
-      const tex = katex.renderToString(String.raw`E(\mathbf{x}) = \sum_i Q_{ii}\,x_i + \sum_{i<j} 2\,Q_{ij}\,x_i x_j + c,\qquad x_i \in \{0,1\}`, { throwOnError: false, displayMode: true })
+      const tex = String.raw`E(\mathbf{x}) = \sum_i Q_{ii}\,x_i + \sum_{i<j} 2\,Q_{ij}\,x_i x_j + c,\qquad x_i \in \{0,1\}`
       return {
         answer: <>The building’s goals and rules become one cost. Lower is better.</>,
         support: <p>A line joins two qubits whose choices affect each other. Thicker means a stronger effect.</p>,
         extra: <>
-          <ul className="rules">{rules.map(r => <li key={r.text}><i style={{ background: r.kind === 'rule' ? C.grid : C.quantum }} />{r.text}</li>)}</ul>
-          <div className="legend-row small muted"><span><i style={{ background: C.grid }} />can’t do both (penalty)</span><span><i style={{ background: C.quantum }} />costs that interact</span></div>
-          <div className="formula" dangerouslySetInnerHTML={{ __html: tex }} />
+          <ul className="rules">{rules.map(r => <li key={r.text}><i style={{ background: r.kind === 'rule' ? 'var(--grid)' : 'var(--quantum)' }} />{r.text}</li>)}</ul>
+          <div className="legend-row small muted"><span><i style={{ background: 'var(--grid)' }} />can’t do both (penalty)</span><span><i style={{ background: 'var(--quantum)' }} />costs that interact</span></div>
+          <Tex src={tex} />
           <p className="muted small">This is a QUBO. Breaking a rule adds a large penalty, so plans that break rules are never the cheapest.</p>
         </>,
       }
@@ -186,7 +185,7 @@ function content(p: PanelProps): Body {
         answer: <>We measure the circuit {total} times and keep the cheapest plan that breaks no rule.</>,
         support: <p>Each bar is a plan that came up in the measurements; taller means it came up more often. Grey bars break a rule, for example charging and discharging together, and are thrown away. The cheapest valid plan wins even if it is not the tallest bar.</p>,
         extra: <>
-          <div className="legend-row"><span><i style={{ background: C.quantum }} />chosen plan</span><span><i style={{ background: '#C9BFFB' }} />other valid plans</span><span><i style={{ background: '#E2E1DB' }} />✕ breaks a rule</span><span><i style={{ background: C.muted, height: 2 }} />random guess</span></div>
+          <div className="legend-row"><span><i style={{ background: 'var(--quantum)' }} />chosen plan</span><span><i style={{ background: 'var(--quantum-mid)' }} />other valid plans</span><span><i style={{ background: 'var(--bar-muted)' }} />✕ breaks a rule</span><span><i style={{ background: 'var(--muted)', height: 2 }} />random guess</span></div>
           <p className="muted small">Shots measured by the pipeline: {ex.qaoa.backend ?? 'replay'}. Nothing here is re-sampled in the browser.</p>
         </>,
         keys: <>
@@ -238,7 +237,7 @@ function content(p: PanelProps): Body {
     case '4g': return {
       answer: <>Quantum picks each building’s yes/no plan. Everything around it is classical.</>,
       support: <>
-        <p><b style={{ color: C.quantum }}>Quantum (QAOA):</b> choosing the plan inside each building, up to 16 qubits.</p>
+        <p><b style={{ color: 'var(--quantum-ink)' }}>Quantum (QAOA):</b> choosing the plan inside each building, up to 16 qubits.</p>
         <p><b>Classical:</b> agreement between buildings, checking each answer, fallback solvers and the safety layer.</p>
       </>,
       extra: <div className="honest">{sc.label}. {sc.qiea_label}.</div>,

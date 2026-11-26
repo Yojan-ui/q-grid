@@ -7,7 +7,7 @@ import gsap from 'gsap'
 import { Label3D } from './Label3D'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import type { Run, Scenario } from '../lib/data'
-import { C, reducedMotion, signed } from '../lib/theme'
+import { reducedMotion, signed, useC } from '../lib/theme'
 import { zn } from '../lib/labels'
 
 // schematic grid connection point west of the campus (not a surveyed location)
@@ -101,19 +101,23 @@ export function Strip({ a, b, color, w = 1.2, y = 0.3, opacity = 1 }: { a: THREE
   )
 }
 
-function Panels({ mats, opacity }: { mats: THREE.Matrix4[]; opacity: number }) {
+/** Rooftop PV. At night (dark theme) the panels are deep blue and glow faintly only while the replay shows them producing. */
+function Panels({ mats, opacity, glow = 0 }: { mats: THREE.Matrix4[]; opacity: number; glow?: number }) {
+  const C = useC()
   const ref = useRef<THREE.InstancedMesh>(null!)
   useEffect(() => { mats.forEach((m, i) => ref.current.setMatrixAt(i, m)); ref.current.instanceMatrix.needsUpdate = true }, [mats])
   return (
     <instancedMesh ref={ref} args={[undefined, undefined, mats.length]} castShadow>
       <boxGeometry />
-      <meshStandardMaterial color={C.pv} roughness={0.45} metalness={0.15} transparent={opacity < 1} opacity={opacity} />
+      <meshStandardMaterial color={C.pv} roughness={0.45} metalness={0.15} transparent={opacity < 1} opacity={opacity}
+        emissive={C.pvGlow} emissiveIntensity={C.pvGlowMax * Math.max(0, Math.min(1, glow))} />
     </instancedMesh>
   )
 }
 
 /** Battery: a glass capsule with an amber fill at the state of charge. */
 export function Battery({ soc, opacity = 1, scale = 1 }: { soc: number; opacity?: number; scale?: number }) {
+  const C = useC()
   const fill = useRef<THREE.Mesh>(null!)
   const cur = useRef(soc)
   useFrame((_, dt) => {
@@ -125,15 +129,16 @@ export function Battery({ soc, opacity = 1, scale = 1 }: { soc: number; opacity?
   return (
     <group scale={scale}>
       <mesh position-y={5.2} castShadow><cylinderGeometry args={[2.6, 2.6, 10.4, 24, 1, true]} />
-        <meshStandardMaterial color="#ffffff" transparent opacity={0.45 * opacity} roughness={0.2} side={THREE.DoubleSide} depthWrite={false} /></mesh>
+        <meshStandardMaterial color={C.glass} transparent opacity={C.glassOpacity * opacity} roughness={0.2} side={THREE.DoubleSide} depthWrite={false} /></mesh>
       <mesh position-y={10.5}><cylinderGeometry args={[1.1, 1.1, 0.6, 16]} /><meshStandardMaterial color={C.faint} transparent opacity={opacity} /></mesh>
       <mesh ref={fill}><cylinderGeometry args={[2.25, 2.25, 9.2, 24]} />
-        <meshStandardMaterial color={C.battery} roughness={0.6} transparent={opacity < 1} opacity={opacity} /></mesh>
+        <meshStandardMaterial color={C.batteryFill} roughness={0.6} transparent={opacity < 1} opacity={opacity} /></mesh>
     </group>
   )
 }
 
 export function Tank({ level, opacity = 1 }: { level: number; opacity?: number }) {
+  const C = useC()
   const ref = useRef<THREE.Mesh>(null!)
   const cur = useRef(level)
   useFrame((_, dt) => {
@@ -145,13 +150,13 @@ export function Tank({ level, opacity = 1 }: { level: number; opacity?: number }
   return (
     <group>
       <mesh position-y={8}><cylinderGeometry args={[6.5, 6.5, 16, 32, 1, true]} />
-        <meshStandardMaterial color="#ffffff" transparent opacity={0.5 * opacity} side={THREE.DoubleSide} depthWrite={false} /></mesh>
+        <meshStandardMaterial color={C.glass} transparent opacity={(C.glassOpacity + 0.05) * opacity} side={THREE.DoubleSide} depthWrite={false} /></mesh>
       <mesh ref={ref}><cylinderGeometry args={[6.1, 6.1, 16, 32]} /><meshStandardMaterial color={C.water} roughness={0.5} transparent={opacity < 1} opacity={opacity} /></mesh>
     </group>
   )
 }
 
-export type LineView = { color: string; label?: string; w?: number }
+export type LineView = { color: string; ink?: string; label?: string; w?: number }
 
 type Props = {
   sc: Scenario; t: number; run: 'qgrid' | 'status_quo'
@@ -173,6 +178,7 @@ type Props = {
 
 export function Campus({ sc, t, run, zones, flows = 'both', lift = {}, liftStagger = 0, focus, dimOthers, killed, storage = true, labels = 'none',
   lineViews, onZone, interactive = false, opacity = 1, subLabel = true, batteryScale = 1, socLabels = false }: Props) {
+  const C = useC()
   // the substation label opens to the right of its anchor; show it only while the anchor (and room for the
   // label) is inside the stage, so it never sits clipped at the stage edge
   const [subOnStage, setSubOnStage] = useState(true)
@@ -222,17 +228,18 @@ export function Campus({ sc, t, run, zones, flows = 'both', lift = {}, liftStagg
                     transparent={o < 1} opacity={o} depthWrite={o >= 1} />
                 </mesh>
               )}
-              {z.panels.length > 0 && <Panels mats={z.panels} opacity={o} />}
+              {z.panels.length > 0 && <Panels mats={z.panels} opacity={o} glow={off ? 0 : (sc.slots.pv_kw[zi]?.[slot] ?? 0) / Math.max(zone.pv_kwp, 1)} />}
               <Label3D show={labels !== 'none' || hover === z.name || focus === z.name} position={[z.pos.x, z.h + 8, z.pos.z]} center>
                 <div className={`zlabel ${focus === z.name ? 'on' : ''} ${off ? 'off' : ''} ${labels === 'names' && !interactive ? 'sm' : ''}`}>
                   {zn(z.name)}{labels === 'net' && !off ? <span className="tn"> · {signed(r.net_kw[zi][slot])}</span> : null}
                 </div>
               </Label3D>
             </group>
-            {storage && zone.battery_kwh > 0 && (
-              <group position={[z.pos.x + 17, 0, z.pos.z + 12]}>
+            {/* hidden rather than unmounted when storage is off: its <Html> label must not unmount mid-render */}
+            {zone.battery_kwh > 0 && (
+              <group position={[z.pos.x + 17, 0, z.pos.z + 12]} visible={storage}>
                 <Battery soc={off ? 0 : r.soc[zi][Math.min(96, slot + 1)]} opacity={o} scale={batteryScale} />
-                <Label3D show={socLabels && !off} position={[0, 12 * batteryScale + 4, 0]} center>
+                <Label3D show={storage && socLabels && !off} position={[0, 12 * batteryScale + 4, 0]} center>
                   <div className="soclabel tn">{Math.round(100 * r.soc[zi][Math.min(96, slot + 1)])}%</div>
                 </Label3D>
               </group>
@@ -243,7 +250,7 @@ export function Campus({ sc, t, run, zones, flows = 'both', lift = {}, liftStagg
             {zone.dg_kw > 0 && (
               <group position={[z.pos.x - 18, 0, z.pos.z - 12]}>
                 <mesh position-y={2.6} castShadow><boxGeometry args={[8, 5.2, 4.6]} />
-                  <meshStandardMaterial color={r.dg_kw[zi][slot] > 0 && !off ? C.diesel : '#D9D8D2'} roughness={0.9} transparent={o < 1} opacity={o} /></mesh>
+                  <meshStandardMaterial color={r.dg_kw[zi][slot] > 0 && !off ? C.diesel : C.dieselIdle} roughness={0.9} transparent={o < 1} opacity={o} /></mesh>
                 {r.dg_kw[zi][slot] > 0 && !off && flows !== 'none' &&
                   <Ribbon a={new THREE.Vector3(z.pos.x - 18, 0, z.pos.z - 12)} b={z.pos} kw={r.dg_kw[zi][slot]} color={C.diesel} max={300} y={0.9} />}
               </group>
@@ -262,17 +269,17 @@ export function Campus({ sc, t, run, zones, flows = 'both', lift = {}, liftStagg
         const pa = pos(a, 0.3), pb = pos(b, 0.3)
         return (
           <group key={i}>
-            <Strip a={pa} b={pb} color={dead ? '#C9C8C2' : v?.color ?? C.road} w={v?.w ?? 1} opacity={opacity} />
+            <Strip a={pa} b={pb} color={dead ? C.offline : v?.color ?? C.road} w={v?.w ?? 1} opacity={opacity} />
             {!dead && !v && (flows === 'ties' || flows === 'both') && <Ribbon a={pa} b={pb} kw={r.flows[i][slot]} color={C.solar} max={240} />}
             <Label3D show={!!v?.label && !dead} position={pa.clone().add(pb).multiplyScalar(0.5).setY(4)} center>
-              <div className="linelabel tn" style={{ borderColor: v?.color, color: v?.color }}>{v?.label ?? ''}</div>
+              <div className="linelabel tn" style={{ borderColor: v?.color, color: v?.ink ?? v?.color }}>{v?.label ?? ''}</div>
             </Label3D>
           </group>
         )
       })}
       <group position={SUBSTATION}>
         <mesh position-y={4} castShadow receiveShadow><boxGeometry args={[18, 8, 14]} />
-          <meshStandardMaterial color={gridUp ? '#E9E8E2' : '#CFCEC8'} roughness={0.9} transparent={opacity < 1} opacity={opacity} /></mesh>
+          <meshStandardMaterial color={gridUp ? C.substation : C.substationDown} roughness={0.9} transparent={opacity < 1} opacity={opacity} /></mesh>
         <mesh position={[0, 8.2, 0]}><boxGeometry args={[18.4, 0.5, 14.4]} /><meshStandardMaterial color={gridUp ? C.grid : C.offline} transparent={opacity < 1} opacity={opacity} /></mesh>
         {/* anchored at its left end and opening towards the campus, so it never runs off the stage's left edge */}
         <Label3D show={subLabel && subOnStage} position={[-6, 16, 0]} style={{ transform: 'translateY(-50%)' }}>
@@ -290,6 +297,7 @@ export function Campus({ sc, t, run, zones, flows = 'both', lift = {}, liftStagg
 
 /** Soft daylight that follows the sun's real azimuth / elevation for the slot (NASA POWER geometry). */
 export function Sun({ sc, t }: { sc: Scenario; t: number }) {
+  const C = useC()
   const el = at(sc.slots.sun.elevation_deg, t), az = at(sc.slots.sun.azimuth_deg, t)
   const day = THREE.MathUtils.clamp((el + 2) / 30, 0, 1)
   const light = useRef<THREE.DirectionalLight>(null!)
@@ -300,20 +308,22 @@ export function Sun({ sc, t }: { sc: Scenario; t: number }) {
     if (reducedMotion()) light.current.position.copy(p)
     else light.current.position.lerp(p, 1 - Math.exp(-dt * 4))
     // physically based lights: intensity ~ pi gives full albedo; hemisphere keeps the model bright at any hour
-    light.current.intensity = THREE.MathUtils.damp(light.current.intensity, 1.1 + 1.5 * day, 4, dt)
+    // dark theme: the same sun path, but a cool moonlight key with low ambient so the model reads as a campus at night
+    light.current.intensity = THREE.MathUtils.damp(light.current.intensity, C.keyBase + C.keyGain * day, 4, dt)
   })
   return (
     <>
-      <hemisphereLight args={['#FFFFFF', '#DEDBD2', 2.35]} />
+      <hemisphereLight args={[C.hemiSky, C.hemiGround, C.hemiI]} />
       <primitive object={target} />
-      <directionalLight ref={light} castShadow target={target} color={day > 0.25 ? '#FFFDF6' : '#FFEBD2'} intensity={2.2}
-        shadow-mapSize={[2048, 2048]} shadow-bias={-0.0004} shadow-normalBias={0.6} shadow-radius={6}
+      <directionalLight ref={light} castShadow target={target} color={day > 0.25 ? C.keyDay : C.keyNight} intensity={2.2}
+        shadow-mapSize={[2048, 2048]} shadow-bias={-0.0004} shadow-normalBias={0.6} shadow-radius={C.shadowRadius} shadow-intensity={C.shadowI}
         shadow-camera-left={-460} shadow-camera-right={460} shadow-camera-top={360} shadow-camera-bottom={-360} shadow-camera-near={10} shadow-camera-far={1500} />
     </>
   )
 }
 
 export function Ground({ sc, opacity = 1, outline: showOutline = true }: { sc: Scenario; opacity?: number; outline?: boolean }) {
+  const C = useC()
   const outline = useMemo(() => {
     if (!sc.campus.outline) return null
     return new THREE.Shape(sc.campus.outline.map(([x, y]) => new THREE.Vector2(x, y)))
@@ -326,18 +336,18 @@ export function Ground({ sc, opacity = 1, outline: showOutline = true }: { sc: S
       </mesh>
       {outline && showOutline && (
         <mesh rotation-x={-Math.PI / 2} position-y={0.02} receiveShadow>
-          <shapeGeometry args={[outline]} /><meshStandardMaterial color="#F7F6F2" roughness={1} transparent={opacity < 1} opacity={opacity} />
+          <shapeGeometry args={[outline]} /><meshStandardMaterial color={C.plot} roughness={1} transparent={opacity < 1} opacity={opacity} />
         </mesh>
       )}
-      {roads?.map((rd, i) => <RoadLine key={i} pts={rd} />)}
+      {roads?.map((rd, i) => <RoadLine key={i} pts={rd} color={C.road} />)}
     </group>
   )
 }
 
-function RoadLine({ pts }: { pts: [number, number][] }) {
+function RoadLine({ pts, color }: { pts: [number, number][]; color: string }) {
   const obj = useMemo(() => {
     const g = new THREE.BufferGeometry().setFromPoints(pts.map(([x, y]) => new THREE.Vector3(x, 0.08, -y)))
-    return new THREE.Line(g, new THREE.LineBasicMaterial({ color: C.road }))
-  }, [pts])
+    return new THREE.Line(g, new THREE.LineBasicMaterial({ color }))
+  }, [pts, color])
   return <primitive object={obj} />
 }

@@ -74,6 +74,7 @@ python scripts/new_campus.py --name "<campus>" --lat <lat> --lon <lon>   # anoth
 | 8 | new_campus.py, manifest + make verify, CI | ✅ |
 | 9 | report, why-quantum, viva Q&A, pitch, data request | ✅ |
 | 10 | design study: 24 h rolling horizon, LP coordination between neighbours, hybrid-Benders and quantum-master variants measured; ablation of four design changes (docs/ablation.md); quantum placement test; multi-dataset benchmark (docs/benchmark_v3.md, docs/scorecard.md) | ✅ code · tariff PENDING · hardware runs need tokens |
+| 11 | explainer: light / dark / system theme (one token file, `D`), presenter mode (`P`, step timer, projector sizing), one-page summary (print → PDF), friendly missing-file states, lazy 3D / KaTeX chunks, WCAG AA contrast test for both themes (`npm run test:contrast`), checked at 1280×720 / 1440×900 / 1920×1080 | ✅ (branch ui-dark-mode) |
 
 ## Honest limits
 PENDING prices/CO2/calendar/meter data; loads are area-based estimates; perfect forecasts; QAOA simulated (ideal, noiseless);

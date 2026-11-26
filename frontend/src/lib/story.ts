@@ -1,7 +1,7 @@
 // The guided story: stops, and the facts each stop shows. Every number is read from replay files produced by
 // scripts/make_replay.py (results/*.csv / *.json); this module only selects and formats them.
 import { useEffect, useState } from 'react'
-import { getCSV, getJSON, type Bench, type LiveSolve, type QaoaFile, type QStory, type Scenario, type V2Data, type V2Example } from './data'
+import { getCSV, getJSON, MissingReplay, type Bench, type LiveSolve, type QaoaFile, type QStory, type Scenario, type V2Data, type V2Example } from './data'
 
 export type StopId = '1' | '2' | '3' | '4a' | '4b' | '4c' | '4d' | '4e' | '4f' | '4g' | '5' | '5b' | '6' | '7a' | '7b' | '7c' | '7d'
 export const STOPS: { id: StopId; step: number; title: string }[] = [
@@ -75,18 +75,24 @@ function pickAdmmSlot(sc: Scenario) {
 export function useStoryData(key: string) {
   const [d, setD] = useState<StoryData | null>(null)
   const [err, setErr] = useState<string | null>(null)
+  const [missing, setMissing] = useState<string[] | null>(null)
+  const [loading, setLoading] = useState<string>('')
   useEffect(() => {
     if (!key) return
+    setErr(null); setMissing(null)
     let off = false
     ;(async () => {
       try {
+        setLoading(`scenario_${key}.json`)
         const sc = await getJSON<Scenario>(`scenario_${key}.json`)
+        setLoading(sc.qaoa_file)
         const q = await getJSON<QaoaFile>(sc.qaoa_file)
+        setLoading('benchmark tables')
         const [summary, robust] = await Promise.all([getCSV('benchmark_summary.csv'), getCSV('robustness.csv')])
         const problem = await getJSON<{ scenarios: Record<string, Record<string, number | string>> }>('problem_day.json').then(p => p.scenarios[key] ?? null).catch(() => null)
         const search = await getJSON<SearchSpace>('search_space.json').catch(() => null)
         const live = sc.live_solve ?? []
-        if (!live.length) throw new Error('scenario has no live_solve records (worked example)')
+        if (!live.length) throw new Error(`scenario_${key}.json has no live_solve records, so there is no worked example for steps 3 and 4. Re-run make replay.`)
         // optimiser v2: when its run exists, "Q-Grid" in the story is the v2 run (v1 kept as qgrid_v1 for comparison)
         if (sc.runs.qgrid_v2) { (sc.runs as any).qgrid_v1 = sc.runs.qgrid; sc.runs.qgrid = sc.runs.qgrid_v2 }
         const v2ex = sc.v2?.example ?? null
@@ -97,11 +103,15 @@ export function useStoryData(key: string) {
         const admmRounds = qs ? qs.admm_rounds : v2ex ? v2ex.admm_rounds : (sc.admm.iterations[String(admmSlot)] ?? [])
         if (!off) setD({ sc, q, example, miss: (v2ex || qs) ? null : pickMiss(live), summary, problem, search, robust, admmSlot, admmRounds,
           v2: sc.v2 ?? null, v2ex, qs, bench })
-      } catch (e) { if (!off) setErr(String(e)) }
+      } catch (e) {
+        if (off) return
+        if (e instanceof MissingReplay) setMissing(e.files)
+        else setErr(e instanceof Error ? e.message : String(e))
+      }
     })()
     return () => { off = true }
   }, [key])
-  return { d, err }
+  return { d, err, missing, loading }
 }
 
 /** Campus-wide state of charge (energy-weighted) for one run, per slot boundary (97 values). */

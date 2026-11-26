@@ -33,9 +33,9 @@ function Heatmap({ M, names }: { M: number[][]; names: string[] }) {
     <svg width={c * n + 70} height={c * n + 10} aria-label="QUBO heatmap">
       {M.map((row, i) => row.map((v, j) => (
         <rect key={`${i}-${j}`} x={70 + j * c} y={i * c} width={c - 1} height={c - 1}
-          fill={v >= 0 ? `rgba(255,90,95,${Math.sqrt(Math.abs(v) / mx)})` : `rgba(61,220,151,${Math.sqrt(Math.abs(v) / mx)})`}>
+          style={{ fill: v >= 0 ? 'var(--grid)' : 'var(--solar)' }} fillOpacity={Math.sqrt(Math.abs(v) / mx)}>
           <title>{`${names[i]} × ${names[j]} = ${v.toFixed(3)}`}</title></rect>)))}
-      {names.map((nm, i) => <text key={nm} x={66} y={i * c + c * 0.7} fontSize={Math.min(10, c * 0.7)} fill="#8A94A6" textAnchor="end">{nm}</text>)}
+      {names.map((nm, i) => <text key={nm} x={66} y={i * c + c * 0.7} fontSize={Math.min(10, c * 0.7)} style={{ fill: 'var(--muted)' }} textAnchor="end">{nm}</text>)}
     </svg>
   )
 }

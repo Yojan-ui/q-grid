@@ -3,12 +3,15 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { animate, motion } from 'framer-motion'
 import { Area, ComposedChart, Line, ReferenceArea, ReferenceDot, ReferenceLine, ResponsiveContainer, XAxis, YAxis } from 'recharts'
 import type { Scenario } from '../lib/data'
-import { C, reducedMotion } from '../lib/theme'
+import { reducedMotion, useC, type Palette } from '../lib/theme'
 import { campusSoc, sumZones } from '../lib/story'
 
 const hourTicks = [0, 24, 48, 72, 96]
 const hourFmt = (v: number) => `${String(Math.round(v / 4)).padStart(2, '0')}:00`
-const axis = { stroke: C.faint, fontSize: 11, tickLine: false, axisLine: false } as const
+// tick labels in muted ink (>= 4.5:1 in both themes)
+const axisOf = (C: Palette) => ({ stroke: C.muted, fontSize: 11, tickLine: false, axisLine: false }) as const
+const hhmm = (sc: Scenario, i: number) => sc.slots.t[Math.max(0, Math.min(95, i))]
+const argmax = (a: number[]) => a.reduce((b, v, i) => (v > a[b] ? i : b), 0)
 
 export function outageSpan(sc: Scenario): [number, number] | null {
   const a = sc.slots.grid_up.indexOf(0)
@@ -17,6 +20,7 @@ export function outageSpan(sc: Scenario): [number, number] | null {
 
 /** Step 1: solar, load and price through the status-quo day, with the two loss areas shaded. */
 export function DayChart({ sc, t }: { sc: Scenario; t: number }) {
+  const C = useC(), axis = axisOf(C)
   const r = sc.runs.status_quo ?? sc.runs.qgrid
   const pmax = Math.max(...sc.slots.price_import)
   const data = useMemo(() => sc.slots.t.map((_, i) => ({
@@ -25,11 +29,16 @@ export function DayChart({ sc, t }: { sc: Scenario; t: number }) {
     bought: sc.slots.price_import[i] >= pmax && r.grid_import_kw[i] > 0.5 ? r.grid_import_kw[i] : null,
   })), [sc])
   const out = outageSpan(sc)
+  const summary = useMemo(() => {
+    const so = data.map(x => x.solar), lo = data.map(x => x.load), is = argmax(so), il = argmax(lo)
+    return `Status-quo day. Solar peaks at ${Math.round(so[is]).toLocaleString('en-IN')} kW around ${hhmm(sc, is)}; campus load peaks at ${Math.round(lo[il]).toLocaleString('en-IN')} kW around ${hhmm(sc, il)}. `
+      + `Import price ranges from Rs ${Math.min(...sc.slots.price_import)} to Rs ${pmax} per kWh.${out ? ` Grid outage ${hhmm(sc, out[0])} to ${hhmm(sc, out[1])}.` : ''}`
+  }, [data, sc])
   return (
     <figure className="chart">
-      <div style={{ height: 150 }}>
+      <div style={{ height: `calc(150px * var(--ch, 1))` }} role="img" aria-label={summary}>
         <ResponsiveContainer>
-          <ComposedChart data={data} margin={{ top: 6, right: 4, bottom: 0, left: 0 }}>
+          <ComposedChart data={data} margin={{ top: 6, right: 4, bottom: 0, left: 0 }} accessibilityLayer={false}>
             <XAxis dataKey="i" type="number" domain={[0, 96]} ticks={hourTicks} tickFormatter={hourFmt} {...axis} />
             <YAxis yAxisId="kw" {...axis} tickFormatter={v => `${Math.round(v / 100) / 10}k`} width={40} />
             <YAxis yAxisId="rs" orientation="right" domain={[0, Math.ceil(pmax + 1)]} {...axis} width={28} />
@@ -54,6 +63,7 @@ export function DayChart({ sc, t }: { sc: Scenario; t: number }) {
 
 /** Step 6: campus state of charge, status quo vs Q-Grid, with data-checked annotations. */
 export function SocChart({ sc, t }: { sc: Scenario; t: number }) {
+  const C = useC(), axis = axisOf(C)
   const qg = campusSoc(sc, 'qgrid'), sq = campusSoc(sc, 'status_quo')
   const data = qg.map((v, i) => ({ i, qg: 100 * v, sq: sq.length ? 100 * sq[i] : null }))
   const out = outageSpan(sc)
@@ -67,17 +77,20 @@ export function SocChart({ sc, t }: { sc: Scenario; t: number }) {
   }
   const dg = (run: 'qgrid' | 'status_quo') => sc.runs[run]?.dg_kw ? sc.slots.t.map((_, i) => sumZones(sc.runs[run]!.dg_kw, i) > 0) : []
   const tankZ = sc.campus.zones.find(z => z.tank_m3 > 0)
+  const o0 = out?.[0] ?? 72
+  const summary = `Campus battery level through the day. At ${hhmm(sc, o0)}: Q-Grid ${Math.round(100 * (qg[o0] ?? 0))}%`
+    + `${sq.length ? `, status quo ${Math.round(100 * (sq[o0] ?? 0))}%` : ''}. ${notes.map((n, k) => `Note ${k + 1}: ${n.text}.`).join(' ')}`
   return (
     <figure className="chart">
-      <div style={{ height: 160 }}>
+      <div style={{ height: `calc(160px * var(--ch, 1))` }} role="img" aria-label={summary}>
         <ResponsiveContainer>
-          <ComposedChart data={data} margin={{ top: 14, right: 8, bottom: 0, left: 0 }}>
+          <ComposedChart data={data} margin={{ top: 14, right: 8, bottom: 0, left: 0 }} accessibilityLayer={false}>
             <XAxis dataKey="i" type="number" domain={[0, 96]} ticks={hourTicks} tickFormatter={hourFmt} {...axis} />
             <YAxis domain={[0, 100]} ticks={[0, 50, 100]} tickFormatter={v => `${v}%`} {...axis} width={38} />
             {out && <ReferenceArea x1={out[0]} x2={out[1]} fill={C.hair} fillOpacity={0.8} />}
             <Line dataKey="sq" stroke={C.faint} strokeWidth={1.4} strokeDasharray="4 3" dot={false} isAnimationActive={false} />
             <Line dataKey="qg" stroke={C.battery} strokeWidth={2} dot={false} isAnimationActive={false} />
-            {notes.map((n, k) => <ReferenceDot key={n.text} x={n.x} y={n.y} r={8} fill="#fff" stroke={C.battery} strokeWidth={1.5}
+            {notes.map((n, k) => <ReferenceDot key={n.text} x={n.x} y={n.y} r={8} fill={C.surface} stroke={C.battery} strokeWidth={1.5}
               label={{ value: String(k + 1), position: 'center', fontSize: 10, fontWeight: 600, fill: C.text }} />)}
             <ReferenceLine x={t} stroke={C.accent} strokeWidth={1.2} />
           </ComposedChart>
@@ -96,10 +109,12 @@ export function SocChart({ sc, t }: { sc: Scenario; t: number }) {
 }
 
 function Strip({ label, on, color, t }: { label: string; on: boolean[]; color: string; t: number }) {
+  const C = useC()
+  const n = on.filter(Boolean).length
   return (
     <div className="strip">
       <span>{label}</span>
-      <svg viewBox="0 0 96 6" preserveAspectRatio="none">
+      <svg viewBox="0 0 96 6" preserveAspectRatio="none" role="img" aria-label={`${label}: on for ${(n / 4).toFixed(2)} h`}>
         <rect x={0} y={2.5} width={96} height={1} fill={C.hair} />
         {on.map((v, i) => v ? <rect key={i} x={i} y={0.5} width={1.02} height={5} fill={color} /> : null)}
         <rect x={t} y={0} width={0.3} height={6} fill={C.accent} />
@@ -110,11 +125,13 @@ function Strip({ label, on, color, t }: { label: string; on: boolean[]; color: s
 
 /** Step 5: disagreement (primal residual, kW) per ADMM round. */
 export function ResidualChart({ rounds, k }: { rounds: { k: number; r_primal: number }[]; k: number }) {
+  const C = useC(), axis = axisOf(C)
   const data = rounds.map(r => ({ k: r.k + 1, gap: r.r_primal }))   // not "r": Recharts passes row fields to the SVG dot
+  const summary = data.length ? `Largest cable disagreement per round: ${data[0].gap.toFixed(1)} kW in round 1, ${data[data.length - 1].gap.toFixed(1)} kW in round ${data.length}. Showing round ${k + 1}.` : 'No rounds recorded.'
   return (
-    <div style={{ height: 110 }}>
+    <div style={{ height: `calc(110px * var(--ch, 1))` }} role="img" aria-label={summary}>
       <ResponsiveContainer>
-        <ComposedChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}>
+        <ComposedChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -12 }} accessibilityLayer={false}>
           <XAxis dataKey="k" {...axis} />
           <YAxis {...axis} width={40} />
           <Line dataKey="gap" stroke={C.grid} strokeWidth={1.6} isAnimationActive={false} type="linear" dot={{ r: 2.5, fill: C.grid, stroke: C.grid }} />
@@ -159,13 +176,14 @@ export function GapBars({ rows }: { rows: { method: string; name: string; gap: n
 
 /** Benders bounds per round (step 5b): best upper bound and lower bound, Rs over the 24 h horizon. */
 export function BoundsChart({ iters }: { iters: { k: number; best_UB: number; LB: number }[] }) {
+  const C = useC(), axis = axisOf(C)
   const data = iters.map(r => ({ k: r.k, ub: r.best_UB, lb: r.LB }))
   const lo = Math.min(...data.map(d => d.lb)), hi = Math.max(...data.map(d => d.ub))
   const pad = (hi - lo) * 0.08 || 1
   return (
     <div style={{ marginBottom: 10 }}>
-      <div style={{ height: 150 }}><ResponsiveContainer>
-        <ComposedChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 8 }}>
+      <div style={{ height: `calc(150px * var(--ch, 1))` }} role="img" aria-label={`Benders bounds over ${data.length} rounds: best upper bound Rs ${Math.round(data[data.length - 1]?.ub ?? 0)}, lower bound Rs ${Math.round(data[data.length - 1]?.lb ?? 0)}.`}><ResponsiveContainer>
+        <ComposedChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 8 }} accessibilityLayer={false}>
           <XAxis dataKey="k" {...axis} />
           <YAxis {...axis} width={58} domain={[Math.floor(lo - pad), Math.ceil(hi + pad)]} tickFormatter={(v: number) => `${Math.round(v / 1000)}k`} />
           <Line dataKey="ub" name="upper bound (best plan)" stroke={C.text} strokeWidth={1.6} isAnimationActive={false} dot={{ r: 2.5 }} />
