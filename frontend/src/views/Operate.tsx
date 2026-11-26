@@ -22,6 +22,7 @@ export function OperateView({ d, online }: { d: StoryData; online: boolean }) {
   if (!s) return <main className="page op"><div className="loading" role="status"><span className="bar"><i /></span><span>{op.err ?? (online ? 'Connecting to the control room…' : 'Loading the recorded session…')}</span></div></main>
   return (
     <main className="op" aria-label="Operate: control room">
+      <h1 className="op-title">{headline(s)}</h1>
       <OpHeader s={s} op={op} online={online} />
       <div className="op-grid">
         <section className="op-col">
@@ -49,6 +50,16 @@ export function OperateView({ d, online }: { d: StoryData; online: boolean }) {
       </div>
     </main>
   )
+}
+
+/** One plain sentence about the campus right now, read from the snapshot. */
+function headline(s: OpSnapshot): string {
+  const n = s.zones.length
+  const c = (st: OpZone['state']) => s.zones.filter(z => z.state === st).length
+  if (!s.grid_up_now) return c('shedding') ? `The grid is down: ${c('shedding')} of ${n} buildings are shedding some load, critical loads first.` : `The grid is down and all ${n} buildings are running on their own batteries and diesel.`
+  const next = s.zones.map(z => ({ z, a: z.next_action })).find(x => !x.a.startsWith('No change') && x.a !== '—')
+  const now = c('export') ? `${c('export')} of ${n} buildings are sending solar to the grid` : `${c('import')} of ${n} buildings are drawing from the grid`
+  return `${now}${next ? `; next planned change: ${zn(next.z.name).toLowerCase()}, ${next.a.charAt(0).toLowerCase()}${next.a.slice(1)}` : '; no changes planned in the next three hours'}${s.comms_ok ? '.' : ', with the campus network down.'}`
 }
 
 function OpHeader({ s, op, online }: { s: OpSnapshot; op: ReturnType<typeof useOperate>; online: boolean }) {
@@ -105,8 +116,8 @@ function BuildingCard({ z }: { z: OpZone }) {
     <div className={`bcard st-${z.state}`}>
       <div className="bc-top"><b>{zn(z.name)}</b>{z.source === 'hardware' ? <span className="hwbadge">LIVE HARDWARE</span> : <span className="simbadge">simulated</span>}</div>
       <div className="bc-row tn"><span>Solar <b>{kw(z.pv_kw)}</b></span><span>Load <b>{kw(z.load_kw)}</b></span></div>
-      {z.has.battery && <div className="bc-bat" title={`battery ${Math.round(100 * (z.soc ?? 0))}%`}><i style={{ width: `${Math.round(100 * (z.soc ?? 0))}%` }} /><span className="tn">{Math.round(100 * (z.soc ?? 0))}% · {z.battery_kw > 1 ? `charging ${kw(z.battery_kw)}` : z.battery_kw < -1 ? `discharging ${kw(-z.battery_kw)}` : 'idle'}</span></div>}
-      <div className="bc-row small tn"><span>{stateText[z.state]}</span><span>grid {z.net_kw >= 0 ? '+' : '−'}{kw(Math.abs(z.net_kw))}</span>{z.dg_kw > 0 && <span className="warn">diesel {kw(z.dg_kw)}</span>}{z.pump && <span>pump on</span>}</div>
+      {z.has.battery && <div className="bc-bat" title={`battery ${Math.round(100 * (z.soc ?? 0))}%, ${z.battery_kw > 1 ? `charging ${kw(z.battery_kw)}` : z.battery_kw < -1 ? `discharging ${kw(-z.battery_kw)}` : 'idle'}`}><i style={{ width: `${Math.round(100 * (z.soc ?? 0))}%` }} /><span className="tn">battery {Math.round(100 * (z.soc ?? 0))}% · {z.battery_kw > 1 ? 'charging' : z.battery_kw < -1 ? 'discharging' : 'idle'}</span></div>}
+      <div className="bc-row small"><span>{stateText[z.state]}</span>{z.dg_kw > 0 && <span className="warn">diesel on</span>}{z.pump && <span>pump on</span>}</div>
       <div className="bc-next small"><b>{z.next_action}</b><span className="muted"> — {z.reason}</span></div>
     </div>
   )

@@ -1,0 +1,165 @@
+{
+ "checked_at": "2026-11-26 23:14",
+ "n_real": 3,
+ "n_pending": 6,
+ "items": [
+  {
+   "key": "nasa_power",
+   "label": "NASA POWER irradiance (Bengaluru, 2023)",
+   "status": "REAL",
+   "real": true,
+   "files": [
+    {
+     "path": "data/raw/nasa_power/*.json",
+     "present": true
+    }
+   ],
+   "missing": []
+  },
+  {
+   "key": "osm_layout",
+   "label": "OpenStreetMap campus layout",
+   "status": "REAL",
+   "real": true,
+   "files": [
+    {
+     "path": "data/raw/osm_rvce.json",
+     "present": true
+    },
+    {
+     "path": "data/raw/osm_rvce.geojson",
+     "present": true
+    }
+   ],
+   "missing": []
+  },
+  {
+   "key": "bdg2_load_shapes",
+   "label": "BDG2 education-building meters (load shapes)",
+   "status": "REAL",
+   "real": true,
+   "files": [
+    {
+     "path": "data/raw/bdg2/electricity_cleaned.csv",
+     "present": true
+    },
+    {
+     "path": "data/raw/bdg2/metadata.csv",
+     "present": true
+    }
+   ],
+   "missing": []
+  },
+  {
+   "key": "iex",
+   "label": "IEX day-ahead prices, 15-min, 2023",
+   "status": "PENDING",
+   "real": false,
+   "files": [
+    {
+     "path": "data/raw/iex/*.xlsx (exports from the IEX market snapshot)",
+     "present": false
+    }
+   ],
+   "missing": [
+    "data/raw/iex/*.xlsx (exports from the IEX market snapshot)"
+   ]
+  },
+  {
+   "key": "tariff_A",
+   "label": "KERC / BESCOM tariff order (HT educational, ToD) and solar export order",
+   "status": "PENDING",
+   "real": false,
+   "files": [
+    {
+     "path": "data/raw/tariff/KERC_tariff_order_BESCOM_FY2023-24.pdf",
+     "present": false
+    },
+    {
+     "path": "data/raw/tariff/KERC_solar_export_tariff.pdf",
+     "present": false
+    },
+    {
+     "path": "config.yaml prices.A.status: REAL",
+     "present": false
+    }
+   ],
+   "missing": [
+    "data/raw/tariff/KERC_tariff_order_BESCOM_FY2023-24.pdf",
+    "data/raw/tariff/KERC_solar_export_tariff.pdf",
+    "config.yaml prices.A.status: REAL"
+   ]
+  },
+  {
+   "key": "cea",
+   "label": "CEA CO\u2082 baseline database (user guide PDF)",
+   "status": "PENDING",
+   "real": false,
+   "files": [
+    {
+     "path": "data/raw/cea/*.pdf",
+     "present": false
+    },
+    {
+     "path": "data/raw/cea/emission_factor.yaml",
+     "present": false
+    }
+   ],
+   "missing": [
+    "data/raw/cea/*.pdf",
+    "data/raw/cea/emission_factor.yaml"
+   ]
+  },
+  {
+   "key": "calendar",
+   "label": "RVCE academic calendar",
+   "status": "PENDING",
+   "real": false,
+   "files": [
+    {
+     "path": "data/raw/rvce_calendar.csv (date, day_type)",
+     "present": false
+    }
+   ],
+   "missing": [
+    "data/raw/rvce_calendar.csv (date, day_type)"
+   ]
+  },
+  {
+   "key": "campus_loads",
+   "label": "RVCE bills and interval meter data",
+   "status": "PENDING RVCE DATA",
+   "real": false,
+   "files": [
+    {
+     "path": "data/raw/rvce_meters/*.csv (15-min kW per building)",
+     "present": false
+    },
+    {
+     "path": "12 months of BESCOM bills",
+     "present": false
+    }
+   ],
+   "missing": [
+    "data/raw/rvce_meters/*.csv (15-min kW per building)",
+    "12 months of BESCOM bills"
+   ]
+  },
+  {
+   "key": "lab_schedule",
+   "label": "RVCE lab schedule",
+   "status": "TEMPLATE",
+   "real": false,
+   "files": [
+    {
+     "path": "data/raw/lab_schedule.csv filled in by RVCE (currently a template)",
+     "present": true
+    }
+   ],
+   "missing": [
+    "data/raw/lab_schedule.csv filled in by RVCE (currently a template)"
+   ]
+  }
+ ],
+ "how": "bash scripts/refresh_all.sh after placing the files (see docs/BLOCKERS.md, docs/data_request.md)"
+}

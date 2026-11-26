@@ -31,7 +31,7 @@ export function ProvProvider({ prov, children }: { prov: Provenance | null; chil
   )
 }
 
-/** A number that opens its provenance when clicked (Judge mode). */
+/** A number that opens its provenance when clicked (Verify). */
 export function N({ v, info }: { v: string; info: Omit<ProvInfo, 'value'> }) {
   const { open } = useContext(Ctx)
   return <button className="num" title="click for provenance" onClick={() => open({ ...info, value: v })}>{v}</button>

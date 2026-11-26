@@ -76,17 +76,19 @@ export function SmallMultiples({ b, metric = 'gap_pct' }: { b: Bench; metric?: s
       {b.datasets.map(d => {
         const vals = show.map(k => ({ k, s: b.table[d.key]?.[k]?.[metric] })).filter(x => x.s)
         const mx = Math.max(...vals.map(x => x.s!.ci_hi), 0.5)
+        const alts = vals.filter(x => x.k !== 'qgrid')
+        const bestAlt = alts.length ? alts.reduce((a, b) => (b.s!.mean < a.s!.mean ? b : a)).k : null
         return (
           <div key={d.key} className="sm" role="img" aria-label={`${d.label}, ${d.n_days} days. Gap to best possible plan: ${vals.map(({ k, s }) => `${names[k]} ${s!.mean.toFixed(1)}% (95% interval ${s!.ci_lo.toFixed(1)} to ${s!.ci_hi.toFixed(1)})`).join('; ')}.`}>
-            <div className="sm-t">{d.label}<span className="muted"> · {d.n_days} days</span></div>
+            <div className="sm-t">{d.label}</div>
             {vals.map(({ k, s }) => (
               <div key={k} className={`sm-r ${k === 'qgrid' ? 'ours' : ''}`}>
-                <span className="n" title={names[k]}>{names[k]}</span>
+                <span className="n" title={`${names[k]}: ${s!.mean.toFixed(1)}% (95 % interval ${s!.ci_lo.toFixed(1)}–${s!.ci_hi.toFixed(1)})`}>{names[k]}</span>
                 <span className="track">
                   <i className="bar" style={{ width: `${(Math.max(s!.mean, 0) / mx) * 100}%` }} />
                   <i className="ci" style={{ left: `${(Math.max(s!.ci_lo, 0) / mx) * 100}%`, width: `${((s!.ci_hi - Math.max(s!.ci_lo, 0)) / mx) * 100}%` }} />
                 </span>
-                <span className="v tn">{s!.mean.toFixed(1)}%</span>
+                <span className="v tn">{k === 'qgrid' || k === bestAlt ? `${s!.mean.toFixed(1)}%` : ''}</span>
               </div>
             ))}
           </div>

@@ -571,9 +571,9 @@ class Session:
                     why = "solar exceeds the building's load" if surplus > 0 else f"cheap power now (Rs {self.pi_raw[sidx]:.1f}/kWh) for later"
                 else:
                     why = "grid down: battery carries the building" if not self.grid_up[sidx] else f"evening price Rs {self.pi_raw[sidx]:.1f}/kWh"
-                return f"Battery {cur(k)} {abs(z['battery_kw'][k]):.0f} kW at {t}", why
+                return f"Battery {'charges' if cur(k) == 'charge' else 'discharges'} at {t}", why
             if b.dg and z["dg_kw"][k] > 1e-6 and (k == 0 or z["dg_kw"][k - 1] <= 1e-6):
                 return f"Diesel on at {t}", "grid down: critical load must be served" if not self.grid_up[sidx] else "cheaper than shedding load"
             if b.tank and z["pump"][k] and (k == 0 or not z["pump"][k - 1]):
                 return f"Pump on at {t}", "keeps the tank in its band at a low price"
-        return "No change in the next 3 h", "the current set-points stay optimal"
+        return "No change in the next three hours", "the current set-points stay optimal"

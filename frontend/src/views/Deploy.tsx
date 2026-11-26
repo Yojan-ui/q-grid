@@ -16,8 +16,8 @@ const BOXES: Box[] = [
   { id: 'wx', x: 422, y: 214, w: 138, h: 60, title: 'Weather forecast', sub: 'Open-Meteo, hourly', does: 'Solar forecast for the next 48 hours, used by every building’s plan. If it is unreachable, the gateways keep the last forecast and the solar forecast model.', hw: ['Internet access from one gateway (or the operator server)'] },
 ]
 const PHASES = [
-  { n: 0, name: 'Shadow mode', dur: '4–6 weeks (estimate)', provides: 'Read access to meters and bills; no control', what: 'Gateways read the meters; Q-Grid plans but does not act. Staff get a daily “would have saved” report (try it below).', risks: 'Meter data gaps; tariff not yet official', kpis: 'Data completeness > 95 %; forecast error tracked; recommended plan feasible every day' },
-  { n: 1, name: 'One-building pilot', dur: '2–3 months (estimate)', provides: 'One building with a battery or diesel set, an electrician, an estate contact', what: 'One gateway controls one building’s battery, pump and flexible loads; the rest stay read-only.', risks: 'Integration with the BMS / diesel controller; staff trust', kpis: 'Zero safety incidents; overrides < 1 per week; measured saving vs shadow estimate' },
+  { n: 0, name: 'Shadow mode', dur: '4–6 weeks (estimate)', provides: 'Read access to meters and bills; no control', what: 'Gateways read the meters; Q-Grid plans but does not act. Staff get a daily “would have saved” report (try it below).', risks: 'Meter data gaps; tariff not yet official', kpis: 'Nearly complete meter data; forecast error tracked; a feasible recommendation every day' },
+  { n: 1, name: 'One-building pilot', dur: '2–3 months (estimate)', provides: 'One building with a battery or diesel set, an electrician, an estate contact', what: 'One gateway controls one building’s battery, pump and flexible loads; the rest stay read-only.', risks: 'Integration with the BMS / diesel controller; staff trust', kpis: 'No safety incidents; rare overrides; measured saving close to the shadow estimate' },
   { n: 2, name: 'Whole campus', dur: '4–6 months (estimate)', provides: 'Access to every building, network ports, a maintenance window', what: 'Every building runs its node and agrees cable flows with its neighbours; the estate office uses Operate.', risks: 'Network reliability; diesel sets without remote start', kpis: 'Critical downtime and bill vs status quo, monthly; agreement rate of neighbours' },
   { n: 3, name: 'Other campuses and feeders', dur: '12 months + (estimate)', provides: 'Partner campuses; BESCOM conversation for feeder-level operation', what: 'The same node per building; campuses on one feeder agree the same way, neighbours only.', risks: 'Utility rules for export and islanding; ownership of assets', kpis: 'Campuses live; feeder peak reduction (not yet modelled)' },
 ]
@@ -35,7 +35,7 @@ export function DeployView({ d }: { d: StoryData }) {
   }
   return (
     <main className="page deploy" aria-label="Deploy: how RVCE implements Q-Grid">
-      <section className="page-head"><h1 className="answer">How RVCE would implement it.</h1>
+      <section className="page-head"><h1 className="answer">RVCE can start read-only with one small computer per building, then switch on control one building at a time.</h1>
         <p className="support">A gateway in each building, encrypted messages between neighbours, and this app in the estate office. Start in shadow mode: read only, with a daily “would have saved” report.</p></section>
 
       <section className="card">

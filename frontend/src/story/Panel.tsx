@@ -51,7 +51,7 @@ export function Panel(p: PanelProps) {
           <motion.section key={p.stop} aria-live="polite" {...fade} transition={{ duration: reducedMotion() ? 0.15 : 0.45, ease: [0.65, 0, 0.35, 1] }}>
             <h1 className="answer">{body.answer}</h1>
             {body.support && <div className="support">{body.support}</div>}
-            {body.keys && <div className={`keys-row ${p.stop === '7a' || p.stop === '7d' ? 'k4' : ''}`}>{body.keys}</div>}
+            {body.keys && <div className="keys-row">{body.keys}</div>}
             {body.extra}
           </motion.section>
         </AnimatePresence>
@@ -93,18 +93,16 @@ function content(p: PanelProps): Body {
           : out ? <>Today the campus sells noon solar cheaply, buys power back expensively in the evening, and runs diesel when the grid fails.</>
           : <>Today the campus sells noon solar cheaply and buys power back expensively in the evening.</>,
         support: <>
-          {hs && <p>Sentence generated from the benchmark ({hs.n_days} RVCE days). One of those days up close: the campus sells noon solar cheaply, buys power back in the evening{out ? ' and runs diesel when the grid fails' : ''}.</p>}
-          <p>A modelled {SCENARIO(sc)} day ({fmtDate(sc.scenario.date)}){out ? `, with BESCOM supply down ${slotT(out[0])}–${slotT(out[1])}` : ''}. Every building acts on its own.</p>
-          {pr && <p>Around noon it exported <b className="tn">{num(Number(pr.noon_export_kwh))} kWh</b> at Rs {noonPrice}/kWh; in the evening it imported <b className="tn">{num(Number(pr.evening_import_kwh))} kWh</b> at up to Rs {evePrice}/kWh.</p>}
+          <p>{hs ? `Averaged over ${hs.n_days} modelled RVCE days. ` : ''}One {SCENARIO(sc)} day up close ({fmtDate(sc.scenario.date)}{out ? `, BESCOM supply down ${slotT(out[0])}–${slotT(out[1])}` : ''}): {pr ? <>around noon it exported <b className="tn">{num(Number(pr.noon_export_kwh))} kWh</b> at Rs {noonPrice}/kWh, and in the evening imported <b className="tn">{num(Number(pr.evening_import_kwh))} kWh</b> at up to Rs {evePrice}/kWh.</> : 'every building acts on its own.'}</p>
         </>,
         keys: sc.problem && <>
-          <Key label="Value lost per day" pending={priceStatus ? 'Tariff' : undefined}><CountUp value={sc.problem.rs_lost} format={rs} /></Key>
-          <Key label="CO₂ per day" pending={cea ? 'CEA CO₂ factor' : undefined}><CountUp value={sc.problem.co2_kg} format={v => `${num(v)} kg`} delay={0.1} /></Key>
+          <Key label={`Value lost on ${fmtDate(sc.scenario.date)}`} pending={priceStatus ? 'Tariff' : undefined}><CountUp value={sc.problem.rs_lost} format={rs} /></Key>
+          <Key label="CO₂ that day" pending={cea ? 'CEA CO₂ factor' : undefined}><CountUp value={sc.problem.co2_kg} format={v => `${num(v)} kg`} delay={0.1} /></Key>
           <Key label="Diesel running" note={`critical loads unserved ${sc.problem.critical_downtime_h.toFixed(1)} h`}><CountUp value={sc.problem.dg_hours} format={v => `${v.toFixed(1)} h`} delay={0.2} /></Key>
         </>,
         extra: <>
           <DayChart sc={sc} t={p.t} />
-          {sc.problem && <p className="muted small defn">Value lost = Σ over zones of min(kWh exported by day, kWh bought back later) × (average later import price − average export price). {num(sc.problem.reusable_kwh)} kWh qualify on this day.</p>}
+          {sc.problem && <details className="assume defn"><summary>How “value lost” is computed</summary><p className="muted small">Σ over zones of min(kWh exported by day, kWh bought back later) × (average later import price − average export price). {num(sc.problem.reusable_kwh)} kWh qualify on this day.</p></details>}
           <div className="row"><button className="btn ghost small" onClick={p.onPlay}>{p.playing ? 'Pause the day' : 'Replay the day'}</button></div>
         </>,
       }
@@ -277,11 +275,15 @@ function content(p: PanelProps): Body {
       const qg = campusSoc(sc, 'qgrid'), sq = campusSoc(sc, 'status_quo')
       const o = out?.[0] ?? 72
       return {
-        answer: <>Q-Grid fills the batteries before the evening outage and uses them while the grid is down.</>,
-        support: <p>Batteries next to each building fill and empty through the day. The chart shows the campus battery level, status quo against Q-Grid, with diesel and the pump on the same time axis.</p>,
+        answer: out
+          ? (qg[o] > (sq[o] ?? 0) + 0.05 ? <>The batteries are fuller when the evening outage starts, so they can carry the campus while the grid is down.</>
+            : <>The batteries are no fuller than today’s when the outage starts; diesel carries the campus.</>)
+          : <>The batteries fill when solar is plentiful and empty when power is dear.</>,
+        support: <p>The chart shows the campus battery level through the day, today’s practice against Q-Grid, with diesel and the pump on the same time axis.</p>,
         keys: <>
-          <Key label={`Battery at ${slotT(o)}`}><span className="tn">{pct(100 * qg[o])}</span><span className="vs tn"> vs {sq.length ? pct(100 * sq[o]) : '–'}</span></Key>
-          {(() => { const o6 = sc.benchmark.find(r => r.method === 'OURS' && r.price_scenario === 'A'), z6 = sc.benchmark.find(r => r.method === 'B0' && r.price_scenario === 'A'); return o6 && z6 && <Key label="Diesel hours"><span className="tn">{o6.dg_hours.toFixed(2)}</span><span className="vs tn"> vs {z6.dg_hours.toFixed(2)}</span></Key> })()}
+          <Key label={`Battery at ${slotT(o)}`} note="Q-Grid vs today"><span className="tn">{pct(100 * qg[o])}</span><span className="vs tn"> vs {sq.length ? pct(100 * sq[o]) : '–'}</span></Key>
+          {sc.runs.qgrid.metrics?.dg_hours !== undefined && sc.runs.status_quo?.metrics?.dg_hours !== undefined &&
+            <Key label="Diesel running" note="hours, Q-Grid vs today"><span className="tn">{Number(sc.runs.qgrid.metrics.dg_hours).toFixed(1)}</span><span className="vs tn"> vs {Number(sc.runs.status_quo.metrics.dg_hours).toFixed(1)}</span></Key>}
         </>,
         extra: <>
           <SocChart sc={sc} t={p.t} />
@@ -381,19 +383,19 @@ function contentQ(p: PanelProps): Body | null {
       keys: <><Key label="Qubits in this block">{blk?.n_qubits ?? 0}</Key><Key label="Average block size" note={`${num(pl.instances ?? 0)} problems tested`}>{(pl.qaoa_block_qubits_mean ?? 0).toFixed(1)}</Key></>,
     }
     case '4b': return {
-      answer: <>The block’s costs and rules become one cost formula (a QUBO).</>,
-      support: <p>Each qubit’s cost comes from how much the relaxed solution says that choice would add; rules that link the block’s choices become penalties. Lines join choices that affect each other.</p>,
+      answer: <>Those choices and the rules between them become one score to make as small as possible.</>,
+      support: <p>In the jargon this is a QUBO. Each qubit’s cost comes from how much the relaxed solution says that choice would add; rules that link the choices become penalties. Lines join choices that affect each other.</p>,
       extra: <p className="muted small">Lower cost is better; plans that break a rule get a large penalty.</p>,
     }
     case '4c': return {
-      answer: <>QAOA turns that cost into a circuit that makes cheap plans more likely.</>,
+      answer: <>A quantum circuit is tuned so that cheaper plans come up more often.</>,
       support: <ol className="steps"><li><b>H</b>: every plan equally likely.</li><li><b>Cost layer γ</b>: each plan gets a phase from its cost.</li><li><b>Mixer β</b>: probability flows towards cheaper plans.</li><li>Repeat twice, then <b>measure</b>.</li></ol>,
       extra: <p className="muted small">Simulated with Qiskit Aer (ideal, noiseless); no quantum hardware used.</p>,
     }
     case '4d': {
       const win = shots.find(s => s.bits === blk?.qaoa.best_bits)
       return {
-        answer: <>We measure the circuit {total} times; the best valid result becomes a starting plan.</>,
+        answer: <>We run the circuit {total} times and keep the best plan that breaks no rule.</>,
         support: <p>Taller bars came up more often; grey bars break a rule. The result is completed into a full plan and handed to branch and bound as a starting point.</p>,
         extra: <p className="muted small">Shots measured by the pipeline: {blk?.qaoa.backend}. Nothing is re-sampled in the browser.</p>,
         keys: <><Key label="Best result came up">{win ? `${win.count} of ${total}` : '–'}</Key><Key label="Distinct results">{shots.length}</Key></>,
@@ -402,7 +404,7 @@ function contentQ(p: PanelProps): Body | null {
     case '4e': {
       const same = blk && blk.qaoa.best_bits === blk.exact.bits
       return {
-        answer: <>Decoded, the best result is a set of on/off settings for those choices{blk ? (same ? ', and it matches exact search.' : ' — here it differs from exact search.') : '.'}</>,
+        answer: <>The best result reads back as on/off settings{blk ? (same ? ', and it matches the exact answer.' : ', and here it differs from the exact answer.') : '.'}</>,
         support: <p className="muted small">Every block is checked against an exact search over all {blk ? num(2 ** blk.n_qubits) : '–'} settings.</p>,
         keys: blk ? <>
           <Key label="QAOA's best setting"><code className="bits">{blk.qaoa.best_bits ?? '–'}</code></Key>
@@ -411,7 +413,7 @@ function contentQ(p: PanelProps): Body | null {
       }
     }
     case '4f': return {
-      answer: <>Verdict: the quantum starting plan did not make the exact solver faster, so Q-Grid does not use it.</>,
+      answer: <>The quantum start did not make the exact solver any faster, so Q-Grid does not use it.</>,
       support: <p>Across {num(pl.instances ?? 0)} building problems from five days, branch and bound already finished at its first node in {pct(pl.cold_root_node_pct ?? 0, 1)} of cases. QAOA’s block was always solved correctly ({pct(pl.qaoa_block_opt_pct ?? 0)} vs exact search) and its starting plan was optimal in {pct(pl.incumbent_optimal_pct_all ?? 0)}, but it saved no work.</p>,
       keys: <>
         <Key label="Nodes, no start" note="mean">{(pl.nodes_cold_mean ?? 0).toFixed(2)}</Key>
@@ -424,7 +426,7 @@ function contentQ(p: PanelProps): Body | null {
       </>,
     }
     case '4g': return {
-      answer: <>Each building solves its own on/off plan exactly; everything continuous is agreed with neighbours.</>,
+      answer: <>Each building plans its own switches; the power on each cable is agreed with its neighbours.</>,
       support: <>
         <p><b>Inside each building:</b> exact branch and bound for the 24 h on/off plan at the prices the neighbours agreed.</p>
         <p><b>Between buildings:</b> battery, diesel, cable and grid power as a linear programme, agreed by trading proposals (ADMM). No central computer.</p>
@@ -436,8 +438,8 @@ function contentQ(p: PanelProps): Body | null {
       const r = rounds[Math.min(p.admmRound, rounds.length - 1)]
       const agreed = r ? Object.values(r.proposals).filter(([a, b]) => Math.abs(a - b) < 1).length : 0
       return {
-        answer: <>Neighbours agree on every cable’s flow by trading proposals. This part is convex, so the trading is guaranteed to converge given enough rounds.</>,
-        support: <p>At {Q.time}, with each building’s on/off plan fixed, both ends of each cable propose a flow every round. Red means they still disagree. There is no central computer.</p>,
+        answer: <>Neighbouring buildings agree how much power each cable carries by trading offers, with no central computer.</>,
+        support: <p>At {Q.time}, with each building’s on/off plan fixed, both ends of each cable propose a flow every round; red means they still disagree. This part is a convex problem (consensus ADMM), so the trading converges given enough rounds.</p>,
         keys: <><Key label="Round"><span className="tn">{(r?.k ?? 0) + 1} / {rounds.length}</span></Key><Key label="Cables agreed"><span className="tn">{agreed} / {sc.campus.lines.length}</span></Key></>,
         extra: <>
           <ResidualChart rounds={rounds} k={p.admmRound} />
@@ -455,7 +457,7 @@ function contentQ(p: PanelProps): Body | null {
       const o = Q.outer ?? []
       const last = o[o.length - 1]
       return {
-        answer: <>The two halves talk through prices: each building re-plans its on/off choices at the prices the cable agreement produces.</>,
+        answer: <>The cable agreement sets a price, and each building re-plans its switches at that price.</>,
         support: <p>The cable agreement ends with a price for power on each cable; each building re-solves its on/off plan at those prices and the cables are agreed again. Q-Grid runs a fixed {o.length} rounds of this per decision{last?.buildings_changed_commitment ? `; in this decision the second round still changed ${last.buildings_changed_commitment} buildings’ plans, so more rounds might help (not yet measured)` : ''}.</p>,
         extra: <table className="kv small"><tbody>
           <tr><th>Round</th><th>buildings that changed their plan</th><th>trading rounds</th></tr>
@@ -473,11 +475,10 @@ function step7(p: PanelProps, B: NonNullable<StoryData['bench']>, ds: string, pr
   const chips = <div className="chips">{B.datasets.map(x => <button key={x.key} className={`chip ${ds === x.key ? 'on' : ''}`} onClick={() => p.setBenchDs?.(x.key)}>{x.label.split(',')[0].split(' (')[0]}</button>)}</div>
   switch (p.stop) {
     case '7a': return {
-      answer: <>The scorecard: Q-Grid against every benchmark method on the same days and data.</>,
+      answer: <>Q-Grid against every other way of running the campus, on the same {dsl?.n_days} days and data.</>,
       support: <p>Rows are grouped Today / Research methods / Smart control / Central control / Ours. ▲ marks the best value in each column among methods that work without a central controller; the best possible plan (central, perfect information) is a reference line, not a competitor.</p>,
       keys: <>
-        <Key label="Q-Grid gap to best plan">{g('qgrid', 'gap_pct') !== undefined ? pct(g('qgrid', 'gap_pct')!, 2) : '–'}</Key>
-        <Key label="Certified gap" note="proven upper bound">{g('qgrid', 'certified_gap_pct') !== undefined ? pct(g('qgrid', 'certified_gap_pct')!, 2) : '–'}</Key>
+        <Key label="Q-Grid gap to best plan" note={g('qgrid', 'certified_gap_pct') !== undefined ? `proven at most ${pct(g('qgrid', 'certified_gap_pct')!, 2)}` : undefined}>{g('qgrid', 'gap_pct') !== undefined ? pct(g('qgrid', 'gap_pct')!, 2) : '–'}</Key>
         <Key label="Bill saving vs today" pending={priceStatus ? 'Tariff' : undefined}>{g('qgrid', 'saving_pct') !== undefined ? pct(g('qgrid', 'saving_pct')!, 1) : '–'}</Key>
         <Key label="Critical downtime" note="h per day">{g('qgrid', 'critical_downtime_h') !== undefined ? g('qgrid', 'critical_downtime_h')!.toFixed(2) : '–'}</Key>
       </>,
@@ -490,15 +491,15 @@ function step7(p: PanelProps, B: NonNullable<StoryData['bench']>, ds: string, pr
         return q !== undefined && q !== null && nocoord.every(m => (st(B, x.key, m, 'gap_pct')?.mean ?? Infinity) >= q)
       }).length
       return {
-        answer: <>Across {B.datasets.length} real campuses, Q-Grid is closest to the best possible plan among methods without a central controller on {best} of {B.datasets.length}.</>,
-        support: <p>Gap to the best possible plan (mean and 95 % interval) for Q-Grid and the strongest alternatives on each dataset.</p>,
+        answer: <>On {best} of {B.datasets.length} real campuses, Q-Grid comes closest to the best possible plan of all methods that need no central computer.</>,
+        support: <p>Gap to the best possible plan on each campus (mean of {B.datasets[0]?.n_days} days, bar = mean, line = 95 % interval). Numbers are shown for Q-Grid and the closest alternative; hover a row for the others.</p>,
         extra: <SmallMultiples b={B} />,
       }
     }
     case '7c': {
       const pen = (m: string) => (g(m + '_comms_fail', 'gap_pct') ?? NaN) - (g(m, 'gap_pct') ?? NaN)
       return {
-        answer: <>When the network fails for 3 hours, central control loses {Number.isNaN(pen('central_mpc')) ? '–' : pen('central_mpc').toFixed(2)} points of gap; Q-Grid loses {Number.isNaN(pen('qgrid')) ? '–' : pen('qgrid').toFixed(2)}.</>,
+        answer: <>When the campus network fails for 3 hours, central control falls {Number.isNaN(pen('central_mpc')) ? '–' : pen('central_mpc').toFixed(2)} percentage points further behind the best plan; Q-Grid only {Number.isNaN(pen('qgrid')) ? '–' : pen('qgrid').toFixed(2)}.</>,
         support: <p>Same seeded 3-hour outage for both. The central controller’s buildings fall back to simple rules; Q-Grid’s buildings keep optimising on their own and resume sharing when links return.</p>,
         extra: <><CommsChart b={B} /><p className="muted small">Mean over {dsl?.n_days} days on {dsl?.label}; the chart shows one day. Network outages are synthetic and seeded.</p></>,
       }
@@ -527,7 +528,6 @@ function step7(p: PanelProps, B: NonNullable<StoryData['bench']>, ds: string, pr
           <Key label="Payback, after wear" pending="Tariff">{c.payback_net_years !== null ? `${c.payback_net_years.toFixed(1)} y` : 'none'}</Key>
           <Key label="10-yr NPV, after wear" note={`P5–P95 ${lakh(m.monte_carlo.npv_net_rs.p5)} to ${lakh(m.monte_carlo.npv_net_rs.p95)}`}>{lakh(c.npv_net_rs)}</Key>
           <Key label="Chance NPV is positive" note={`${m.monte_carlo.samples.toLocaleString('en-IN')} Monte Carlo samples`}>{`${Math.round(100 * m.monte_carlo.npv_net_rs.prob_positive)}%`}</Key>
-          <Key label="Net per year" note={`bill saving − maintenance − wear`}>{lakh(c.net_rs_per_year)}</Key>
         </>,
         extra: <ImpactDetail m={m} />,
       }

@@ -3,6 +3,7 @@
 import type { Flows } from '../lib/operate'
 import { zn } from '../lib/labels'
 import { useC } from '../lib/theme'
+import { reg } from '../lib/numcheck'
 
 const SRC_ORDER = ['Solar', 'Battery', 'Grid', 'Diesel']
 
@@ -21,10 +22,12 @@ export function Sankey({ flows, height = 360, title }: { flows: Flows; height?: 
   const srcs = SRC_ORDER.filter(s => links.some(l => l.source === s))
   const sinkTot: Record<string, number> = {}
   links.forEach(l => { sinkTot[l.target] = (sinkTot[l.target] ?? 0) + l.kwh })
+  Object.values(sinkTot).forEach(v => reg(v, 'Sankey: sum of the flows into a sink'))
   const special = ['Other zones', 'Critical loads', 'Battery charging', 'Export']
   const sinks = [...Object.keys(sinkTot).filter(k => !special.includes(k)).sort((a, b) => sinkTot[b] - sinkTot[a]), ...special.filter(k => sinkTot[k])]
   const srcTot: Record<string, number> = {}
   links.forEach(l => { srcTot[l.source] = (srcTot[l.source] ?? 0) + l.kwh })
+  Object.values(srcTot).forEach(v => reg(v, 'Sankey: sum of the flows out of a source'))
   const total = Object.values(srcTot).reduce((a, b) => a + b, 0) || 1
   const W = 660, H = height, padT = 8, gapS = 10, gapK = 6, x0 = 112, x1 = W - 206, nw = 10
   const scaleS = (H - padT * 2 - gapS * (srcs.length - 1)) / total

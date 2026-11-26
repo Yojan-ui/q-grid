@@ -58,12 +58,10 @@ export function RemoveBuilding({ d, online, killed, setKilled }: { d: StoryData;
   return (
     <div className="card live" aria-live="polite" ref={ref}>
       <div className="row"><b>Live: remove a building</b>
+        {!killed && <select className="scenpick" value={zone} onChange={e => setZone(e.target.value)} aria-label="building to take offline">{zones.map(z => <option key={z} value={z}>{zn(z)}</option>)}</select>}
         {killed ? <button className="btn small primary" onClick={() => { setKilled(null); reset() }}>Bring {zn(killed).toLowerCase()} back</button>
-          : <button className="btn small ghost" onClick={() => go(zone)} disabled={st.busy}>{st.busy ? 'Re-planning…' : `Take ${zn(zone).toLowerCase()} offline`}</button>}
+          : <button className="btn small ghost" onClick={() => go(zone)} disabled={st.busy}>{st.busy ? 'Re-planning…' : 'Take it offline'}</button>}
       </div>
-      {!killed && <div className="chips sm" role="radiogroup" aria-label="building to take offline">
-        {zones.map(z => <button key={z} role="radio" aria-checked={zone === z} className={`chip ${zone === z ? 'on' : ''}`} onClick={() => setZone(z)}>{zn(z)}</button>)}
-      </div>}
       {st.err && <p className="small warn">{st.err}</p>}
       {r && killed && <>
         <ul className="liveres small">

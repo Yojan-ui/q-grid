@@ -101,7 +101,8 @@ export function useStoryData(key: string) {
         const live = sc.live_solve ?? []
         if (!live.length) throw new Error(`scenario_${key}.json has no live_solve records, so there is no worked example for steps 3 and 4. Re-run make replay.`)
         // optimiser v2: when its run exists, "Q-Grid" in the story is the v2 run (v1 kept as qgrid_v1 for comparison)
-        if (sc.runs.qgrid_v2) { (sc.runs as any).qgrid_v1 = sc.runs.qgrid; sc.runs.qgrid = sc.runs.qgrid_v2 }
+        // runs.qgrid is the current design (make_replay attach_qgrid); older runs (qgrid_v2, earlier) are history only
+        if (sc.runs.qgrid_v2 && !sc.qgrid_story) { (sc.runs as any).qgrid_v1 = sc.runs.qgrid; sc.runs.qgrid = sc.runs.qgrid_v2 }
         const v2ex = sc.v2?.example ?? null
         const qs = sc.qgrid_story ?? null
         const [bench, liveFile, impact, sankey] = await Promise.all([getJSON<Bench>('bench_v3.json').catch(() => null),
