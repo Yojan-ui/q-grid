@@ -44,10 +44,10 @@ export function VerifyView({ d, idx, online }: { d: StoryData; idx: Index; onlin
           <div className="seg">{['A', 'B'].map(p => <button key={p} className={price === p ? 'on' : ''} onClick={() => setPrice(p)}>Prices {p}</button>)}</div></div>
         <MetricsTable sc={d.sc} price={price} />
       </section>
-      {d.v2 && <section className="card">
-        <h3>Optimiser v2 benchmark: {d.sc.scenario.key.replace(/_/g, ' ')} day <span className="pending">tariff {d.v2.tariff_status.toLowerCase()}</span></h3>
-        <V2Table v2={d.v2} />
-        <p className="muted small">Rs incl. the demand charge (Rs {d.v2.demand_rs_per_kva_month}/kVA/month stand-in, 1/{d.v2.days_per_month} per day) and the value of lost load. Gap is to the central MILP with the demand charge. From <code>results/v2/benchmark_v2.csv</code> (<code>scripts/run_benchmark_v2.py</code>).</p>
+      {d.bench && d.bench.design_choices.length > 0 && <section className="card">
+        <h3>Design choices (ablation)</h3>
+        <p className="muted small">How each change to the design moved the gap to the best possible plan. Q-Grid uses the combination with the smallest gap that works without a central controller.</p>
+        <DesignTable rows={d.bench.design_choices} />
       </section>}
       <section className="card">
         <h3>Solve a slot live</h3>
@@ -66,26 +66,15 @@ export function VerifyView({ d, idx, online }: { d: StoryData; idx: Index; onlin
   )
 }
 
-const V2LBL: Record<string, string> = { B0: 'Status quo', B1: 'Rule-based', 'B2-GA': 'Genetic algorithm', 'B2-PSO': 'Particle swarm',
-  B3: 'Per-zone MILP', B4: 'Central MILP (energy only)', 'B4-DC': 'Central MILP + demand charge (optimum)', V1: 'Old Q-Grid (v1)',
-  'V2-QAOA': 'v2, QAOA master', 'V2-QIEA': 'v2, QIEA master', 'V2-SA': 'v2, annealing master', 'V2-EXACT': 'v2, exact master',
-  'V2-EXACT-FC': 'v2, exact master, solar forecast', 'V2-QAOA-FC': 'v2, QAOA master, solar forecast' }
-
-function V2Table({ v2 }: { v2: NonNullable<StoryData['v2']> }) {
-  const f = (x: any, dgt = 0) => (x === null || x === undefined || Number.isNaN(Number(x)) ? '–' : Number(x).toLocaleString('en-IN', { maximumFractionDigits: dgt, minimumFractionDigits: dgt }))
-  const order = Object.keys(V2LBL)
-  const rows = [...v2.rows].sort((a, b) => order.indexOf(a.method) - order.indexOf(b.method))
+function DesignTable({ rows }: { rows: NonNullable<StoryData['bench']>['design_choices'] }) {
+  const f = (x: number | null | undefined, d = 2) => (x === null || x === undefined || Number.isNaN(x) ? '–' : x.toFixed(d))
+  const sorted = [...rows].sort((a, b) => (a.gap_pct ?? 1e9) - (b.gap_pct ?? 1e9))
   return (
     <div className="tablewrap"><table className="tbl">
-      <thead><tr><th>Method</th><th>Rs/day</th><th>Peak kVA</th><th>CO₂ kg</th><th>Diesel h</th><th>Crit. downtime h</th><th>Gap %</th><th>Benders</th><th>Masters optimal</th><th>Runtime s</th></tr></thead>
-      <tbody>{rows.map(r => (
-        <tr key={r.method} className={r.method === 'V2-QAOA' ? 'ours' : ''}>
-          <td>{V2LBL[r.method] ?? r.method}</td><td className="tn">{f(r.objective_incl_demand_rs)}</td><td className="tn">{f(r.peak_kva)}</td>
-          <td className="tn">{f(r.co2_kg)}</td><td className="tn">{f(r.dg_hours, 2)}</td><td className="tn">{f(r.critical_downtime_h, 2)}</td>
-          <td className="tn">{f(r.gap_to_opt_pct, 2)}</td><td className="tn">{f(r.benders_iters_mean, 1)}</td>
-          <td className="tn">{r.master_opt_share === null || r.master_opt_share === undefined || Number.isNaN(Number(r.master_opt_share)) ? '–' : `${f(100 * r.master_opt_share)}%`}</td>
-          <td className="tn">{f(r.runtime_s, 1)}</td>
-        </tr>))}</tbody>
+      <thead><tr><th>Design</th><th>Where measured</th><th>Gap %</th><th>Certified gap %</th><th>Critical downtime h</th><th>Time per decision s</th></tr></thead>
+      <tbody>{sorted.map(r => (
+        <tr key={r.key}><td>{r.name}</td><td className="muted small">{r.what_changed}</td><td className="tn">{f(r.gap_pct)}</td>
+          <td className="tn">{f(r.certified_gap_pct)}</td><td className="tn">{f(r.critical_downtime_h)}</td><td className="tn">{f(r.runtime_per_decision_s)}</td></tr>))}</tbody>
     </table></div>
   )
 }

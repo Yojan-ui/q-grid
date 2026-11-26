@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import math
 import shutil
 import subprocess
@@ -274,6 +275,67 @@ V2_COLS = ["method", "objective_incl_demand_rs", "cost_incl_demand_rs", "cost_rs
            "qaoa_block_opt_share", "qaoa_block_solves", "admm_converged_rate", "admm_iters_mean", "feasible", "solar"]
 
 
+def attach_qgrid(campus, meta, outs: dict) -> None:
+    """Current Q-Grid design (24 h, continuous dispatch, LP coordination, realistic forecasts) on every named day:
+    its run becomes runs.qgrid (the earlier prototype's run is kept as runs.earlier), and the headline day gets the
+    worked example qgrid_story."""
+    from qgrid import data as qdata
+    from qgrid.ablation.engine import ACfg, run_day
+    from qgrid.ablation.forecast import GBMForecaster
+    from qgrid.ablation.story import qgrid_story
+    from qgrid.model import Schedule, make_day
+    from qgrid.v2.horizon import YearData
+    from qgrid.v2.tariff import settle_v2
+    proc = qdata.load_processed()
+    yd = YearData(campus, proc, "A", forecast=False)
+    hold = meta["days"]["eval_days"] + [v["date"] for v in meta["days"]["scenarios"].values()]
+    fc = GBMForecaster(campus, proc, yd, hold, cache=ROOT / "results" / "bench_v3" / "gbm_rvce.pkl")
+    qp = ROOT / "results" / "quantum_placement" / "summary.json"
+    placement = json.loads(qp.read_text()) if qp.exists() else {}
+    hs = campus.cfg["headline_scenario"]
+    for k, o in outs.items():
+        sc = meta["days"]["scenarios"][k]
+        with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
+            if k == hs:
+                sched, story = qgrid_story(campus, yd, sc["date"], sc.get("outage"), fc, slot=72, placement=placement)
+                o["qgrid_story"] = story
+            else:
+                sched, _ = run_day(campus, yd, sc["date"], sc.get("outage"), ACfg(True, True, True, True), forecaster=fc)
+        day = make_day(campus, proc, sc["date"], "A", k, sc.get("outage"))
+        m = settle_v2(campus, day, sched)
+        o["runs"]["earlier"] = o["runs"]["qgrid"]
+        o["runs"]["qgrid"] = run_block_ext(campus, day, sched, m)
+        print(f"{k}: current Q-Grid objective Rs {m['objective_rs']:,.0f}, critical downtime {m['critical_downtime_h']:.2f} h", flush=True)
+
+
+def run_block_ext(campus, day, sched, metrics):
+    """Replay run block for a schedule computed outside build_scenario (same fields as run_block)."""
+    from qgrid.model import DT, flex_load, pump_load, soc_trajectory, tank_trajectory
+    net = np.asarray(metrics["net_kw"])
+    demand = day.load + flex_load(campus, sched) + pump_load(campus, sched)
+    deficit = np.where(day.grid[None, :], 0.0, np.maximum(net, 0))
+    crit_short = np.maximum(deficit - np.maximum(demand - day.crit, 0), 0)
+    g = day.grid[None, :]
+    imp = np.where(g, np.maximum(net, 0), 0).sum(0); exp = np.where(g, np.maximum(-net, 0), 0).sum(0)
+    cost_t = (imp * day.price_imp - exp * day.price_exp) * DT
+    fuel_t = np.zeros(96); co2_t = imp * DT * day.ef
+    for i, b in enumerate(campus.buildings):
+        if b.dg:
+            on = np.asarray(sched.dg_kw[i]) > 1e-9
+            L = b.dg.litres(on, np.asarray(sched.dg_kw[i]))
+            fuel_t += L * b.dg.price; co2_t += L * b.dg.co2_per_l
+    return {"p_bat": np.round(sched.p_bat, 2).tolist(),
+            "soc": [np.round(soc_trajectory(b.battery, sched.p_bat[i]) / max(b.battery.kwh, 1e-9), 4).tolist() for i, b in enumerate(campus.buildings)],
+            "flows": np.round(sched.flows, 2).tolist(), "dg_kw": np.round(sched.dg_kw, 2).tolist(),
+            "pump_on": np.asarray(sched.pump_on).astype(int).tolist(), "flex_start": sched.flex_start,
+            "tank_m3": {b.name: np.round(tank_trajectory(b.tank, np.asarray(sched.pump_on[i]), day.water), 2).tolist()
+                        for i, b in enumerate(campus.buildings) if b.tank},
+            "net_kw": np.round(net, 2).tolist(), "grid_import_kw": np.round(imp, 2).tolist(), "grid_export_kw": np.round(exp, 2).tolist(),
+            "demand_kw": np.round(demand, 2).tolist(), "crit_unserved_kw": np.round(crit_short, 3).tolist(),
+            "cum_cost_rs": np.round(np.cumsum(cost_t + fuel_t), 1).tolist(), "cum_co2_kg": np.round(np.cumsum(co2_t), 1).tolist(),
+            "metrics": {kk: (round(v, 3) if isinstance(v, float) else v) for kk, v in metrics.items() if kk != "net_kw"}}
+
+
 def attach_v2(campus, meta, outs: dict) -> None:
     """Optimiser v2 results (results/v2, from scripts/run_benchmark_v2.py) and the headline worked example."""
     d = ROOT / "results" / "v2"
@@ -331,7 +393,9 @@ def main():
     RDIR.mkdir(parents=True, exist_ok=True)
     index = {"scenarios": [], "headline": campus.cfg["headline_scenario"], "provenance": prov,
              "label": outs[keys[0]]["label"], "data_status": meta["data_status"]}
-    attach_v2(campus, meta, outs)
+    if os.environ.get("QGRID_ATTACH_BENDERS") == "1":   # earlier hybrid-Benders example (old data), off by default
+        attach_v2(campus, meta, outs)
+    attach_qgrid(campus, meta, outs)
     for k, o in outs.items():
         o["provenance"] = prov
         (RDIR / f"scenario_{k}.json").write_text(dump(o))

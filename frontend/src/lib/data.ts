@@ -22,6 +22,7 @@ export type Scenario = {
   explanations: Record<string, Record<string, string[]>>; qaoa_file: string; benchmark: Record<string, any>[]
   headline?: any; live_solve?: LiveSolve[]; provenance: Provenance
   v2?: V2Data
+  qgrid_story?: QStory
   problem?: { rs_lost: number; reusable_kwh: number; co2_kg: number; dg_hours: number; cost_rs: number; critical_downtime_h: number; definition: string } | null
 }
 export type LiveSolve = { zone: string; slot: number; time: string; n_qubits: number; var_names: string[]; qubo_matrix: number[][];
@@ -99,3 +100,31 @@ export type V2Example = {
 export type V2Data = { rows: V2Row[]; summary: (V2Row & { day_set: string; n_days: number })[]; tariff_status: string
   demand_rs_per_kva_month: number; days_per_month: number; power_factor: number; label: string
   replay_matches_benchmark?: boolean; example?: V2Example }
+
+// ---- benchmark v3 (results/bench_v3, scripts/run_bench_v3.py + scripts/write_bench_v3.py)
+export type BenchStat = { mean: number; std: number; ci_lo: number; ci_hi: number; n: number }
+export type BenchMethod = { key: string; name: string; group: string; without_coordinator: boolean }
+export type BenchMetric = { key: string; label: string; group: string; better: 'lower' | 'higher'; unit: string; digits: number }
+export type Bench = {
+  tariff_status: string
+  methods: BenchMethod[]
+  reference: BenchMethod
+  metrics: BenchMetric[]
+  datasets: { key: string; label: string; n_days: number }[]
+  table: Record<string, Record<string, Record<string, BenchStat>>>          // dataset -> method -> metric
+  wilcoxon: Record<string, Record<string, Record<string, number | null>>>   // dataset -> method -> metric -> p vs Q-Grid
+  comms_day: { dataset: string; day: string; window: [number, number]; t: string[]; series: Record<string, number[]>; totals: Record<string, number> } | null
+  headline: { text: string; detail: string }
+  design_choices: { key: string; name: string; what_changed: string; gap_pct: number | null; certified_gap_pct: number | null; critical_downtime_h: number | null; runtime_per_decision_s: number | null; source: string }[]
+}
+
+// ---- current Q-Grid worked example (headline day), written by scripts/make_replay.py (qgrid_story)
+export type QStory = {
+  slot: number; time: string; binaries: Record<string, number>
+  block: (LiveSolve & { kind: string; zone_label?: string }) | null
+  block_note: string
+  placement: Record<string, any>
+  admm_rounds: { k: number; r_primal: number; agreed: boolean; proposals: Record<string, number[]> }[]
+  outer: { round: number; admm_iters: number; admm_converged: boolean; buildings_changed_commitment: number | null; plan_cost_rs: number }[]
+  config: string
+}

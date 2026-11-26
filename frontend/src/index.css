@@ -248,3 +248,30 @@ table.kv td, table.kv th { padding: 4px 12px 4px 0; text-align: left; vertical-a
 .scenpick { font: inherit; font-size: var(--s13); padding: 6px 8px; border: 1px solid var(--hair); border-radius: 8px; background: #fff; color: var(--text); margin-right: 8px; }
 .secondary { color: var(--text); margin: 4px 0 16px; line-height: 1.5; }
 .keys-row.k4 { grid-template-columns: 1fr 1fr; }
+/* step 7 scorecard / small multiples / comms chart */
+.scorecard { position: absolute; inset: 64px 20px 56px 20px; background: #fff; border: 1px solid var(--hair); border-radius: 14px; padding: 14px 16px; overflow: hidden; display: flex; flex-direction: column; z-index: 20; box-shadow: 0 2px 10px rgba(0,0,0,.04); }
+.sc-head { font-size: var(--s13); margin-bottom: 8px; }
+.sc-scroll { overflow: auto; flex: 1; }
+.scorecard table { border-collapse: collapse; font-size: 12px; width: 100%; }
+.scorecard th, .scorecard td { padding: 5px 7px; border-bottom: 1px solid var(--hair); text-align: right; white-space: nowrap; }
+.scorecard th { font-weight: 500; color: var(--muted); vertical-align: bottom; }
+.scorecard th .u { display: block; font-weight: 400; font-size: 10px; }
+.scorecard th.grp { text-align: center; color: var(--text); border-bottom: 2px solid var(--hair); }
+.scorecard .mcol { text-align: left; position: sticky; left: 0; background: #fff; }
+.scorecard tr.gr td { text-align: left; font-weight: 600; color: var(--muted); background: var(--bg); font-size: 11px; }
+.scorecard tr.ours td { background: #F1EEFF; color: var(--quantum); font-weight: 600; }
+.scorecard tr.ours .mcol { background: #F1EEFF; }
+.scorecard td.best { font-weight: 700; }
+.scorecard .tri { color: var(--accent); font-size: 9px; margin-right: 3px; }
+.scorecard tr.ref td { border-top: 2px dashed var(--muted); color: var(--muted); font-style: italic; }
+.scorecard .needs { margin-left: 6px; font-size: 10px; padding: 0 5px; border-radius: 999px; border: 1px solid var(--hair); color: var(--muted); font-style: normal; }
+.smallmult { display: grid; grid-template-columns: 1fr; gap: 10px; }
+.sm { border: 1px solid var(--hair); border-radius: 10px; padding: 8px 10px; background: #fff; }
+.sm-t { font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+.sm-r { display: grid; grid-template-columns: 150px 1fr 52px; gap: 8px; align-items: center; font-size: 11.5px; }
+.sm-r.ours { color: var(--quantum); font-weight: 600; }
+.sm-r .track { position: relative; height: 10px; background: var(--bg); border-radius: 3px; }
+.sm-r .bar { position: absolute; left: 0; top: 2px; height: 6px; background: #C9C8C1; border-radius: 2px; }
+.sm-r.ours .bar { background: var(--quantum); }
+.sm-r .ci { position: absolute; top: 4px; height: 2px; background: var(--text); opacity: .6; }
+.commschart { width: 100%; height: auto; display: block; }

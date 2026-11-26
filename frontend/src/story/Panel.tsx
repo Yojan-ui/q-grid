@@ -5,10 +5,11 @@ import { AnimatePresence, motion } from 'framer-motion'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
 import { C, num, pct, reducedMotion, rs } from '../lib/theme'
-import { devices, fmtDate, hourLabel, METHOD, varLabel, zn } from '../lib/labels'
+import { devices, fmtDate, varLabel, zn } from '../lib/labels'
 import { campusSoc, STEP_COUNT, STOPS, subOf, type StopId, type StoryData } from '../lib/story'
-import { BoundsChart, CountUp, DayChart, GapBars, outageSpan, ResidualChart, SocChart } from './charts'
-import { FORMULA, N } from '../panels/Prov'
+import { CountUp, DayChart, outageSpan, ResidualChart, SocChart } from './charts'
+import { CommsChart, SmallMultiples } from './Scorecard'
+
 
 export type PanelProps = {
   stop: StopId; d: StoryData; t: number; playing: boolean; onPlay: () => void
@@ -17,6 +18,7 @@ export type PanelProps = {
   admmRound: number; setAdmmRound: (k: number) => void
   replayPulse: () => void; showMiss: boolean; setShowMiss: (v: boolean) => void
   onPrev: () => void; onNext: () => void; go: (i: number) => void; index: number
+  benchDs?: string; setBenchDs?: (k: string) => void
 }
 
 const Pending = ({ what }: { what: string }) => <span className="pending" title={`${what} is a labelled stand-in until the official data arrives`}>stand-in</span>
@@ -77,8 +79,8 @@ function content(p: PanelProps): Body {
   const zi = sc.campus.zones.findIndex(z => z.name === ex.zone)
   const priceStatus = sc.price_status !== 'REAL'
   const cea = sc.data_status?.cea !== 'REAL'
-  const v2body = contentV2(p)
-  if (v2body) return v2body
+  const qbody = contentQ(p)
+  if (qbody) return qbody
   switch (p.stop) {
     case '1': {
       const pr = d.problem
@@ -286,54 +288,9 @@ function content(p: PanelProps): Body {
         </>,
       }
     }
-    case '7a': {
-      const rows = d.summary.filter(r => r.day_set === 'eval30_mean' && r.price_scenario === 'A')
-      const get = (m: string) => rows.find(r => r.method === m)
-      const ours30 = get('OURS')
-      const order = ['B0', 'B1', 'B3', 'B5', 'OURS', 'OURS-QIEA']
-      const bars = order.map(m => get(m)).filter(Boolean).map(r => ({ method: r!.method, name: METHOD[r!.method] ?? r!.method, gap: Number(r!.gap_to_B4_pct), ours: r!.method.startsWith('OURS') }))
-      const bm = (m: string) => sc.benchmark.find(r => r.method === m && r.price_scenario === 'A')
-      const B0 = bm('B0'), OU = bm('OURS'), B4 = bm('B4')
-      const tiers = sc.admm.summary.tiers as Record<string, number> | undefined
-      const solves = sc.admm.summary.n_local_solves as number | undefined
-      const src = `results/benchmark.csv: scenario=${sc.scenario.key}, price_scenario=A`
-      const prov = (m: string, k: string) => ({ label: `${METHOD[m] ?? m} · ${k}`, unit: '', formula: FORMULA[k] ?? k, file: 'results/benchmark.csv', fn: 'scripts/run_benchmark.py', row: `${src}, method=${m}` })
-      if (!B0 || !OU || !B4) return { answer: <>Results for this day are in the Verify tab.</> }
-      const dCost = 100 * (OU.cost_rs / B0.cost_rs - 1)
-      const outage = B0.critical_downtime_h > 0 || OU.critical_downtime_h > 0
-      return {
-        answer: outage
-          ? <>{out ? 'In the outage' : 'On this day'}, critical loads go without power for {OU.critical_downtime_h.toFixed(1)} h instead of {B0.critical_downtime_h.toFixed(1)} h.</>
-          : <>No critical load is lost on this day{B0.dg_hours > 0 || OU.dg_hours > 0 ? `; Q-Grid runs diesel ${OU.dg_hours.toFixed(1)} h instead of ${B0.dg_hours.toFixed(1)} h` : ''}, and Q-Grid lands {Number(OU.gap_to_B4_pct).toFixed(1)}% from the best possible plan.</>,
-        support: <p>Every method ran on the same day, data and constraints ({fmtDate(sc.scenario.date)}{out ? `, BESCOM down ${slotT(out[0])}–${slotT(out[1])}` : ''}).</p>,
-        keys: <>
-          <Key label="Critical-load downtime" note={`optimum ${B4.critical_downtime_h.toFixed(1)} h`}><N v={`${B0.critical_downtime_h.toFixed(1)} → ${OU.critical_downtime_h.toFixed(1)} h`} info={prov('OURS', 'critical_downtime_h')} /></Key>
-          <Key label="Diesel running"><N v={`${B0.dg_hours.toFixed(2)} → ${OU.dg_hours.toFixed(2)} h`} info={prov('OURS', 'dg_hours')} /></Key>
-          <Key label="Gap to optimum" note="this day"><N v={`${Number(OU.gap_to_B4_pct).toFixed(1)}%`} info={prov('OURS', 'gap_to_B4_pct')} /></Key>
-          {tiers && solves && <Key label="QAOA answer used" note={`all ${num(solves)} checked vs exact`}>{pct(100 * (tiers.qaoa ?? 0) / solves)}</Key>}
-        </>,
-        extra: <>
-          <p className="secondary small">Cost of the day {priceStatus && <Pending what="Tariff" />}: <span className="tn"><N v={rs(B0.cost_rs)} info={prov('B0', 'cost_rs')} /> → <N v={rs(OU.cost_rs)} info={prov('OURS', 'cost_rs')} /> ({dCost >= 0 ? '+' : ''}{dCost.toFixed(1)}%)</span>{dCost > 0 && outage ? ', because diesel and batteries are spent keeping critical loads on' : ''}. Final once the official BESCOM/KERC tariff is added.</p>
-          <h3 className="sub">Gap to the central optimum, 30-day mean {priceStatus && <Pending what="Tariff" />}</h3>
-          <GapBars rows={bars} />
-          <p className="muted small">Q-Grid {ours30 ? `${Number(ours30.gap_to_B4_pct).toFixed(1)}%` : '–'} above optimum over 30 modelled days. GA/PSO, CO₂ and run times are in the Verify tab; click any figure for its source.</p>
-        </>,
-      }
-    }
-    case '7b': {
-      const qs = d.search ? Object.values(d.search.local_qubo_qubits) : []
-      return {
-        answer: <>As the network grows, each building’s problem stays the same size.</>,
-        support: <>
-          <p>More buildings means more neighbours to agree with, not more qubits per building. On this campus each zone needs {qs.length ? `${Math.min(...qs)}–${Math.max(...qs)}` : '≤16'} qubits.</p>
-          <ul className="levels">
-            <li><b>RVCE</b> {sc.campus.zones.length} zones, {sc.campus.lines.length} cables: the modelled campus.</li>
-            <li><b>Cluster of campuses</b>: more zones, the same per-zone qubit count.</li>
-            <li><b>City feeder</b>: campuses agree flows over the feeder the way zones agree over cables.</li>
-          </ul>
-        </>,
-        extra: <p className="honest">The cluster and feeder views are an illustration, not results. New campuses can be modelled with <code>scripts/new_campus.py</code>.</p>,
-      }
+    case '7a': case '7b': case '7c': case '7d': return {
+      answer: <>The benchmark results are not in this replay yet.</>,
+      support: <p>Run <code>python scripts/run_bench_v3.py</code>, <code>python scripts/write_bench_v3.py</code> and <code>make replay</code>.</p>,
     }
   }
   return { answer: <>{STOPS.find(x => x.id === p.stop)?.title}</> }
@@ -380,125 +337,99 @@ function Multiply({ n, N: Nb, log10, zones, slots }: { n: number; N?: number; lo
 }
 
 
-/* ----------------------------------------------------------------------------------------------- optimiser v2 */
-const V2NAME: Record<string, string> = { B0: 'Status quo', V1: 'Old Q-Grid (v1)', 'V2-QAOA': 'Q-Grid v2 (QAOA master)',
-  'V2-QIEA': 'Q-Grid v2 (QIEA master)', 'V2-EXACT': 'Q-Grid v2 (exact master)', 'B4-DC': 'Best possible (central)',
-  'V2-QAOA-FC': 'v2, solar forecast', B3: 'Per-zone MILP', B1: 'Rule-based' }
+/* ------------------------------------------------------------------------------------- current Q-Grid design */
+const st = (b: StoryData['bench'], ds: string, m: string, k: string) => b?.table[ds]?.[m]?.[k] ?? null
 
-/** Story text when optimiser v2 results are in the replay; null falls back to the v1 text. */
-function contentV2(p: PanelProps): Body | null {
+/** Story text for the current design (exact branch and bound per building, LP coordination, price exchange) and the
+ *  benchmark scorecard. Null falls back to the earlier text when the data is not in the replay. */
+function contentQ(p: PanelProps): Body | null {
   const { d } = p
   const { sc, example: ex } = d
-  const v2 = d.v2, X = d.v2ex
-  const row = (m: string) => v2?.rows.find(r => r.method === m)
-  if (p.stop === '7a' && v2 && row('V2-QAOA') && row('B4-DC')) return results7(p)
-  if (p.stop === '5b' && !X) return { answer: <>The two halves exchange prices and plans until their bounds meet.</>,
-    support: <p>Run the v2 benchmark (<code>scripts/run_benchmark_v2.py</code>) and <code>make replay</code> to see the worked example.</p> }
-  if (!X || !v2) return null
-  const B = X.block
-  const hrs = B.hours
-  const span = `${hourLabel(hrs[0])}–${hourLabel(hrs[hrs.length - 1] + 1)}`
-  const nb = Object.values(X.binaries).reduce((a, b) => a + b, 0)
-  const nz = X.binaries[ex.zone]
-  const shots = B.qaoa.shots ?? []
+  const Q = d.qs, B = d.bench
+  const priceStatus = sc.price_status !== 'REAL' || (B?.tariff_status ?? 'PENDING') !== 'REAL'
+  const ds = p.benchDs ?? 'rvce'
+  if (p.stop.startsWith('7') && B) return step7(p, B, ds, priceStatus)
+  if (!Q) return null
+  const pl = Q.placement ?? {}
+  const nb = Object.values(Q.binaries).reduce((a, b) => a + b, 0)
+  const blk = Q.block
+  const shots = blk?.qaoa.shots ?? []
   const total = shots.reduce((a, s) => a + s.count, 0)
   switch (p.stop) {
     case '3': return {
-      answer: <>Each hour of the next 24 h is a set of yes/no choices, and they multiply fast.</>,
-      support: <p>At {X.time}, the {zn(ex.zone).toLowerCase()} decides for every clock hour: is the pump on? Other buildings decide diesel on/off, whether the battery may charge or discharge, and when flexible jobs start.</p>,
+      answer: <>Every 15 minutes, for the next 24 hours, each building has hundreds of on/off choices.</>,
+      support: <p>At {Q.time}, each building plans its diesel on/off, whether its battery may charge or discharge, pump hours and job start times for every 15-minute slot of the next 24 h.</p>,
       extra: <div className="multiply">
-        <div className="mrow"><b className="big tn">{nz}</b><span>yes/no choices for the {zn(ex.zone).toLowerCase()} over the next 24 h</span></div>
-        <div className="mrow"><b className="big tn">{nb}</b><span>for the whole campus ({sc.campus.zones.length} buildings)</span></div>
-        <div className="mrow"><b className="big tn">2<sup>{nb}</sup> ≈ 10<sup>{Math.floor(nb * Math.log10(2))}</sup></b><span>possible on/off plans for the campus day</span></div>
-        <p className="muted small">The tiles show one block: {B.n_qubits} hours of {zn(ex.zone).toLowerCase()} pumping, {span}.</p>
+        <div className="mrow"><b className="big tn">{num(Q.binaries[ex.zone] ?? 0)}</b><span>on/off choices for the {zn(ex.zone).toLowerCase()} alone</span></div>
+        <div className="mrow"><b className="big tn">{num(nb)}</b><span>for the whole campus ({sc.campus.zones.length} buildings)</span></div>
+        <div className="mrow"><b className="big tn">2<sup>{num(nb)}</sup> ≈ 10<sup>{num(Math.floor(nb * Math.log10(2)))}</sup></b><span>possible plans for the campus day</span></div>
+        <p className="muted small">Each building solves only its own choices, exactly, with branch and bound; neighbours then agree on the cables.</p>
       </div>,
     }
     case '4a': return {
-      answer: <>A block of {B.n_qubits} hourly choices becomes {B.n_qubits} qubits.</>,
+      answer: <>We tested whether a quantum circuit helps with these on/off choices.</>,
       support: <>
-        <p>Quantum solves the on/off commitment, one block of up to 16 qubits at a time: here, pumping {span}. The circuit holds all {num(2 ** B.n_qubits)} plans for the block at once.</p>
-        <p>Battery power, diesel output and cable flows are not on/off choices; they stay with classical solvers (step 5).</p>
+        <p>Branch and bound first solves a relaxed version of the problem. The few choices it leaves undecided — here {blk?.n_qubits ?? 0} — form a block for a quantum circuit: one qubit per choice{blk ? ` (${blk.var_names.length} qubits, ${zn(ex.zone).toLowerCase()} at ${Q.time})` : ''}.</p>
+        <p className="muted small">{Q.block_note}</p>
       </>,
-      keys: <><Key label="Qubits in this block">{B.n_qubits}</Key><Key label="Largest block allowed">16</Key></>,
+      keys: <><Key label="Qubits in this block">{blk?.n_qubits ?? 0}</Key><Key label="Average block size" note={`${num(pl.instances ?? 0)} problems tested`}>{(pl.qaoa_block_qubits_mean ?? 0).toFixed(1)}</Key></>,
     }
     case '4b': return {
-      answer: <>The block’s costs and rules become one cost. Lower is better.</>,
-      support: <p>Each pumping hour has a price, taken from the continuous half’s latest Benders cut. Lines join hours that affect each other: the tank level after every hour depends on all the pumping before it.</p>,
-      extra: <>
-        <ul className="rules">
-          <li><i style={{ background: C.quantum }} />Energy for pumping, priced by the latest cut from the LP</li>
-          <li><i style={{ background: C.quantum }} />Water kept in the tank at the end is worth money later</li>
-          <li><i style={{ background: C.grid }} />Keep the tank between its minimum and maximum (penalty)</li>
-        </ul>
-        <p className="muted small">This is a QUBO. Plans that break a rule get a large penalty, and every candidate is re-scored with the true master objective.</p>
-      </>,
+      answer: <>The block’s costs and rules become one cost formula (a QUBO).</>,
+      support: <p>Each qubit’s cost comes from how much the relaxed solution says that choice would add; rules that link the block’s choices become penalties. Lines join choices that affect each other.</p>,
+      extra: <p className="muted small">Lower cost is better; plans that break a rule get a large penalty.</p>,
+    }
+    case '4c': return {
+      answer: <>QAOA turns that cost into a circuit that makes cheap plans more likely.</>,
+      support: <ol className="steps"><li><b>H</b>: every plan equally likely.</li><li><b>Cost layer γ</b>: each plan gets a phase from its cost.</li><li><b>Mixer β</b>: probability flows towards cheaper plans.</li><li>Repeat twice, then <b>measure</b>.</li></ol>,
+      extra: <p className="muted small">Simulated with Qiskit Aer (ideal, noiseless); no quantum hardware used.</p>,
     }
     case '4d': {
-      const win = shots.find(s => s.bits === B.qaoa.best_bits)
-      const valid = shots.filter(s => s.feasible).reduce((a, s) => a + s.count, 0)
+      const win = shots.find(s => s.bits === blk?.qaoa.best_bits)
       return {
-        answer: <>We measure the circuit {total} times and keep the cheapest plan that keeps the tank in range.</>,
-        support: <p>Taller bars came up more often. Grey bars would let the tank overflow or run dry and are thrown away. The cheapest valid plan wins even if it is not the tallest bar.</p>,
-        extra: <>
-          <div className="legend-row"><span><i style={{ background: C.quantum }} />chosen plan</span><span><i style={{ background: '#C9BFFB' }} />other valid plans</span><span><i style={{ background: '#E2E1DB' }} />✕ breaks a rule</span><span><i style={{ background: C.muted, height: 2 }} />random guess</span></div>
-          <p className="muted small">Shots measured by the pipeline: {B.qaoa.backend}. Nothing here is re-sampled in the browser.</p>
-        </>,
-        keys: <>
-          <Key label="Chosen plan came up">{win ? `${win.count} of ${total}` : 'not measured'}</Key>
-          <Key label="Valid measurements">{valid} of {total}</Key>
-          <Key label="Distinct plans seen">{shots.length}</Key>
-        </>,
+        answer: <>We measure the circuit {total} times; the best valid result becomes a starting plan.</>,
+        support: <p>Taller bars came up more often; grey bars break a rule. The result is completed into a full plan and handed to branch and bound as a starting point.</p>,
+        extra: <p className="muted small">Shots measured by the pipeline: {blk?.qaoa.backend}. Nothing is re-sampled in the browser.</p>,
+        keys: <><Key label="Best result came up">{win ? `${win.count} of ${total}` : '–'}</Key><Key label="Distinct results">{shots.length}</Key></>,
       }
     }
     case '4e': {
-      const best = B.qaoa.best_bits ?? B.exact.bits
-      const on = B.var_names.filter((_, i) => best[i] === '1').map(v => Number(v.split('@')[1]))
+      const same = blk && blk.qaoa.best_bits === blk.exact.bits
       return {
-        answer: <>The winning bitstring decodes into an hour-by-hour plan.</>,
-        support: <>
-          <p>Pump on at: {on.length ? on.map(h => hourLabel(h)).join(', ') : 'no hour in this block'}.</p>
-          <p className="muted small">All buildings’ blocks together make the 24 h commitment. Only the current slot is carried out; 15 minutes later the plan is made again with new data.</p>
-        </>,
-        keys: <Key label={`Plan, ${hourLabel(hrs[0])} →`}><code className="bits">{best}</code></Key>,
+        answer: <>Decoded, the best result is a set of on/off settings for those choices{blk ? (same ? ', and it matches exact search.' : ' — here it differs from exact search.') : '.'}</>,
+        support: <p className="muted small">Every block is checked against an exact search over all {blk ? num(2 ** blk.n_qubits) : '–'} settings.</p>,
+        keys: blk ? <>
+          <Key label="QAOA's best setting"><code className="bits">{blk.qaoa.best_bits ?? '–'}</code></Key>
+          <Key label="Exact search"><code className="bits">{blk.exact.bits}</code></Key>
+        </> : undefined,
       }
     }
-    case '4f': {
-      const ok = B.qaoa.best_bits === B.exact.bits
-      const qa = row('V2-QAOA')
-      return {
-        answer: <>Every QAOA block is checked against an exact search, and every master against an exact MILP.</>,
-        support: <p>QAOA proposes; a proposal is kept only if it lowers the true master cost. The exact master runs every time: it gives the lower bound and the reference. A safety layer checks every command before it reaches a device.</p>,
-        extra: <>
-          <div className={`card verify ${ok ? 'ok' : 'gap'}`}>
-            <div className="vrow head"><span>{zn(ex.zone)} · {X.time} · {span}</span><span className={`badge ${ok ? 'ok' : 'gap'}`}>{ok ? '✓ match' : 'differs'}</span></div>
-            <div className="vrow"><span className="muted">QAOA plan (cheapest valid of {total} shots)</span><code className="bits">{B.qaoa.best_bits ?? 'none valid'}</code></div>
-            <div className="vrow"><span className="muted">Exact optimum of the block</span><code className="bits">{B.exact.bits}</code></div>
-          </div>
-          {qa && <p className="small">On this day: QAOA’s best measured block = exact block optimum in <b className="tn">{pct(100 * Number(qa.qaoa_block_opt_share ?? 0), 1)}</b> of {num(Number(qa.qaoa_block_solves ?? 0))} blocks; QAOA-driven masters reached the exact master in <b className="tn">{pct(100 * Number(qa.master_opt_share ?? 0), 1)}</b>.</p>}
-          <p className="muted small">At these sizes exact search is faster. We claim correctness, not speed.</p>
-        </>,
-      }
+    case '4f': return {
+      answer: <>Verdict: the quantum starting plan did not make the exact solver faster, so Q-Grid does not use it.</>,
+      support: <p>Across {num(pl.instances ?? 0)} building problems from five days, branch and bound already finished at its first node in {pct(pl.cold_root_node_pct ?? 0, 1)} of cases. QAOA’s block was always solved correctly ({pct(pl.qaoa_block_opt_pct ?? 0)} vs exact search) and its starting plan was optimal in {pct(pl.incumbent_optimal_pct_all ?? 0)}, but it saved no work.</p>,
+      keys: <>
+        <Key label="Nodes, no start" note="mean">{(pl.nodes_cold_mean ?? 0).toFixed(2)}</Key>
+        <Key label="Nodes, quantum start">{(pl.nodes_warm_mean ?? 0).toFixed(2)}</Key>
+        <Key label="Time, no start / with start" note="incl. QAOA">{`${((pl.time_cold_mean_s ?? 0) * 1000).toFixed(0)} / ${((pl.time_warm_plus_incumbent_mean_s ?? 0) * 1000).toFixed(0)} ms`}</Key>
+      </>,
+      extra: <p className="muted small">QAOA on a local simulator: verified against exact solutions, no quantum advantage claimed. The test stays in the repository (scripts/quantum_placement.py) for larger problems where branch and bound struggles.</p>,
     }
     case '4g': return {
-      answer: <>Quantum picks the hourly on/off commitment. Everything continuous is classical.</>,
+      answer: <>Each building solves its own on/off plan exactly; everything continuous is agreed with neighbours.</>,
       support: <>
-        <p><b style={{ color: C.quantum }}>Quantum (QAOA, simulated):</b> diesel on/off, battery charge-or-discharge mode, pump hours, job start times — blocks of up to 16 qubits per building.</p>
-        <p><b>Classical:</b> battery kW, diesel kW, cable flows, grid import and peak (an LP, agreed by neighbours with ADMM), Benders cuts, exact checks, the safety layer.</p>
+        <p><b>Inside each building:</b> exact branch and bound for the 24 h on/off plan at the prices the neighbours agreed.</p>
+        <p><b>Between buildings:</b> battery, diesel, cable and grid power as a linear programme, agreed by trading proposals (ADMM). No central computer.</p>
+        <p className="muted small">Quantum circuits were tested as a helper and are not in the loop (step 4f).</p>
       </>,
-      extra: <div className="honest">{sc.label}. {sc.qiea_label}.</div>,
     }
     case '5': {
       const rounds = d.admmRounds
       const r = rounds[Math.min(p.admmRound, rounds.length - 1)]
       const agreed = r ? Object.values(r.proposals).filter(([a, b]) => Math.abs(a - b) < 1).length : 0
-      const qa = row('V2-QAOA'), v1 = row('V1')
       return {
-        answer: <>Neighbours agree on every cable’s flow by trading proposals. This half is convex, so the trading is guaranteed to converge given enough rounds.</>,
-        support: <p>At {X.time}, with the on/off plan fixed, each building solves its own LP for battery, diesel and grid, and both ends of each cable propose a flow. Red means they still disagree. There is no central computer.</p>,
-        keys: <>
-          <Key label="Round" note={X.benders[0]?.admm_converged ? 'reached tolerance' : 'stopped at the round cap'}><span className="tn">{(r?.k ?? 0) + 1} / {X.benders[0]?.admm_iters ?? rounds.length}</span></Key>
-          <Key label="Cables agreed"><span className="tn">{agreed} / {sc.campus.lines.length}</span></Key>
-        </>,
+        answer: <>Neighbours agree on every cable’s flow by trading proposals. This part is convex, so the trading is guaranteed to converge given enough rounds.</>,
+        support: <p>At {Q.time}, with each building’s on/off plan fixed, both ends of each cable propose a flow every round. Red means they still disagree. There is no central computer.</p>,
+        keys: <><Key label="Round"><span className="tn">{(r?.k ?? 0) + 1} / {rounds.length}</span></Key><Key label="Cables agreed"><span className="tn">{agreed} / {sc.campus.lines.length}</span></Key></>,
         extra: <>
           <ResidualChart rounds={rounds} k={p.admmRound} />
           <div className="row">
@@ -506,59 +437,67 @@ function contentV2(p: PanelProps): Body | null {
             <button className="btn ghost small" onClick={() => p.setAdmmRound(Math.min(rounds.length - 1, p.admmRound + 1))} disabled={p.admmRound >= rounds.length - 1}>round ›</button>
             <button className="btn ghost small" onClick={() => p.setAdmmRound(0)}>replay</button>
           </div>
-          <p className="small muted">Largest disagreement on any cable (kW) per round{rounds.length > 40 ? ', sampled' : ''}. Over this day, v2’s ADMM reached tolerance in {qa ? pct(100 * Number(qa.admm_converged_rate ?? 0)) : '–'} of runs; the old binary negotiation fully agreed in {v1 ? pct(100 * Number(v1.admm_converged_rate ?? 0)) : '–'} of slots. When the round cap is hit, each building fixes the agreed flows and re-solves its own LP, so the plan it applies always balances.</p>
+          <p className="small muted">Largest disagreement on any cable (kW) per round. Convergence for the convex case is a theorem (Boyd et al. 2011, see docs/math.md); measured convergence is in Verify.</p>
         </>,
       }
     }
     case '5b': {
-      const it = X.benders
-      const last = it[it.length - 1]
+      const o = Q.outer ?? []
+      const last = o[o.length - 1]
       return {
-        answer: <>The two halves talk through Benders cuts until the cost bounds nearly meet.</>,
-        support: <>
-          <p>The quantum half proposes an on/off plan. The classical half prices it: each building’s LP says what that plan costs and, from its duals, how the cost would change if any hour flipped. That price list is a <b>cut</b>; it goes back to the building’s master, which then avoids plans the cuts show are expensive.</p>
-          <p className="muted small">Upper bound: the best plan found so far, priced by the LPs. Lower bound: the exact master with all cuts — no plan can be cheaper.</p>
-        </>,
-        keys: <>
-          <Key label="Benders rounds">{it.length}</Key>
-          <Key label="Gap between bounds">{last ? pct(last.gap_pct, 2) : '–'}</Key>
-          <Key label="Cuts per building">{last?.cuts_per_building ?? '–'}</Key>
-        </>,
-        extra: <>
-          <BoundsChart iters={it} />
-          <p className="muted small">The run stops at a 0.5 % gap or after {it.length >= 6 ? 6 : it.length} rounds. {X.note.charAt(0).toUpperCase() + X.note.slice(1)}.</p>
-        </>,
+        answer: <>The two halves talk through prices: each building re-plans its on/off choices at the prices the cable agreement produces.</>,
+        support: <p>The cable agreement ends with a price for power on each cable; each building re-solves its on/off plan at those prices and the cables are agreed again. Q-Grid runs a fixed {o.length} rounds of this per decision{last?.buildings_changed_commitment ? `; in this decision the second round still changed ${last.buildings_changed_commitment} buildings’ plans, so more rounds might help (not yet measured)` : ''}.</p>,
+        extra: <table className="kv small"><tbody>
+          <tr><th>Round</th><th>buildings that changed their plan</th><th>trading rounds</th></tr>
+          {o.map(r => <tr key={r.round}><td>{r.round}</td><td className="tn">{r.buildings_changed_commitment ?? '–'}</td><td className="tn">{r.admm_iters}</td></tr>)}
+        </tbody></table>,
       }
     }
   }
   return null
 }
 
-function results7(p: PanelProps): Body {
-  const { d } = p
-  const sc = d.sc, v2 = d.v2!
-  const row = (m: string) => v2.rows.find(r => r.method === m)
-  const B0 = row('B0'), V1 = row('V1'), QA = row('V2-QAOA'), EX = row('V2-EXACT'), OPT = row('B4-DC')!
-  const priceStatus = sc.price_status !== 'REAL' || v2.tariff_status !== 'REAL'
-  const prov = (m: string, k: string) => ({ label: `${V2NAME[m] ?? m} · ${k}`, unit: '', formula: k, file: 'results/v2/benchmark_v2.csv',
-    fn: 'scripts/run_benchmark_v2.py', row: `scenario=${sc.scenario.key}, method=${m}` })
-  const bars = ['B0', 'V1', 'V2-QAOA', 'V2-EXACT'].map(row).filter(Boolean).map(r => ({ method: r!.method, name: V2NAME[r!.method] ?? r!.method,
-    gap: Number(r!.gap_to_opt_pct), ours: r!.method.startsWith('V2') }))
-  const dc = QA && B0 ? Number(B0.demand_charge_rs) - Number(QA.demand_charge_rs) : null
-  return {
-    answer: QA && V1 ? <>v2 lands {Number(QA.gap_to_opt_pct).toFixed(1)}% from the best possible plan, against {Number(V1.gap_to_opt_pct).toFixed(1)}% for v1.</> : <>v1 vs v2 vs the best possible plan.</>,
-    support: <p>Same day, data and constraints for every method ({fmtDate(sc.scenario.date)}). “Best possible” is a central MILP that sees everything; v2 gets close while staying decentralised.</p>,
-    keys: <>
-      {QA && B0 && <Key label="Critical-load downtime" note={`v1 ${Number(V1?.critical_downtime_h ?? NaN).toFixed(1)} h · best ${Number(OPT.critical_downtime_h).toFixed(1)} h`}><N v={`${Number(B0.critical_downtime_h).toFixed(1)} → ${Number(QA.critical_downtime_h).toFixed(1)} h`} info={prov('V2-QAOA', 'critical_downtime_h')} /></Key>}
-      {QA && B0 && <Key label="Diesel running"><N v={`${Number(B0.dg_hours).toFixed(2)} → ${Number(QA.dg_hours).toFixed(2)} h`} info={prov('V2-QAOA', 'dg_hours')} /></Key>}
-      {QA && B0 && <Key label="Peak demand" note={`best ${num(Number(OPT.peak_kva))} kVA`}><N v={`${num(Number(B0.peak_kva))} → ${num(Number(QA.peak_kva))} kVA`} info={prov('V2-QAOA', 'peak_kva')} /></Key>}
-      {QA && <Key label="Masters solved optimally by QAOA" note="each checked vs exact">{pct(100 * Number(QA.master_opt_share ?? 0))}</Key>}
-    </>,
-    extra: <>
-      <p className="secondary small">Cost of the day incl. demand charge {priceStatus && <Pending what="Tariff and demand charge" />}: <span className="tn">{B0 && QA ? <><N v={rs(Number(B0.cost_incl_demand_rs))} info={prov('B0', 'cost_incl_demand_rs')} /> → <N v={rs(Number(QA.cost_incl_demand_rs))} info={prov('V2-QAOA', 'cost_incl_demand_rs')} /></> : '–'}</span>{dc !== null ? `; demand charge ${dc >= 0 ? 'down' : 'up'} ${rs(Math.abs(dc))}/day` : ''}. Final once the official BESCOM/KERC tariff is added.</p>
-      <h3 className="sub">Gap to the best possible plan, this day</h3>
-      <GapBars rows={bars} />
-      <p className="muted small">Gap includes the value of lost load and the demand charge. {EX ? `With an exact master v2 lands ${Number(EX.gap_to_opt_pct).toFixed(1)}%.` : ''} Full tables in Verify and docs/results_v2.md.</p>
-    </>,
+function step7(p: PanelProps, B: NonNullable<StoryData['bench']>, ds: string, priceStatus: boolean): Body {
+  const dsl = B.datasets.find(x => x.key === ds)
+  const g = (m: string, k: string) => st(B, ds, m, k)?.mean
+  const chips = <div className="chips">{B.datasets.map(x => <button key={x.key} className={`chip ${ds === x.key ? 'on' : ''}`} onClick={() => p.setBenchDs?.(x.key)}>{x.label.split(',')[0].split(' (')[0]}</button>)}</div>
+  switch (p.stop) {
+    case '7a': return {
+      answer: <>The scorecard: Q-Grid against every benchmark method on the same days and data.</>,
+      support: <p>Rows are grouped Today / Research methods / Smart control / Central control / Ours. ▲ marks the best value in each column among methods that work without a central controller; the best possible plan (central, perfect information) is a reference line, not a competitor.</p>,
+      keys: <>
+        <Key label="Q-Grid gap to best plan">{g('qgrid', 'gap_pct') !== undefined ? pct(g('qgrid', 'gap_pct')!, 2) : '–'}</Key>
+        <Key label="Certified gap" note="proven upper bound">{g('qgrid', 'certified_gap_pct') !== undefined ? pct(g('qgrid', 'certified_gap_pct')!, 2) : '–'}</Key>
+        <Key label="Bill saving vs today" pending={priceStatus ? 'Tariff' : undefined}>{g('qgrid', 'saving_pct') !== undefined ? pct(g('qgrid', 'saving_pct')!, 1) : '–'}</Key>
+        <Key label="Critical downtime" note="h per day">{g('qgrid', 'critical_downtime_h') !== undefined ? g('qgrid', 'critical_downtime_h')!.toFixed(2) : '–'}</Key>
+      </>,
+      extra: <>{chips}<p className="muted small">{dsl?.label}: mean of {dsl?.n_days} days. Full tables with ± and 95 % intervals: docs/benchmark_v3.md.</p></>,
+    }
+    case '7b': {
+      const nocoord = ['status_quo', 'rule_based', 'ga', 'pso', 'per_building_mpc']
+      const best = B.datasets.filter(x => {
+        const q = st(B, x.key, 'qgrid', 'gap_pct')?.mean
+        return q !== undefined && q !== null && nocoord.every(m => (st(B, x.key, m, 'gap_pct')?.mean ?? Infinity) >= q)
+      }).length
+      return {
+        answer: <>Across {B.datasets.length} real campuses, Q-Grid is closest to the best possible plan among methods without a central controller on {best} of {B.datasets.length}.</>,
+        support: <p>Gap to the best possible plan (mean and 95 % interval) for Q-Grid and the strongest alternatives on each dataset.</p>,
+        extra: <SmallMultiples b={B} />,
+      }
+    }
+    case '7c': {
+      const pen = (m: string) => (g(m + '_comms_fail', 'gap_pct') ?? NaN) - (g(m, 'gap_pct') ?? NaN)
+      return {
+        answer: <>When the network fails for 3 hours, central control loses {Number.isNaN(pen('central_mpc')) ? '–' : pen('central_mpc').toFixed(2)} points of gap; Q-Grid loses {Number.isNaN(pen('qgrid')) ? '–' : pen('qgrid').toFixed(2)}.</>,
+        support: <p>Same seeded 3-hour outage for both. The central controller’s buildings fall back to simple rules; Q-Grid’s buildings keep optimising on their own and resume sharing when links return.</p>,
+        extra: <><CommsChart b={B} /><p className="muted small">Mean over {dsl?.n_days} days on {dsl?.label}; the chart shows one day. Network outages are synthetic and seeded.</p></>,
+      }
+    }
+    case '7d': return {
+      answer: <>{B.headline.text}</>,
+      support: <p>{B.headline.detail}</p>,
+      extra: <p className="muted small">Generated from results/bench_v3 by scripts/write_bench_v3.py. Tariffs and demand charge are stand-ins until the official BESCOM/KERC tariff is added{priceStatus ? ' (PENDING)' : ''}.</p>,
+    }
   }
+  return { answer: <>Results</> }
 }

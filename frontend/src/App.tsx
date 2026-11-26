@@ -6,6 +6,7 @@ import { STOPS, useStoryData } from './lib/story'
 import { Stage } from './story/Stage'
 import { Panel } from './story/Panel'
 import { WhoDoesWhat } from './story/WhoDoesWhat'
+import { Scorecard } from './story/Scorecard'
 import { ProvProvider } from './panels/Prov'
 import { VerifyView, TryView, DataBadge } from './views/Views'
 
@@ -26,6 +27,7 @@ export default function App() {
   const [pulseKey, setPulseKey] = useState(0)
   const [showMiss, setShowMiss] = useState(false)
   const [online, setOnline] = useState(false)
+  const [benchDs, setBenchDs] = useState('rvce')
   const [scen, setScen] = useState<string>(() => new URLSearchParams(location.search).get('scenario') ?? '')
 
   useEffect(() => {
@@ -43,11 +45,11 @@ export default function App() {
   useEffect(() => {
     if (!d) return
     setShowMiss(false)
-    const play = stop === '1' || stop === '6' || stop === '7a'
+    const play = stop === '1' || stop === '6'
     if (play) { setT(0); setPlaying(!reducedMotion()); if (reducedMotion()) setT(95.99) }
     else {
       setPlaying(false)
-      setT(stop === '2' ? 48 : stop === '5' || stop === '5b' ? d.admmSlot : stop === '7b' ? 95.99 : d.example.slot)
+      setT(stop === '2' ? 48 : stop === '5' || stop === '5b' ? d.admmSlot : stop.startsWith('7') ? 95.99 : d.example.slot)
     }
     if (stop === '5') setAdmmRound(0)
     if (stop !== '5') setKilled(null)
@@ -128,7 +130,8 @@ export default function App() {
           <main className="story">
             <div className="stage" onWheel={onWheel}>
               <Stage stop={stop} d={d} t={t} zone={zone} onZone={setZone} killed={killed} admmRound={admmRound} pulseKey={pulseKey} showMiss={showMiss} />
-              {stop === '4g' && <WhoDoesWhat />}
+              {stop === '4g' && !d.qs && <WhoDoesWhat />}
+              {stop === '7a' && d.bench && <Scorecard b={d.bench} ds={benchDs} />}
               <div className="clock tn" aria-live="off">{d.sc.slots.t[Math.min(95, Math.floor(t))]}{d.sc.slots.grid_up[Math.min(95, Math.floor(t))] ? '' : <span className="down"> · grid down</span>}</div>
               <div className="stage-foot">
                 <span>{d.sc.label}</span>
@@ -137,7 +140,7 @@ export default function App() {
             <Panel stop={stop} d={d} t={t} playing={playing} onPlay={() => { if (!playing && t >= 95.9) setT(0); setPlaying(x => !x) }}
               zone={zone} setZone={setZone} killed={killed} setKilled={setKilled} admmRound={admmRound} setAdmmRound={setAdmmRound}
               replayPulse={() => setPulseKey(k => k + 1)} showMiss={showMiss} setShowMiss={setShowMiss}
-              onPrev={prev} onNext={next} go={go} index={i} />
+              onPrev={prev} onNext={next} go={go} index={i} benchDs={benchDs} setBenchDs={setBenchDs} />
           </main>
         ) : tab === 'verify' ? <VerifyView d={d} idx={idx} online={online} /> : <TryView d={d} online={online} />}
       </div>

@@ -18,9 +18,10 @@ const TW = 10, TH = 5.2, GAP = 1.0, BLOCK = 3
 /** Tile layout grouped by device: battery (charge row over discharge row), one column per cable, then others. */
 export function tileLayout(names: string[]) {
   const blocks: { title: string; cols: string[][] }[] = []
-  if (names.some(v => v.includes('@'))) {         // v2: one row per device kind, one tile per clock hour
-    for (const kind of [...new Set(names.map(v => v.split('@')[0]))]) {
-      const vs = names.filter(v => v.split('@')[0] === kind)
+  if (names.some(v => v.includes('@') || v.includes('#'))) {   // one row per device kind, one tile per hour / slot
+    const kindOf = (v: string) => v.split(/[@#]/)[0]
+    for (const kind of [...new Set(names.map(kindOf))]) {
+      const vs = names.filter(v => kindOf(v) === kind)
       const h = Math.ceil(vs.length / 2)            // two rows (first half of the hours on top) so 12 hours fit on stage
       blocks.push({ title: kind, cols: vs.slice(0, h).map((v, k) => [v, vs[k + h]].filter(Boolean) as string[]) })
     }
@@ -326,6 +327,9 @@ const ringLabelOffset = (i: number, n: number): V3 => {
   return [Math.cos(a) * 5.2, Math.sin(a) * 3.4, 0]
 }
 function blockTitle(t: string, zone: string, sc: Scenario) {
+  if (t === 'mode') return 'Battery charge/discharge mode'
+  if (t === 'charge' || t === 'discharge') return 'Battery level'
+  if (t === 'st') return 'Diesel start'
   if (t === 'pump') return 'Borewell pump · hour by hour'
   if (t === 'dg') return 'Diesel generator · hour by hour'
   if (t === 'mode') return 'Battery mode · hour by hour'

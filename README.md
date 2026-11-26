@@ -63,7 +63,7 @@ python scripts/new_campus.py --name "<campus>" --lat <lat> --lon <lon>   # anoth
 ## Status
 | Step | What | State |
 |---|---|---|
-| 0–5 (v1) | generic 5-building pipeline, kept in docs/results_v1.md | ✅ |
+| 0–5 | generic 5-building pipeline (first prototype), kept in docs/results_v1.md | ✅ |
 | 1 | pricing scenarios A (headline) / B (sensitivity), SOURCES with page numbers when REAL | ✅ code · data PENDING |
 | 2 | RVCE campus from OSM, timetable/Ausgrid loads, DG, tanks, outage islanding, 6 scenarios | ✅ (calendar/loads PENDING) |
 | 3 | QAOA only on scenarios, warm start, QUBO cache, ADMM convergence stats & fallbacks | ✅ |
@@ -73,7 +73,7 @@ python scripts/new_campus.py --name "<campus>" --lat <lat> --lon <lon>   # anoth
 | 7 | 3D demo: light step-by-step explainer (7 steps, one continuous 3D thread: campus → decisions → qubits → QAOA circuit → measurement → decoded plan → ADMM → storage → results), Verify and Try it tabs, honesty strip | ✅ |
 | 8 | new_campus.py, manifest + make verify, CI | ✅ |
 | 9 | report, why-quantum, viva Q&A, pitch, data request | ✅ |
-| v2 | optimiser v2 (branch `optimiser-v2`): 24 h rolling MPC, hybrid Benders (QAOA/QIEA/SA/exact master on hourly commitments, LP subproblem by consensus ADMM), solar forecast, demand charge (PENDING), optional IBM/D-Wave runs; results in [docs/results_v2.md](docs/results_v2.md) | ✅ code · tariff PENDING · hardware needs tokens |
+| 10 | design study: 24 h rolling horizon, LP coordination between neighbours, hybrid-Benders and quantum-master variants measured; ablation of four design changes (docs/ablation.md); quantum placement test; multi-dataset benchmark (docs/benchmark_v3.md, docs/scorecard.md) | ✅ code · tariff PENDING · hardware runs need tokens |
 
 ## Honest limits
 PENDING prices/CO2/calendar/meter data; loads are area-based estimates; perfect forecasts; QAOA simulated (ideal, noiseless);

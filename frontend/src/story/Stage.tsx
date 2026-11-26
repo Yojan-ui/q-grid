@@ -47,7 +47,7 @@ export function Stage(p: StageProps) {
     <Canvas shadows="percentage" flat camera={{ position: [380, 360, 520], fov: 38, near: 2, far: 9000 }} dpr={[1, 1.75]}
       gl={{ antialias: true, preserveDrawingBuffer: true }} onPointerMissed={() => p.stop === '2' && p.onZone(null)}>
       <color attach="background" args={[C.bg]} />
-      <fog attach="fog" args={[C.bg, p.stop === '7b' ? 3200 : 1300, p.stop === '7b' ? 8000 : 3200]} />
+      <fog attach="fog" args={[C.bg, 1300, 3200]} />
       <Scene {...p} />
     </Canvas>
   )
@@ -75,8 +75,7 @@ function Scene({ stop, d, t, zone, onZone, killed, admmRound, pulseKey }: StageP
       case '4g': return { pos: [380, 600, 820], target: [-60, 0, 0] }
       case '5': case '5b': return { pos: [-20, 1120, 170], target: [-20, 0, 0] }
       case '6': return { pos: [150, 250, 400], target: [-40, 0, 0] }
-      case '7a': return { pos: [0, 760, 1060], target: [0, 0, 60] }
-      case '7b': return { pos: [0, 1450, 1750], target: [0, 0, 60], fov: 36 }
+      case '7a': case '7b': case '7c': case '7d': return { pos: [300, 440, 620], target: [-20, 0, 0] }
     }
   }, [stop, zone, zones])
 
@@ -100,7 +99,7 @@ function Scene({ stop, d, t, zone, onZone, killed, admmRound, pulseKey }: StageP
   const primary = useRef<THREE.Group>(null!)
   const secondary = useRef<THREE.Group>(null!)
   useEffect(() => {
-    const duo = stop === '7a'
+    const duo = false
     const D = reducedMotion() ? 0 : 1.0
     gsap.to(primary.current.position, { x: duo ? 235 : 0, duration: D, ease: 'power3.inOut' })
     gsap.to(primary.current.scale, { x: duo ? 0.6 : 1, y: duo ? 0.6 : 1, z: duo ? 0.6 : 1, duration: D, ease: 'power3.inOut' })
@@ -128,12 +127,12 @@ function Scene({ stop, d, t, zone, onZone, killed, admmRound, pulseKey }: StageP
           lineViews={lineViews} onZone={onZone} interactive={stop === '2'} storage={stop !== '5'}
           subLabel={stop !== '7a' && stop !== '7b' && stop !== '4g'} batteryScale={stop === '6' ? 1.7 : 1} socLabels={stop === '6'} />
         {zones.map(z => <DeviceIcons key={z.name} sc={sc} z={z} slot={slot} show={stop === '2' && zone === z.name} />)}
-        <Label3D show={stop === '7a'} position={[0, 90, -300]} center><div className="duotag q">With Q-Grid</div></Label3D>
-        <Label3D show={stop === '7b'} position={[0, 70, 0]} center><div className="duotag q">RVCE · {sc.campus.zones.length} zones</div></Label3D>
+        
+        
       </group>
       <group ref={secondary} scale={0.001}>
         <Campus sc={sc} t={t} run="status_quo" zones={zones} flows={stop === '7a' ? 'both' : 'none'} subLabel={false} />
-        <Label3D show={stop === '7a'} position={[0, 90, -300]} center><div className="duotag">Status quo</div></Label3D>
+        
       </group>
       <Lab stop={stop} ex={ex} sc={sc} anchor={new THREE.Vector3(...A)} yaw={YAW} buildingH={exZone.h} pulseKey={pulseKey} />
       <Label3D show={stop === '4f'} position={[A[0], exZone.h + 22, A[2]]} center>
@@ -141,7 +140,7 @@ function Scene({ stop, d, t, zone, onZone, killed, admmRound, pulseKey }: StageP
           {ex.qaoa.best_bits === ex.exact.bits ? '✓ QAOA plan = exact optimum' : '≠ exact optimum → fallback tier'}
         </div>
       </Label3D>
-      <Cluster zones={zones} show={stop === '7b'} />
+      
     </>
   )
 }
@@ -186,35 +185,3 @@ function DeviceIcons({ sc, z, slot, show }: { sc: Scenario; z: ZoneGeo; slot: nu
   )
 }
 
-/** Step 7b (illustration only, not a result): the same per-zone pattern repeated across a cluster of campuses. */
-function Cluster({ zones, show }: { zones: ZoneGeo[]; show: boolean }) {
-  const spots: V3[] = [[-760, 0, -330], [760, 0, -330], [-760, 0, 420], [760, 0, 420], [0, 0, -760]]
-  const ref = useRef<THREE.Group>(null!)
-  useEffect(() => {
-    gsap.killTweensOf(ref.current.scale)
-    const s = show ? 1 : 0.001
-    gsap.to(ref.current.scale, { x: s, y: s, z: s, duration: reducedMotion() ? 0 : show ? 1.2 : 0.4, ease: 'power3.out', delay: reducedMotion() || !show ? 0 : 0.5 })
-  }, [show])
-  const mat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#E9E8E2', roughness: 1 }), [])
-  return (
-    <group ref={ref} scale={0.001}>
-      {spots.map((s, i) => (
-        <group key={i} position={s} scale={0.55} rotation-y={i * 1.1}>
-          {zones.map(z => z.geo && <mesh key={z.name} geometry={z.geo} material={mat} castShadow />)}
-        </group>
-      ))}
-      {spots.map((s, i) => {
-        const a = new THREE.Vector3(...s), b = new THREE.Vector3(-385, 0, 40)
-        const dd = new THREE.Vector3().subVectors(b, a)
-        return (
-          <mesh key={`f${i}`} position={a.clone().add(b).multiplyScalar(0.5).setY(1)} rotation={[-Math.PI / 2, 0, Math.atan2(-dd.z, dd.x)]} scale={[dd.length(), 9, 1]}>
-            <planeGeometry /><meshBasicMaterial color={C.faint} transparent opacity={0.55} />
-          </mesh>
-        )
-      })}
-      <Label3D show={show} position={[0, 160, -1050]} center><div className="duotag ill">Illustration — not a result</div></Label3D>
-      <Label3D show={show} position={[0, 110, -760]} center><div className="duotag">another campus</div></Label3D>
-      <Label3D show={show} position={[-560, 30, 230]} center><div className="duotag">city feeder</div></Label3D>
-    </group>
-  )
-}
