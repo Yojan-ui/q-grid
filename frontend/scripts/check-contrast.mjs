@@ -39,7 +39,7 @@ for (const b of tokenBad) console.log(`  ✗ [${b.theme}] ${b.fg} on ${b.bg}: ${
 if (has('tokens-only')) process.exit(tokenBad.length ? 1 : 0)
 
 // ------------------------------------------------------------------ 2. live DOM scan
-const STOPS = ['1', '2', '3', '4a', '4b', '4c', '4d', '4e', '4f', '4g', '5', '5b', '6', '7a', '7b', '7c', '7d']
+const STOPS = ['1', '2', '3', '4a', '4b', '4c', '4d', '4e', '4f', '4g', '5', '5b', '6', '6b', '7a', '7b', '7c', '7d', '7e']
 const SIZES = arg('sizes', '1440x900').split(',').map(s => s.split('x').map(Number))
 const THEMES = arg('themes', 'light,dark').split(',')
 

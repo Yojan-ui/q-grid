@@ -33,7 +33,7 @@ export function SummaryDoc({ d, idx, ds }: { d: StoryData; idx: Index; ds: strin
       <p className="sd-sub">One-page summary · EUREKA Track 3 · headline day {sc.scenario.key.replace(/_/g, ' ')}, {fmtDate(sc.scenario.date)} · generated {new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} from the replay files</p>
 
       <h2>The problem</h2>
-      <p>Today every building at RVCE acts on its own: it sells noon solar cheaply, buys power back at the evening peak and runs diesel when the BESCOM supply fails. On the modelled headline day:</p>
+      <p>{B?.headline.story ? <>{B.headline.story.step1.text}{tariffPending ? ' (stand-in tariff)' : ''} </> : <>Today every building at RVCE acts on its own: it sells noon solar cheaply, buys power back at the evening peak and runs diesel when the BESCOM supply fails. </>}On the modelled headline day:</p>
       {pr ? (
         <div className="sd-keys">
           <div><span>Value lost per day {tariffPending && <i className="sd-pend">stand-in tariff</i>}</span><b>{rs(pr.rs_lost)}</b></div>
@@ -69,7 +69,7 @@ export function SummaryDoc({ d, idx, ds }: { d: StoryData; idx: Index; ds: strin
 
       <h2>Scorecard{dsl ? `: ${dsl.label}, mean of ${dsl.n_days} days` : ''}</h2>
       {B ? <>
-        <p>{B.headline.text}</p>
+        <p>{B.headline.story ? <><b>{B.headline.story.step7.text}</b> {B.headline.story.step7.comms} </> : null}{B.headline.text}</p>
         <table>
           <thead><tr><th>Method</th>{metrics.map(m => <th key={m.key}>{m.label}{m.unit ? ` (${m.unit})` : ''}{PRICE_METRICS.has(m.key) && tariffPending ? ' *' : ''}</th>)}</tr></thead>
           <tbody>

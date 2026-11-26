@@ -1,9 +1,9 @@
 // The guided story: stops, and the facts each stop shows. Every number is read from replay files produced by
 // scripts/make_replay.py (results/*.csv / *.json); this module only selects and formats them.
 import { useEffect, useState } from 'react'
-import { getCSV, getJSON, MissingReplay, type Bench, type LiveSolve, type QaoaFile, type QStory, type Scenario, type V2Data, type V2Example } from './data'
+import { getCSV, getJSON, MissingReplay, type Bench, type Impact, type LiveFile, type LiveSolve, type QaoaFile, type QStory, type Scenario, type V2Data, type V2Example } from './data'
 
-export type StopId = '1' | '2' | '3' | '4a' | '4b' | '4c' | '4d' | '4e' | '4f' | '4g' | '5' | '5b' | '6' | '7a' | '7b' | '7c' | '7d'
+export type StopId = '1' | '2' | '3' | '4a' | '4b' | '4c' | '4d' | '4e' | '4f' | '4g' | '5' | '5b' | '6' | '6b' | '7a' | '7b' | '7c' | '7d' | '7e'
 export const STOPS: { id: StopId; step: number; title: string }[] = [
   { id: '1', step: 1, title: 'The problem' },
   { id: '2', step: 2, title: 'The campus' },
@@ -18,10 +18,12 @@ export const STOPS: { id: StopId; step: number; title: string }[] = [
   { id: '5', step: 5, title: 'Buildings agree' },
   { id: '5b', step: 5, title: 'How the two halves talk' },
   { id: '6', step: 6, title: 'Storage behaviour' },
+  { id: '6b', step: 6, title: 'Faculty rules' },
   { id: '7a', step: 7, title: 'The scorecard' },
   { id: '7b', step: 7, title: 'Across real campuses' },
   { id: '7c', step: 7, title: 'When central control fails' },
-  { id: '7d', step: 7, title: 'The bottom line' },
+  { id: '7d', step: 7, title: 'Is it worth it?' },
+  { id: '7e', step: 7, title: 'The bottom line' },
 ]
 export const STEP_COUNT = 7
 export const subOf = (id: StopId) => STOPS.filter(s => s.step === STOPS.find(x => x.id === id)!.step)
@@ -46,6 +48,8 @@ export type StoryData = {
   v2ex: V2Example | null            // earlier Benders worked example (kept for Verify)
   qs: QStory | null                 // current Q-Grid worked example (headline day)
   bench: Bench | null               // multi-dataset benchmark (bench_v3.json)
+  live: LiveFile | null             // precomputed live demo moments (live.json)
+  impact: Impact | null             // "Is it worth it?" (impact.json)
 }
 
 /** The worked example: the headline day's server room at the outage evening slot (a live_solve record);
@@ -97,12 +101,13 @@ export function useStoryData(key: string) {
         if (sc.runs.qgrid_v2) { (sc.runs as any).qgrid_v1 = sc.runs.qgrid; sc.runs.qgrid = sc.runs.qgrid_v2 }
         const v2ex = sc.v2?.example ?? null
         const qs = sc.qgrid_story ?? null
-        const bench = await getJSON<Bench>('bench_v3.json').catch(() => null)
+        const [bench, liveFile, impact] = await Promise.all([getJSON<Bench>('bench_v3.json').catch(() => null),
+          getJSON<LiveFile>('live.json').catch(() => null), getJSON<Impact>('impact.json').catch(() => null)])
         const example: LiveSolve = qs?.block ? { ...qs.block, explanation: [] } : v2ex ? { ...v2ex.block, explanation: [] } : pickExample(live)
         const admmSlot = qs ? qs.slot : v2ex ? v2ex.slot : pickAdmmSlot(sc)
         const admmRounds = qs ? qs.admm_rounds : v2ex ? v2ex.admm_rounds : (sc.admm.iterations[String(admmSlot)] ?? [])
         if (!off) setD({ sc, q, example, miss: (v2ex || qs) ? null : pickMiss(live), summary, problem, search, robust, admmSlot, admmRounds,
-          v2: sc.v2 ?? null, v2ex, qs, bench })
+          v2: sc.v2 ?? null, v2ex, qs, bench, live: liveFile && liveFile.scenario === key ? liveFile : null, impact })
       } catch (e) {
         if (off) return
         if (e instanceof MissingReplay) setMissing(e.files)

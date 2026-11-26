@@ -148,3 +148,20 @@ def test_hardware_runs_only_with_token_and_opt_in(monkeypatch):
     monkeypatch.setenv("QGRID_IBM_TOKEN", "x")
     ok, why = hw._ready("QGRID_IBM_TOKEN", "QGRID_ALLOW_IBM", "qiskit_ibm_runtime")
     assert not ok and "opted in" in why
+
+
+def test_exact_master_never_loses_to_a_heuristic_master(setup):
+    """With verification + fallback (the default), a heuristic-master run takes exactly the exact master's decisions,
+    so its realised day can never be cheaper or dearer than the exact-master run (docs/consistency.md, item 1)."""
+    from qgrid.model import settle
+    from qgrid.v2.mpc import V2Config, run_day_v2
+    c, p, yd = setup
+    kw = dict(max_iter=3, master_every=1, sweeps=1)
+    out = {}
+    for solver in ("exact", "qiea"):
+        cfg = V2Config.from_cfg(c.cfg, solver=solver, **kw)
+        sched, log = run_day_v2(c, yd, DAY, OUT, cfg, slots=2)
+        out[solver] = (sched, log)
+    a, b = out["exact"][0], out["qiea"][0]
+    assert np.allclose(a.p_bat, b.p_bat) and np.allclose(a.dg_kw, b.dg_kw) and np.array_equal(a.pump_on, b.pump_on)
+    assert np.isfinite(out["qiea"][1].summary()["master_opt_share"])   # the heuristic ran and its agreement was recorded

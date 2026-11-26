@@ -7,6 +7,7 @@ import { STOPS, useStoryData } from './lib/story'
 import { Panel } from './story/Panel'
 import { ThemeToggle } from './story/ThemeToggle'
 import { SummaryDoc } from './story/Summary'
+import { ImpactBoard } from './story/Impact'
 import { WhoDoesWhat } from './story/WhoDoesWhat'
 import { Scorecard } from './story/Scorecard'
 import { ProvProvider } from './panels/Prov'
@@ -19,6 +20,8 @@ const Stage = lazy(loadStage)
 type Tab = 'story' | 'verify' | 'try'
 const SCEN_NAME: Record<string, string> = { outage_fest: 'Outage during the fest', fest: 'Fest', teaching: 'Teaching day', exam_week: 'Exam week', vacation: 'Vacation', monsoon: 'Monsoon' }
 const DAY_SECONDS = 18
+// static deployment (npm run build:static, Vercel): replay only, never probes for a backend
+const OFFLINE_BUILD = (import.meta as any).env?.VITE_QGRID_OFFLINE === '1'
 
 function Loading({ text }: { text: string }) {
   return <div className="loading" role="status"><span className="bar"><i /></span><span>{text}</span></div>
@@ -79,8 +82,11 @@ export default function App() {
       const miss = await missingReplayFiles([`scenario_${x.headline}.json`, `qaoa_${x.headline}.json`])
       if (miss.length) setMissing(miss); else setIdx(x)
     }).catch(e => setMissing(e instanceof MissingReplay ? e.files : [String(e)]))
-    if (new URLSearchParams(location.search).has('live')) liveAvailable().then(setOnline)
+    // the live backend is optional: detected at start and every 15 s; offline replay otherwise (?offline forces it)
+    const probe = () => { if (!OFFLINE_BUILD && !new URLSearchParams(location.search).has('offline')) liveAvailable().then(setOnline) }
+    probe(); const id = setInterval(probe, 15000)
     loadStage()   // fetch the 3D chunk while the replay JSON loads
+    return () => clearInterval(id)
   }, [])
   const key = scen && idx?.scenarios.some(x => x.key === scen) ? scen : idx?.headline ?? ''
   const { d, err, missing: storyMissing, loading } = useStoryData(key)
@@ -192,6 +198,7 @@ export default function App() {
               <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>)}
           </nav>
           <div className="right">
+            <span className={`livebadge ${online ? 'on' : ''}`} title={online ? 'Live demo moments run on the backend (localhost:8000)' : OFFLINE_BUILD ? 'Static demo: every result is precomputed by the pipeline' : 'No backend found: live moments show precomputed results'}>{online ? 'Live backend' : 'Offline replay'}</span>
             {present && <PresenterTimer stopKey={stop} />}
             <select className="scenpick devonly" value={key} onChange={e => setScen(e.target.value)} aria-label="scenario day">
               {idx.scenarios.map(x => <option key={x.key} value={x.key}>{SCEN_NAME[x.key] ?? x.key}, {fmtDate(x.date)}</option>)}
@@ -211,6 +218,7 @@ export default function App() {
               </Suspense>
               {stop === '4g' && !d.qs && <WhoDoesWhat />}
               {stop === '7a' && d.bench && <Scorecard b={d.bench} ds={benchDs} />}
+              {stop === '7d' && d.impact && <ImpactBoard m={d.impact} />}
               <div className="clock tn" aria-live="off">{d.sc.slots.t[Math.min(95, Math.floor(t))]}{d.sc.slots.grid_up[Math.min(95, Math.floor(t))] ? '' : <span className="down"> · grid down</span>}</div>
               <div className="stage-foot">
                 <span>{d.sc.label}</span>
@@ -219,7 +227,7 @@ export default function App() {
             <Panel stop={stop} d={d} t={t} playing={playing} onPlay={() => { if (!playing && t >= 95.9) setT(0); setPlaying(x => !x) }}
               zone={zone} setZone={setZone} killed={killed} setKilled={setKilled} admmRound={admmRound} setAdmmRound={setAdmmRound}
               replayPulse={() => setPulseKey(k => k + 1)} showMiss={showMiss} setShowMiss={setShowMiss}
-              onPrev={prev} onNext={next} go={go} index={i} benchDs={benchDs} setBenchDs={setBenchDs} />
+              onPrev={prev} onNext={next} go={go} index={i} benchDs={benchDs} setBenchDs={setBenchDs} online={online} />
           </main>
         ) : tab === 'verify' ? <VerifyView d={d} idx={idx} online={online} /> : <TryView d={d} online={online} />}
       </div>

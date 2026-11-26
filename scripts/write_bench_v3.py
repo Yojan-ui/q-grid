@@ -62,13 +62,25 @@ def daily() -> pd.DataFrame:
     b = pd.read_csv(OUT / "bounds.csv")
     key = lambda d: d.dataset + "|" + d.day   # noqa: E731
     bm = b.assign(k=key(b)).set_index("k")
-    r["opt"] = key(r).map(bm.opt_central); r["LB"] = key(r).map(bm.LB)
+    # Reference for "gap to the best plan" = the cheapest feasible plan known for the day: the central MILP with perfect
+    # information (its run in runs.csv, or the bounds solve if that found a cheaper plan), or any controller's realised
+    # plan if it is cheaper within solver tolerance. So no gap is negative, and the reference row's own gap is >= 0.
+    feas = r[r.feasible.astype(bool)]
+    best_run = feas.assign(k=key(feas)).groupby("k").objective_rs.min()
+    k_r = key(r)
+    r["opt"] = np.fmin(k_r.map(best_run), k_r.map(bm.opt_central))
+    # a valid lower bound can never exceed a feasible plan; where it does (solver tolerance) it is capped and counted
+    lb_raw = k_r.map(bm.LB)
+    r["LB_capped"] = lb_raw > r.opt + 1e-6 * r.opt.abs()
+    r["LB"] = np.fmin(lb_raw, r.opt)
     r["bill_rs"] = r.cost_incl_demand_rs
+    # every figure of a method-day (gap, downtime, unserved energy, bill...) comes from that one row of runs.csv
     r["gap_pct"] = 100 * (r.objective_rs - r.opt) / r.opt
     r["certified_gap_pct"] = 100 * (r.objective_rs - r.LB) / r.LB
     money = r.objective_rs - r.voll_rs
-    opt_money = r[r.method == "optimum"].assign(k=lambda d: key(d), mm=lambda d: d.objective_rs - d.voll_rs).set_index("k").mm
-    r["gap_novoll_pct"] = 100 * (money - key(r).map(opt_money)) / key(r).map(opt_money)
+    opt_money = feas.assign(k=key(feas), mm=feas.objective_rs - feas.voll_rs).groupby("k").mm.min()
+    r["gap_novoll_pct"] = 100 * (money - k_r.map(opt_money)) / k_r.map(opt_money)
+    assert (r.gap_pct >= -1e-9).all() and (r.certified_gap_pct >= r.gap_pct - 1e-9).all(), "inconsistent gap / bound"
     b0 = r[r.method == "status_quo"].assign(k=lambda d: key(d)).set_index("k").bill_rs
     r["saving_rs"] = key(r).map(b0) - r.bill_rs
     r["saving_pct"] = 100 * r.saving_rs / key(r).map(b0)
@@ -203,6 +215,43 @@ def headline(s, w, labels) -> dict:
             "best_on": best_on, "n": n}
 
 
+def story_headlines(s, labels, cfg, ds: str = "rvce") -> dict:
+    """Step 1 (the problem) and Step 7 (the result) sentences, generated from the summary on the case-study dataset.
+    Wording follows the numbers (e.g. 'cuts' vs 'raises'); figures that depend on the stand-in tariff are flagged."""
+    g = lambda m, k: (_stat(s, ds, m, k) or {}).get("mean")   # noqa: E731
+    n = int(s[(s.dataset == ds) & (s.method == "qgrid")].n_days.iloc[0]) if len(s[(s.dataset == ds) & (s.method == "qgrid")]) else 0
+    pend = cfg["tariff_v2"]["status"] != "REAL"
+    sq_dt, sq_dt1, sq_bill = g("status_quo", "critical_downtime_h"), g("status_quo", "critical_downtime_1pct_h"), g("status_quo", "bill_rs")
+    opt_sav = g("optimum", "saving_pct")
+    q_dt, q_dt1, q_sav, q_gap = g("qgrid", "critical_downtime_h"), g("qgrid", "critical_downtime_1pct_h"), g("qgrid", "saving_pct"), g("qgrid", "gap_pct")
+    c_gap, cf_gap = g("central_mpc", "gap_pct"), g("central_mpc_comms_fail", "gap_pct")
+    qf_gap = g("qgrid_comms_fail", "gap_pct")
+    if None in (sq_dt, sq_bill, q_dt, q_sav, q_gap):
+        return {}
+    hm = lambda h: f"{h * 60:.0f} min" if h < 1 else f"{h:.1f} h"   # noqa: E731
+    step1 = (f"Today every building runs on its own: over {n} modelled days the campus loses power to critical loads for "
+             f"{hm(sq_dt)} a day on average and pays Rs {sq_bill:,.0f} a day"
+             + (f"; the best possible plan would pay {opt_sav:.1f}% less." if opt_sav is not None and opt_sav > 0 else "."))
+    dt_verb = "cuts" if q_dt < sq_dt - 1e-9 else ("keeps" if abs(q_dt - sq_dt) <= 1e-9 else "raises")
+    dt_txt = (f"{dt_verb} critical downtime from {hm(sq_dt)} to {hm(q_dt)} a day" if dt_verb != "keeps" else f"keeps critical downtime at {hm(q_dt)} a day")
+    if q_dt1 is not None and q_dt1 < q_dt - 1e-9:
+        dt_txt += f" ({hm(q_dt1)} counting only shortfalls above 1 %)"
+    sav_txt = f"{'saves' if q_sav >= 0 else 'adds'} {abs(q_sav):.1f}% {'on' if q_sav >= 0 else 'to'} the bill versus today"
+    step7 = f"Q-Grid {dt_txt}, {sav_txt}, and lands {q_gap:.1f}% from the best possible plan."
+    comms = ""
+    if None not in (c_gap, cf_gap, qf_gap):
+        pc, pq = cf_gap - c_gap, qf_gap - q_gap
+        comms = (f"When the campus network fails for 3 hours, central control loses {pc:.1f} points of gap and Q-Grid "
+                 f"{pq:.1f}, because each building keeps optimising on its own.")
+    return {"dataset": ds, "n_days": n, "tariff_pending": pend,
+            "step1": {"text": step1, "tariff_dependent": True},
+            "step7": {"text": step7, "comms": comms, "tariff_dependent": True},
+            "numbers": {"status_quo_downtime_h": sq_dt, "status_quo_downtime_1pct_h": sq_dt1, "status_quo_bill_rs": sq_bill,
+                        "optimum_saving_pct": opt_sav, "qgrid_downtime_h": q_dt, "qgrid_downtime_1pct_h": q_dt1,
+                        "qgrid_saving_pct": q_sav, "qgrid_gap_pct": q_gap, "central_gap_pct": c_gap,
+                        "central_comms_fail_gap_pct": cf_gap, "qgrid_comms_fail_gap_pct": qf_gap}}
+
+
 def main():
     cfg = yaml.safe_load((ROOT / "config.yaml").read_text())
     from qgrid.datasets import SPECS
@@ -237,6 +286,7 @@ def main():
             design.append({"key": m, "name": nm, "what_changed": what, **{k: (v or {}).get("mean") for k, v in st.items()},
                            "source": "results/bench_v3/summary.csv"})
     hl = headline(s, w, labels)
+    hl["story"] = story_headlines(s, labels, cfg)
     out = {"tariff_status": cfg["tariff_v2"]["status"],
            "methods": [{"key": k, "name": v[0], "group": v[1], "without_coordinator": k not in ("central_mpc", "central_mpc_comms_fail")} for k, v in NAMES.items()],
            "reference": {"key": REF[0], "name": REF[1], "group": "Reference", "without_coordinator": False},
@@ -271,6 +321,8 @@ def write_docs(r, s, w, labels, order, hl, cfg):
          "> QAOA on a local simulator: verified against exact solutions, no quantum advantage claimed. Prices, the demand charge and "
          "the CO₂ factor are PENDING stand-ins; outages are SYNTHETIC (seeded); Rs figures are not headline results.\n",
          "## Headline (generated from the results)\n", f"**{hl['text']}** {hl['detail']}\n",
+         *([f"Step 1 (problem): {hl['story']['step1']['text']}\n", f"Step 7 (result): {hl['story']['step7']['text']} {hl['story']['step7']['comms']}"
+            + (" Bill figures use a stand-in tariff (PENDING).\n" if hl['story']['tariff_pending'] else "\n")] if hl.get("story") else []),
          "## Protocol\n",
          "- **Datasets** (same for every method): " + "; ".join(f"{labels[k]}" for k in order) +
          ". Licences and mappings: `data/SOURCES.md`; asset sizing rule for sites without asset data: `qgrid/datasets.py`.",
@@ -282,7 +334,10 @@ def write_docs(r, s, w, labels, order, hl, cfg):
          "The best possible plan (central MILP with perfect information) is the only oracle and is shown as a reference line.",
          f"- **Same objective and VoLL**: energy + diesel fuel + value of lost load (non-critical Rs {oc['voll_noncritical_rs_kwh']}/kWh, "
          f"critical Rs {oc['voll_critical_rs_kwh']}/kWh — ASSUMPTION, see docs/consistency.md) + terminal value. No method optimises the "
-         "demand charge; it is reported in the bill.",
+         "demand charge; it is reported in the bill. Every gap is also reported on money alone (no VoLL).",
+         "- **Best plan**: the cheapest feasible plan known for the day — the central MILP with perfect information, or a "
+         "controller's realised plan where it is cheaper within solver tolerance. Every figure of a method-day (gap, critical "
+         "downtime, unserved energy, bill) comes from the same run.",
          "- **Communication failure**: one seeded 3-hour campus network outage per day (06:00–21:00). Central MPC cannot reach its "
          "coordinator and devices fall back to the rule-based controller; Q-Grid's buildings lose their neighbours and keep "
          "optimising alone (each runs its own solver).",

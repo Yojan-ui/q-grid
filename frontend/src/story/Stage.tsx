@@ -76,8 +76,8 @@ function Scene({ stop, d, t, zone, onZone, killed, admmRound, pulseKey }: StageP
       case '4f': return { pos: add(A, rotY([50, 90, 180])), target: add(A, [0, 8, 0]) }
       case '4g': return { pos: [380, 600, 820], target: [-60, 0, 0] }
       case '5': case '5b': return { pos: [-20, 1120, 170], target: [-20, 0, 0] }
-      case '6': return { pos: [150, 250, 400], target: [-40, 0, 0] }
-      case '7a': case '7b': case '7c': case '7d': return { pos: [300, 440, 620], target: [-20, 0, 0] }
+      case '6': case '6b': return { pos: [150, 250, 400], target: [-40, 0, 0] }
+      case '7a': case '7b': case '7c': case '7d': case '7e': return { pos: [300, 440, 620], target: [-20, 0, 0] }
     }
   }, [stop, zone, zones])
 

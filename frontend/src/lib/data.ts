@@ -114,7 +114,8 @@ export type Bench = {
   table: Record<string, Record<string, Record<string, BenchStat>>>          // dataset -> method -> metric
   wilcoxon: Record<string, Record<string, Record<string, number | null>>>   // dataset -> method -> metric -> p vs Q-Grid
   comms_day: { dataset: string; day: string; window: [number, number]; t: string[]; series: Record<string, number[]>; totals: Record<string, number> } | null
-  headline: { text: string; detail: string }
+  headline: { text: string; detail: string; story?: { dataset: string; n_days: number; tariff_pending: boolean
+    step1: { text: string; tariff_dependent: boolean }; step7: { text: string; comms: string; tariff_dependent: boolean }; numbers: Record<string, number | null> } }
   design_choices: { key: string; name: string; what_changed: string; gap_pct: number | null; certified_gap_pct: number | null; critical_downtime_h: number | null; runtime_per_decision_s: number | null; source: string }[]
 }
 
@@ -127,4 +128,33 @@ export type QStory = {
   admm_rounds: { k: number; r_primal: number; agreed: boolean; proposals: Record<string, number[]> }[]
   outer: { round: number; admm_iters: number; admm_converged: boolean; buildings_changed_commitment: number | null; plan_cost_rs: number }[]
   config: string
+}
+
+// ---- live demo moments (results/replay/live.json from scripts/make_live.py; live: /live/* on the backend)
+export type RemoveResult = { label: string; scenario: string; slot: number; time: string; zone: string; grid_up_now: boolean; lines_dark: number[]
+  before: { time_s: number; admm_rounds: number; converged: boolean; buildings: { cost_rs: number; crit_shed_kwh: number; shed_kwh: number }[] }
+  after: { time_s: number; admm_rounds: number; converged: boolean; buildings: { cost_rs: number; crit_shed_kwh: number; shed_kwh: number }[] }
+  others: { cost_before_rs: number; cost_after_rs: number; crit_shed_before_kwh: number; crit_shed_after_kwh: number; n: number }; compute_s: number }
+export type QaoaResult = { label: string; zone: string; time: string; n_qubits: number; var_names: string[]; seed: number; shots_total: number; backend: string
+  exact: { bits: string; objective: number; time_s: number }
+  qaoa: { best_bits: string; best_objective: number; matches_exact: boolean; p_opt: number; time_s: number; shots: { bits: string; count: number; optimal: boolean; objective: number }[] } }
+export type RuleEffectSide = { status: string; cost_rs?: number; objective_rs?: number; dg_hours?: number; dg_litres?: number; critical_downtime_h?: number; critical_unserved_kwh?: number; shed_noncritical_kwh?: number }
+export type RuleResult = { text: string; results: { ok: boolean; reason: string; rule: Record<string, any> | null; parser: string }[]
+  effect: { before: RuleEffectSide; after: RuleEffectSide; label: string } | null; day: string; day_type: string; time_s: number }
+export type LiveFile = { scenario: string; remove: Record<string, RemoveResult>; qaoa: QaoaResult[]; rules: RuleResult[] }
+
+// ---- impact (results/replay/impact.json from scripts/write_impact.py)
+export type Pct = { p5: number; p50: number; p95: number; prob_positive: number }
+export type Impact = {
+  status: string; n_buildings: number; n_days: number; battery_kwh_total: number
+  benefit: { bill_saving_rs_per_day_mean: number; bill_saving_rs_per_day_ci95: [number, number]; extra_throughput_kwh_per_day_mean: number; source: string }
+  central: { hardware_rs: number; om_rs_per_year: number; bill_saving_rs_per_year: number; battery_wear_rs_per_year: number; net_rs_per_year: number
+    discount_rate: number; npv_gross_rs: number; npv_net_rs: number; payback_gross_years: number | null; payback_net_years: number | null
+    wear_rs_per_kwh_throughput: number; breakeven_wear_rs_per_kwh: number | null }
+  monte_carlo: { samples: number; seed: number; npv_gross_rs: Pct; npv_net_rs: Pct; payback_gross_years: { p5: number; p50: number; p95: number } }
+  per_building: { zone: string; battery_kwh: number; hardware_rs: [number, number]; battery_value_rs: [number, number] }[]
+  assumptions: { name: string; value: [number, number] | null; unit: string; source: string }[]
+  scale: { stage: string; what: string; evidence: string; datasets?: { dataset: string; label: string; gap_pct: number; saving_pct: number; runtime_per_decision_s: number; messages_per_decision: number }[] }[]
+  variant: null | { name: string; wear_rs_per_kwh_in_objective: number; n_days: number; bill_saving_rs_per_day_mean: number; extra_throughput_kwh_per_day_mean: number
+    critical_downtime_h: number; net_rs_per_year: number; npv_net_rs: number; payback_net_years: number | null; mc_npv_net_rs: Pct; source: string }
 }

@@ -49,6 +49,11 @@ class V2Config:
     record_slots: tuple = ()          # decision slots whose QAOA master blocks are saved (hardware comparison)
     master_every: int = 4             # Benders master (commitment) re-optimised every N slots; dispatch every slot
     radius0: int = 3
+    # Every heuristic (QAOA / QIEA / SA) master proposal is verified against the exact master on the same cuts and
+    # trust region; the plan actually used is the exact one (tiered fallback, CLAUDE.md). The heuristic's agreement is
+    # recorded (master_opt_share). So the exact master can never lose to a heuristic master. False = the raw
+    # heuristic decides (kept only for the study in docs/consistency.md, never in the scorecard).
+    verify_fallback: bool = True
 
     @staticmethod
     def from_cfg(cfg: dict, **kw) -> "V2Config":
@@ -296,10 +301,16 @@ def _run_day_v2(campus: Campus, yd: YearData, day: str, outage: list[str] | None
                     rec = log.blocks if (t0 in cfg.record_slots and k == 0) else None
                     yh, Jh, st = m.heuristic(best[1][i], cfg.solver, int(rng.integers(1 << 30)), cfg.sweeps, cfg.max_q,
                                              p=cfg.p, shots=cfg.shots, record=rec, tag={"zone": campus.names[i], "t0": t0})
-                    master_opt.append(bool(Jh <= ex[i][1] + 1e-6 * max(1.0, abs(ex[i][1]))))
                     block_opt += st.block_opt
                     block_solves += st.block_solves if cfg.solver == "qaoa" else 0
-                    new.append(yh)
+                    if cfg.verify_fallback:
+                        # the exact master's proposal (same cuts, same trust region) is the reference and the decision
+                        ye, Je = m.exact(center=best[1][i], radius=radius[i])
+                        master_opt.append(bool(Jh <= Je + 1e-6 * max(1.0, abs(Je))))
+                        new.append(ye)
+                    else:
+                        master_opt.append(bool(Jh <= ex[i][1] + 1e-6 * max(1.0, abs(ex[i][1]))))
+                        new.append(yh)
             entry["changed"] = int(sum(int((a != b_).any()) for a, b_ in zip(new, ys)))
             it_log.append(entry)
             key = tuple(np.concatenate(new).astype(int))

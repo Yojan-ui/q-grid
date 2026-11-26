@@ -8,6 +8,8 @@ import { campusSoc, STEP_COUNT, STOPS, subOf, type StopId, type StoryData } from
 import { CountUp, DayChart, outageSpan, ResidualChart, SocChart } from './charts'
 import { CommsChart, SmallMultiples } from './Scorecard'
 import { Tex } from './Tex'
+import { LiveQaoa, RemoveBuilding, RuleCard } from './Live'
+import { ImpactDetail, lakh } from './Impact'
 
 
 export type PanelProps = {
@@ -18,6 +20,7 @@ export type PanelProps = {
   replayPulse: () => void; showMiss: boolean; setShowMiss: (v: boolean) => void
   onPrev: () => void; onNext: () => void; go: (i: number) => void; index: number
   benchDs?: string; setBenchDs?: (k: string) => void
+  online?: boolean
 }
 
 const Pending = ({ what }: { what: string }) => <span className="pending" title={`${what} is a labelled stand-in until the official data arrives`}>stand-in</span>
@@ -30,7 +33,7 @@ export function Panel(p: PanelProps) {
   const s = STOPS[p.index]
   const subs = subOf(p.stop)
   const subIdx = subs.findIndex(x => x.id === p.stop)
-  const body = useMemo(() => content(p), [p.stop, p.t, p.zone, p.killed, p.admmRound, p.showMiss, p.playing, p.d])
+  const body = useMemo(() => content(p), [p.stop, p.t, p.zone, p.killed, p.admmRound, p.showMiss, p.playing, p.d, p.online, p.benchDs])
   const fade = reducedMotion() ? { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 } }
     : { initial: { opacity: 0, y: 14 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -10 } }
   return (
@@ -48,7 +51,7 @@ export function Panel(p: PanelProps) {
           <motion.section key={p.stop} aria-live="polite" {...fade} transition={{ duration: reducedMotion() ? 0.15 : 0.45, ease: [0.65, 0, 0.35, 1] }}>
             <h1 className="answer">{body.answer}</h1>
             {body.support && <div className="support">{body.support}</div>}
-            {body.keys && <div className={`keys-row ${p.stop === '7a' ? 'k4' : ''}`}>{body.keys}</div>}
+            {body.keys && <div className={`keys-row ${p.stop === '7a' || p.stop === '7d' ? 'k4' : ''}`}>{body.keys}</div>}
             {body.extra}
           </motion.section>
         </AnimatePresence>
@@ -84,10 +87,13 @@ function content(p: PanelProps): Body {
     case '1': {
       const pr = d.problem
       const noonPrice = sc.slots.price_export[48], evePrice = Math.max(...sc.slots.price_import)
+      const hs = d.bench?.headline.story
       return {
-        answer: out ? <>Today the campus sells noon solar cheaply, buys power back expensively in the evening, and runs diesel when the grid fails.</>
+        answer: hs ? <>{hs.step1.text}{hs.tariff_pending && <> <Pending what="Tariff" /></>}</>
+          : out ? <>Today the campus sells noon solar cheaply, buys power back expensively in the evening, and runs diesel when the grid fails.</>
           : <>Today the campus sells noon solar cheaply and buys power back expensively in the evening.</>,
         support: <>
+          {hs && <p>Sentence generated from the benchmark ({hs.n_days} RVCE days). One of those days up close: the campus sells noon solar cheaply, buys power back in the evening{out ? ' and runs diesel when the grid fails' : ''}.</p>}
           <p>A modelled {SCENARIO(sc)} day ({fmtDate(sc.scenario.date)}){out ? `, with BESCOM supply down ${slotT(out[0])}–${slotT(out[1])}` : ''}. Every building acts on its own.</p>
           {pr && <p>Around noon it exported <b className="tn">{num(Number(pr.noon_export_kwh))} kWh</b> at Rs {noonPrice}/kWh; in the evening it imported <b className="tn">{num(Number(pr.evening_import_kwh))} kWh</b> at up to Rs {evePrice}/kWh.</p>}
         </>,
@@ -231,6 +237,7 @@ function content(p: PanelProps): Body {
           {d.miss && <button className="btn ghost small" onClick={() => p.setShowMiss(!p.showMiss)}>{p.showMiss ? 'Back to the matching example' : 'Show a case where QAOA misses'}</button>}
           {tiers && total && <p className="small">On this day, whose answer was used: QAOA <b className="tn">{num(tiers.qaoa ?? 0)}</b>, QIEA <b className="tn">{num(tiers.qiea ?? 0)}</b>, annealing <b className="tn">{num(tiers.anneal ?? 0)}</b>, exact <b className="tn">{num(tiers.exact ?? 0)}</b>, out of {num(total)} local solves.</p>}
           <p className="muted small">{show.exact.time_s <= show.qaoa.time_s ? `At ${show.n_qubits} qubits exact search on a laptop is faster than simulating the circuit` : `At ${show.n_qubits} qubits both take milliseconds`}. We claim correctness, not speed.</p>
+          <LiveQaoa d={d} online={!!p.online} />
         </>,
       }
     }
@@ -247,8 +254,6 @@ function content(p: PanelProps): Body {
       const r = rounds[Math.min(p.admmRound, rounds.length - 1)]
       const agreed = r ? Object.values(r.proposals).filter(([a, b]) => Math.abs(a - b) < 1).length : 0
       const sm = sc.admm.summary
-      const kill = d.robust.find(x => x.mode === 'in-process' && x.scenario === sc.scenario.key)
-      const net = d.robust.find(x => x.mode === 'networked' && x.scenario === sc.scenario.key && x.method === 'OURS')
       return {
         answer: <>Buildings agree on what each cable carries by talking only to their neighbours.</>,
         support: <p>At {slotT(d.admmSlot)}, both ends of each cable propose a flow every round. Red means they disagree; blue means they agree. There is no central computer.</p>,
@@ -264,10 +269,7 @@ function content(p: PanelProps): Body {
             <button className="btn ghost small" onClick={() => p.setAdmmRound(0)}>replay</button>
           </div>
           <p className="small muted">Disagreement (kW) per round. Over the whole day, all cables agreed in {Math.round(96 * (sm.admm_convergence_rate ?? 0))} of 96 slots. In the rest, each remaining cable was settled between its two buildings ({num(sm.resolved_bilateral ?? 0)} times), which is always safe.</p>
-          <div className="card">
-            <div className="row"><b>Remove a building</b><button className={`btn small ${p.killed ? 'primary' : 'ghost'}`} onClick={() => p.setKilled(p.killed ? null : 'heavy_labs')}>{p.killed ? `Bring ${zn('heavy_labs').toLowerCase()} back` : `Take ${zn('heavy_labs').toLowerCase()} offline`}</button></div>
-            {p.killed && <p className="small">Its cables go dark and the others carry on. Measured in the replay: the schedule stayed {kill?.feasible === 'True' ? 'feasible' : kill ? 'infeasible' : 'untested'}{net?.recovery_time_s ? `, neighbours noticed in ${Number(net.recovery_time_s).toFixed(1)} s (networked run)` : ''}{kill?.slots_to_reconverge ? `, and full agreement returned after ${Math.round(Number(kill.slots_to_reconverge))} slots` : ''}.</p>}
-          </div>
+          <RemoveBuilding d={d} online={!!p.online} killed={p.killed} setKilled={p.setKilled} />
         </>,
       }
     }
@@ -287,7 +289,12 @@ function content(p: PanelProps): Body {
         </>,
       }
     }
-    case '7a': case '7b': case '7c': case '7d': return {
+    case '6b': return {
+      answer: <>Faculty can add a rule in plain English; it is checked before it can touch a schedule.</>,
+      support: <p>Each rule is parsed into a precise constraint, validated against the campus (impossible rules are refused with a reason), and priced: the best possible plan with and without it.</p>,
+      extra: <RuleCard d={d} online={!!p.online} />,
+    }
+    case '7a': case '7b': case '7c': case '7d': case '7e': return {
       answer: <>The benchmark results are not in this replay yet.</>,
       support: <p>Run <code>python scripts/run_bench_v3.py</code>, <code>python scripts/write_bench_v3.py</code> and <code>make replay</code>.</p>,
     }
@@ -411,7 +418,10 @@ function contentQ(p: PanelProps): Body | null {
         <Key label="Nodes, quantum start">{(pl.nodes_warm_mean ?? 0).toFixed(2)}</Key>
         <Key label="Time, no start / with start" note="incl. QAOA">{`${((pl.time_cold_mean_s ?? 0) * 1000).toFixed(0)} / ${((pl.time_warm_plus_incumbent_mean_s ?? 0) * 1000).toFixed(0)} ms`}</Key>
       </>,
-      extra: <p className="muted small">QAOA on a local simulator: verified against exact solutions, no quantum advantage claimed. The test stays in the repository (scripts/quantum_placement.py) for larger problems where branch and bound struggles.</p>,
+      extra: <>
+        <p className="muted small">QAOA on a local simulator: verified against exact solutions, no quantum advantage claimed. The test stays in the repository (scripts/quantum_placement.py) for larger problems where branch and bound struggles.</p>
+        <LiveQaoa d={d} online={!!p.online} />
+      </>,
     }
     case '4g': return {
       answer: <>Each building solves its own on/off plan exactly; everything continuous is agreed with neighbours.</>,
@@ -437,6 +447,7 @@ function contentQ(p: PanelProps): Body | null {
             <button className="btn ghost small" onClick={() => p.setAdmmRound(0)}>replay</button>
           </div>
           <p className="small muted">Largest disagreement on any cable (kW) per round. Convergence for the convex case is a theorem (Boyd et al. 2011, see docs/math.md); measured convergence is in Verify.</p>
+          <RemoveBuilding d={d} online={!!p.online} killed={p.killed} setKilled={p.setKilled} />
         </>,
       }
     }
@@ -492,10 +503,29 @@ function step7(p: PanelProps, B: NonNullable<StoryData['bench']>, ds: string, pr
         extra: <><CommsChart b={B} /><p className="muted small">Mean over {dsl?.n_days} days on {dsl?.label}; the chart shows one day. Network outages are synthetic and seeded.</p></>,
       }
     }
-    case '7d': return {
-      answer: <>{B.headline.text}</>,
-      support: <p>{B.headline.detail}</p>,
-      extra: <p className="muted small">Generated from results/bench_v3 by scripts/write_bench_v3.py. Tariffs and demand charge are stand-ins until the official BESCOM/KERC tariff is added{priceStatus ? ' (PENDING)' : ''}.</p>,
+    case '7d': {
+      const m = p.d.impact
+      if (!m) return { answer: <>The impact figures are not in this replay yet.</>, support: <p>Run <code>python scripts/write_impact.py</code> (reads <code>results/bench_v3/daily.csv</code>).</p> }
+      const c = m.central, v = m.variant
+      return {
+        answer: <>Is it worth it? The hardware is cheap; battery wear decides{c.npv_net_rs > 0 ? ', and it still pays' : ''}.</>,
+        support: <p>{m.n_buildings} building nodes cost {lakh(c.hardware_rs)}; the bill falls by {lakh(c.bill_saving_rs_per_year)} a year (mean of {m.n_days} RVCE days), but cycling the existing batteries wears them by {lakh(c.battery_wear_rs_per_year)} a year.{v ? ` With wear priced in the objective (under test, not in the scorecard) the net is ${lakh(v.net_rs_per_year)} a year.` : ''}</p>,
+        keys: <>
+          <Key label="Payback, before wear" pending="Tariff">{c.payback_gross_years !== null ? `${c.payback_gross_years.toFixed(1)} y` : 'none'}</Key>
+          <Key label="10-yr NPV, after wear" note={`P5–P95 ${lakh(m.monte_carlo.npv_net_rs.p5)} to ${lakh(m.monte_carlo.npv_net_rs.p95)}`}>{lakh(c.npv_net_rs)}</Key>
+          <Key label="Break-even wear" note={`assumed Rs ${c.wear_rs_per_kwh_throughput.toFixed(2)}/kWh`}>{c.breakeven_wear_rs_per_kwh !== null ? `Rs ${c.breakeven_wear_rs_per_kwh.toFixed(2)}/kWh` : '–'}</Key>
+          {v && <Key label="NPV with wear in objective" note={`${Math.round(100 * v.mc_npv_net_rs.prob_positive)}% chance positive`}>{lakh(v.npv_net_rs)}</Key>}
+        </>,
+        extra: <ImpactDetail m={m} />,
+      }
+    }
+    case '7e': {
+      const hs = B.headline.story
+      return {
+        answer: hs ? <>{hs.step7.text}{hs.tariff_pending && <> <Pending what="Tariff" /></>}</> : <>{B.headline.text}</>,
+        support: <>{hs?.step7.comms && <p>{hs.step7.comms}</p>}<p>{B.headline.text} {B.headline.detail}</p></>,
+        extra: <p className="muted small">Sentences generated from results/bench_v3 by scripts/write_bench_v3.py. Tariffs and demand charge are stand-ins until the official BESCOM/KERC tariff is added{priceStatus ? ' (PENDING)' : ''}.</p>,
+      }
     }
   }
   return { answer: <>Results</> }

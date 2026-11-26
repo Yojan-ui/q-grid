@@ -1,86 +1,131 @@
-# Q-Grid — decentralised, QAOA-verified scheduling for the RVCE campus microgrid
+# Q-Grid — decentralised scheduling for a campus solar + battery microgrid
 
-EUREKA Track 3 · Smart Decentralised Energy Systems
+EUREKA Track 3 · Smart Decentralised Energy Systems · RVCE, Bengaluru
 
-![Q-Grid demo](docs/media/hero.gif)
+![Q-Grid explainer: the campus, the decisions, the neighbour agreement, the scorecard](docs/media/hero.gif)
+
+**{{q3.story.step7}}** {{q3.story.comms}}
 
 > QAOA on a local simulator: verified against exact solutions, no quantum advantage claimed.
-> QIEA = quantum-inspired evolutionary algorithm on a classical CPU (not quantum computing).
+> Tariffs and the CO₂ factor are labelled stand-ins (PENDING the official documents); Rs figures are not headline results.
+> Every number in this README is rendered from `results/` by `scripts/write_results_md.py`.
 
-**Data status:** real NASA POWER irradiance, Ausgrid household shapes (hostels), OpenStreetMap layout (© OpenStreetMap
-contributors). **PENDING:** KERC/BESCOM tariff ({{price_A_status}}), IEX prices ({{price_B_status}}), CEA CO2 factor, RVCE calendar
-and meter data — labelled stand-ins, never headline results. See `data/SOURCES.md`, `docs/BLOCKERS.md`, `docs/data_request.md`.
+## Open the demo
 
-## The problem (status quo, from results/*.csv)
-BESCOM outage during the fest evening: status quo **{{headline.before.critical_downtime_h|2}} h** of critical-load downtime,
-{{headline.before.dg_hours|1}} DG hours, Rs {{headline.before.cost_rs}} for the day (stand-in prices).
+- **Live link:** `⟨paste the Vercel URL here after deploying⟩` — static build, offline replay, no backend needed.
+- **Locally:** `cd frontend && npm install && npm run dev` → <http://localhost:5173>. Press **P** for presenter mode,
+  **D** for dark mode, ← → to move through the seven steps.
+- **With the live backend** (the three live moments compute on the spot): `make backend` in a second terminal; the top bar
+  turns to **Live backend**.
+- **Deploy your own:** import the repo in Vercel with root directory `frontend` (`frontend/vercel.json` sets
+  `npm run build:static`, output `dist`). Or `cd frontend && npm run build:static` and serve `dist/` from any static host.
+- **Backup video (90 s):** [docs/media/backup_demo.webm](docs/media/backup_demo.webm) · **one-page summary:** the
+  "Download summary (PDF)" button in the demo.
 
-## Result
-| Outage during fest (scenario A) | Status quo | Q-Grid | Central optimum (B4) |
-|---|---:|---:|---:|
-| Critical-load downtime (h) | {{headline.before.critical_downtime_h|2}} | **{{headline.after.critical_downtime_h|2}}** | {{headline.optimum_B4.critical_downtime_h|2}} |
-| Cost (Rs/day) | {{headline.before.cost_rs}} | {{headline.after.cost_rs}} | {{headline.optimum_B4.cost_rs}} |
-| DG hours | {{headline.before.dg_hours|2}} | {{headline.after.dg_hours|2}} | – |
-| Re-plan time per slot | – | {{headline.after.replan_time_s|3}} s | – |
+## The problem
 
-30-day evaluation set (scenario A, mean Rs/day): status quo {{B0.eval30_mean.A.cost_rs}} · per-zone MILP {{B3.eval30_mean.A.cost_rs}} ·
-**Q-Grid {{OURS.eval30_mean.A.cost_rs}}** ({{OURS.eval30_mean.A.gap_to_B4_pct|2}} % above optimum) · central optimum {{B4.eval30_mean.A.cost_rs}}.
-QAOA answers verified optimal in {{tiers.qaoa_pct|1}} % of local solves (rest: QIEA / annealing / exact fallback).
-Full tables: [docs/results.md](docs/results.md).
+{{q3.story.step1}}
+
+## Results (scorecard: {{q3.story.n_days|0}} RVCE days, same data, forecasts and constraints for every method)
+
+| Method | Gap to best plan % | Certified gap % | Bill saving vs today %* | Critical downtime h/day | …counting >1 % shortfalls | Works without a central controller |
+|---|---:|---:|---:|---:|---:|:---:|
+| Status quo (no coordination) | {{q3.b.rvce.status_quo.gap_pct|2}} | {{q3.b.rvce.status_quo.certified_gap_pct|2}} | {{q3.b.rvce.status_quo.saving_pct|1}} | {{q3.b.rvce.status_quo.critical_downtime_h|2}} | {{q3.b.rvce.status_quo.critical_downtime_1pct_h|2}} | ✓ |
+| Rule-based battery controller | {{q3.b.rvce.rule_based.gap_pct|2}} | {{q3.b.rvce.rule_based.certified_gap_pct|2}} | {{q3.b.rvce.rule_based.saving_pct|1}} | {{q3.b.rvce.rule_based.critical_downtime_h|2}} | {{q3.b.rvce.rule_based.critical_downtime_1pct_h|2}} | ✓ |
+| Particle swarm optimisation | {{q3.b.rvce.pso.gap_pct|2}} | {{q3.b.rvce.pso.certified_gap_pct|2}} | {{q3.b.rvce.pso.saving_pct|1}} | {{q3.b.rvce.pso.critical_downtime_h|2}} | {{q3.b.rvce.pso.critical_downtime_1pct_h|2}} | ✓ |
+| Per-building MPC (MILP) | {{q3.b.rvce.per_building_mpc.gap_pct|2}} | {{q3.b.rvce.per_building_mpc.certified_gap_pct|2}} | {{q3.b.rvce.per_building_mpc.saving_pct|1}} | {{q3.b.rvce.per_building_mpc.critical_downtime_h|2}} | {{q3.b.rvce.per_building_mpc.critical_downtime_1pct_h|2}} | ✓ |
+| Central MPC with forecasts | {{q3.b.rvce.central_mpc.gap_pct|2}} | {{q3.b.rvce.central_mpc.certified_gap_pct|2}} | {{q3.b.rvce.central_mpc.saving_pct|1}} | {{q3.b.rvce.central_mpc.critical_downtime_h|2}} | {{q3.b.rvce.central_mpc.critical_downtime_1pct_h|2}} | ✗ |
+| Central MPC, 3 h network failure | {{q3.b.rvce.central_mpc_comms_fail.gap_pct|2}} | {{q3.b.rvce.central_mpc_comms_fail.certified_gap_pct|2}} | {{q3.b.rvce.central_mpc_comms_fail.saving_pct|1}} | {{q3.b.rvce.central_mpc_comms_fail.critical_downtime_h|2}} | {{q3.b.rvce.central_mpc_comms_fail.critical_downtime_1pct_h|2}} | ✗ |
+| **Q-Grid** | **{{q3.b.rvce.qgrid.gap_pct|2}}** | **{{q3.b.rvce.qgrid.certified_gap_pct|2}}** | **{{q3.b.rvce.qgrid.saving_pct|1}}** | **{{q3.b.rvce.qgrid.critical_downtime_h|2}}** | **{{q3.b.rvce.qgrid.critical_downtime_1pct_h|2}}** | ✓ |
+| Q-Grid, 3 h network failure | {{q3.b.rvce.qgrid_comms_fail.gap_pct|2}} | {{q3.b.rvce.qgrid_comms_fail.certified_gap_pct|2}} | {{q3.b.rvce.qgrid_comms_fail.saving_pct|1}} | {{q3.b.rvce.qgrid_comms_fail.critical_downtime_h|2}} | {{q3.b.rvce.qgrid_comms_fail.critical_downtime_1pct_h|2}} | ✓ |
+| _Best possible plan (central MILP, perfect information; reference)_ | _{{q3.b.rvce.optimum.gap_pct|2}}_ | _{{q3.b.rvce.optimum.certified_gap_pct|2}}_ | _{{q3.b.rvce.optimum.saving_pct|1}}_ | _{{q3.b.rvce.optimum.critical_downtime_h|2}}_ | _{{q3.b.rvce.optimum.critical_downtime_1pct_h|2}}_ | — |
+
+\* stand-in tariff (PENDING). Across {{q3.n_campuses|0}} campuses (RVCE + four public meter datasets), Q-Grid is the closest
+method without a central controller on {{q3.best_on_n|0}}. Full tables with ± and 95 % intervals, Wilcoxon verdicts:
+[docs/benchmark_v3.md](docs/benchmark_v3.md) · consistency checks: [docs/consistency.md](docs/consistency.md).
+
+**Is it worth it?** Node hardware ≈ Rs {{imp.hardware_rs_lakh|1}} lakh for {{imp.n_buildings|0}} buildings (assumed costs);
+bill saving ≈ Rs {{imp.bill_saving_rs_per_year_lakh|1}} lakh/year; extra battery wear ≈ Rs {{imp.battery_wear_rs_per_year_lakh|1}}
+lakh/year at the assumed battery cost. The benchmarked optimisers don't price battery wear, so after wear the 10-year NPV is
+Rs {{imp.npv_net_rs_lakh|1}} lakh (Monte Carlo P5–P95: Rs {{imp.mc.npv_net_rs.p5|1}} to {{imp.mc.npv_net_rs.p95|1}} lakh). Pricing wear
+in the objective is the next design change: [docs/impact.md](docs/impact.md).
 
 ## Architecture
+
 ```mermaid
 flowchart LR
-  subgraph Data
-    N[NASA POWER] --> PV[PV per zone]
-    O[OpenStreetMap RVCE] --> Z[9 zones + tie-lines + roof area]
-    A[Ausgrid shapes + timetables] --> L[zone loads]
+  subgraph data[Data]
+    N[NASA POWER solar] --> F
+    O[OpenStreetMap RVCE: 9 zones, 10 cables] --> F
+    M[meter load shapes: BDG2, CU-BEMS] --> F[gradient-boosted forecasts]
   end
-  subgraph Zone_i["each zone (own process)"]
-    Q[local QUBO ≤16 qubits] --> S{QAOA → QIEA → SA → exact}
-    E[exhaustive search] -->|verify| S
-    S --> SAFE[safety layer: SoC, DG min-on, tanks, critical loads]
+  subgraph b["each building — its own node, every 15 min, 24 h ahead"]
+    BB[exact branch and bound: on/off plan] --> LP[continuous dispatch LP]
+    LP --> SAFE[safety layer: battery limits, diesel min-on, tank, critical loads]
+    QA[QAOA block, simulator] -. tested, verified vs exact, not in the loop .-> BB
   end
-  Z --> Zone_i
-  PV --> Zone_i
-  L --> Zone_i
-  Zone_i <-->|tie-line proposals + 1 price, websockets| Zone_j[neighbour zones]
-  SAFE --> R[replay JSON] --> UI[3D demo: story · judge · sandbox]
-  API[FastAPI live] --- UI
+  F --> b
+  b <-->|cable-flow proposals + prices, neighbours only: consensus ADMM| nb[neighbour buildings]
+  SAFE --> R[replay JSON] --> UI[explainer: 7 steps, live moments, Verify]
+  API[FastAPI: /live/remove · /live/qaoa · /live/rule] --- UI
 ```
+
+RVCE is modelled as 9 zones (buildings or building groups) joined by 10 cables. No central computer at runtime: each building solves its own commitment exactly and agrees cable flows with its neighbours
+(convex LP, consensus ADMM). If the network fails, buildings keep optimising alone. Faculty rules in plain English are parsed,
+validated and priced before they can touch a schedule.
 
 ## How to run
+
 ```bash
 conda activate qgrid && make install
-make test                      # pytest
-make demo                      # frontend (+ live backend on :8000); frontend alone works offline
-make data && make qaoa && make bench && make replay   # full pipeline (~20 min on a MacBook)
-make verify                    # recompute headline numbers, PASS/FAIL vs results/manifest.json
-bash scripts/refresh_all.sh    # after adding the PENDING files
-python scripts/new_campus.py --name "<campus>" --lat <lat> --lon <lon>   # another campus
+make test                                  # pytest (backend) ; cd frontend && npm run test:contrast  (WCAG AA, both themes)
+make demo                                  # frontend + live backend on :8000 (the frontend alone works offline)
+python scripts/run_bench_v3.py             # scorecard benchmark (5 datasets x 30 days x 10 methods; ~10 h on 8 workers)
+python scripts/write_bench_v3.py && python scripts/write_consistency.py && python scripts/write_impact.py
+make replay && python scripts/make_live.py # replay JSON + precomputed live moments for the offline demo
+python scripts/write_results_md.py         # re-render README and docs from results/
+make verify                                # recompute headline numbers, PASS/FAIL vs results/manifest.json
 ```
 
-## Status
-| Step | What | State |
+## Data sources and pending items
+
+| Source | Use | Status |
 |---|---|---|
-| 0–5 | generic 5-building pipeline (first prototype), kept in docs/results_v1.md | ✅ |
-| 1 | pricing scenarios A (headline) / B (sensitivity), SOURCES with page numbers when REAL | ✅ code · data PENDING |
-| 2 | RVCE campus from OSM, timetable/Ausgrid loads, DG, tanks, outage islanding, 6 scenarios | ✅ (calendar/loads PENDING) |
-| 3 | QAOA only on scenarios, warm start, QUBO cache, ADMM convergence stats & fallbacks | ✅ |
-| 4 | QAOA → QIEA → SA → exact tiers, C-QIEA, baselines B0–B5, benchmark both price scenarios | ✅ |
-| 5 | plain-English operator rules (guarded) + deterministic explanations | ✅ |
-| 6 | replay export | ✅ |
-| 7 | 3D demo: light step-by-step explainer (7 steps, one continuous 3D thread: campus → decisions → qubits → QAOA circuit → measurement → decoded plan → ADMM → storage → results), Verify and Try it tabs, honesty strip | ✅ |
-| 8 | new_campus.py, manifest + make verify, CI | ✅ |
-| 9 | report, why-quantum, viva Q&A, pitch, data request | ✅ |
-| 10 | design study: 24 h rolling horizon, LP coordination between neighbours, hybrid-Benders and quantum-master variants measured; ablation of four design changes (docs/ablation.md); quantum placement test; multi-dataset benchmark (docs/benchmark_v3.md, docs/scorecard.md) | ✅ code · tariff PENDING · hardware runs need tokens |
+| NASA POWER (NASA LaRC) | solar irradiance, Bengaluru | real |
+| OpenStreetMap (© contributors, ODbL) | campus layout, roof areas | real |
+| Building Data Genome 2 (CC BY-SA 4.0) | load shapes for 7 of the 9 RVCE zones; three other campuses in the benchmark | real |
+| CU-BEMS (CC BY 4.0) | fifth campus in the benchmark (Bangkok office building) | real |
+| Ausgrid Solar Home Electricity Data (CC BY 3.0 AU) | earlier hostel load shape (superseded by BDG2) | real |
+| KERC / BESCOM tariff order | energy tariff, demand charge | **PENDING** — {{price_A_status}} stand-in |
+| IEX day-ahead prices | sensitivity scenario | **PENDING** — {{price_B_status}} |
+| CEA CO₂ baseline | grid emission factor | **PENDING** — stand-in |
+| RVCE meter data, calendar, asset list | loads, day types, battery/diesel sizes | **PENDING** — area-based estimates |
+
+Licences, URLs and fetch dates: `data/SOURCES.md` · what we asked RVCE for: `docs/data_request.md`.
+
+## Pitch materials
+
+[3-minute script](docs/pitch_3min.md) · [1-minute script](docs/pitch_1min.md) · [Q&A prep: 20 hardest questions](docs/qa_prep.md) ·
+[demo runbook](docs/demo_runbook.md) · [impact](docs/impact.md) · [why quantum](docs/why_quantum.md)
+
+## Team and faculty guide
+
+- **Team lead:** Yashas (GitHub: Yojan-ui)
+- **Team members:** ⟨add names⟩
+- **Faculty guide:** ⟨add name, department⟩
+- RV College of Engineering, Bengaluru
 
 ## Honest limits
-PENDING prices/CO2/calendar/meter data; loads are area-based estimates; perfect forecasts; QAOA simulated (ideal, noiseless);
-ADMM with binaries has no convergence guarantee (full agreement in {{admm.conv_pct|1}} % of slots, rest settled safely);
-lossless tie-lines without AC power flow. Docs: [report](docs/report.md) · [why quantum](docs/why_quantum.md) ·
-[viva Q&A](docs/viva_qa.md) · [pitch](docs/pitch.md) · [QUBO derivation](docs/qubo.md).
+
+- No quantum advantage: QAOA is simulated (ideal, noiseless) and is not in the control loop; it was tested and verified.
+- Tariff, demand charge, CO₂ factor, RVCE loads, calendar and asset sizes are stand-ins until the documents arrive.
+- Outages and network failures in the benchmark are synthetic (seeded). Cables are modelled as lossless, without AC power flow.
+- The optimisers don't price battery wear, which makes the after-wear economics negative at the assumed battery cost.
+- Value of lost load (Rs 40 / 1,000 per kWh) is an assumption; every gap is also reported without it.
+- Feeder-scale operation is a plan, not a result.
 
 ## Credits
+
 The QIEA solver tier and the LLM rule-guard idea were inspired by RVCE team ReZero's *Q-Route* project. Map data
 © OpenStreetMap contributors (ODbL). Ausgrid Solar Home Electricity Data (CC BY 3.0 AU). NASA POWER (NASA LaRC).
+BDG2 and CU-BEMS under their published licences (see `data/SOURCES.md`).

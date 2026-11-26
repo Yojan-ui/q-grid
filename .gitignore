@@ -28,3 +28,6 @@ results/net/node_*.json
 results/net/
 docs/media/story/*.webm
 results/**/*.pkl
+
+# backup of the previous scorecard run (kept locally for comparison)
+results/bench_v3_prev/

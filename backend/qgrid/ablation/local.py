@@ -31,7 +31,8 @@ class LState:
 class LocalModel:
     def __init__(self, campus: Campus, i: int, w, st: LState, t0: int, H: int, *, disc: bool, disc_flows: bool,
                  term_slope: float, voll: tuple[float, float], lam_co2: float = 0.0, quad_flows: bool = False,
-                 pwl: int = 9, time_limit: float = 5.0, mip_gap: float = 1e-4):
+                 pwl: int = 9, time_limit: float = 5.0, mip_gap: float = 1e-4, wear: float = 0.0):
+        # wear: battery wear cost in Rs per kWh charged and per kWh discharged (0 = not priced, as in the scorecard)
         b = campus.buildings[i]
         self.b, self.i, self.H, self.t0 = b, i, H, t0
         self.inc = campus.incident(i)
@@ -53,7 +54,7 @@ class LocalModel:
 
         # ---------------- battery
         if bat.present:
-            add("ch", H, 0.0, bat.kw); add("dis", H, 0.0, bat.kw)
+            add("ch", H, 0.0, bat.kw, wear * DT); add("dis", H, 0.0, bat.kw, wear * DT)
             c_e = np.zeros(H); c_e[-1] = -term_slope
             add("e", H, bat.e_min, bat.e_max, c_e)
             if disc:

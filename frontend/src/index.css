@@ -414,3 +414,32 @@ kbd { font: 500 11px ui-monospace, Menlo, monospace; border: 1px solid var(--hai
   :root[data-present] .stepnums button { width: 28px; height: 28px; }
   :root[data-present] .panel-scroll { padding-top: 8px; }
 }
+
+/* ---------------------------------------------------------------- live demo moments */
+.card.live { border-color: var(--quantum-line); }
+.card.live > b, .card.live .row > b { font-weight: 600; }
+.chips.sm { margin: 8px 0; gap: 4px; }
+.chips.sm .chip { font-size: 12px; padding: 2px 9px; }
+.liveres { margin: 8px 0 4px; padding-left: 18px; }
+.liveres li { margin: 3px 0; }
+.livesrc { margin: 6px 0 2px; }
+.dotlive { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--solar); margin-right: 6px; vertical-align: 1px; }
+.livebadge { font-size: 12px; color: var(--muted); border: 1px solid var(--hair); border-radius: 999px; padding: 3px 10px; margin-right: 8px; white-space: nowrap; }
+.livebadge::before { content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--faint); margin-right: 6px; vertical-align: 0; }
+.livebadge.on { color: var(--solar-ink); border-color: var(--ok-line); }
+.livebadge.on::before { background: var(--solar); }
+.minihist { display: flex; align-items: flex-end; gap: 6px; height: 54px; margin: 8px 0 2px; }
+.minihist span { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 2px; }
+.minihist i { width: 100%; background: var(--quantum-mid); border-radius: 2px 2px 0 0; min-height: 2px; }
+.minihist span.opt i { background: var(--quantum); }
+.minihist em { font-style: normal; font-size: 11px; color: var(--muted); }
+details.assume { margin: 8px 0; font-size: var(--s13); }
+details.assume summary { cursor: pointer; color: var(--text2); font-weight: 500; padding: 4px 0; }
+details.assume .tbl { margin: 6px 0; }
+details.assume .tbl td { white-space: normal; }
+.impactboard { position: absolute; inset: 64px 20px 56px 20px; display: flex; flex-direction: column; gap: 14px; z-index: 20; overflow: auto; }
+.ib-card { background: var(--surface); border: 1px solid var(--hair); border-radius: 14px; padding: 14px 16px; box-shadow: 0 2px 10px var(--shadow); }
+.scale { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 6px; }
+.sc-stage { display: flex; flex-direction: column; gap: 4px; border: 1px solid var(--hair); border-radius: 10px; padding: 10px 12px; font-size: var(--s13); position: relative; }
+.sc-stage + .sc-stage::before { content: '→'; position: absolute; left: -12px; top: 10px; color: var(--muted); }
+@media (max-height: 800px) { .impactboard { gap: 8px; } .ib-card { padding: 10px 12px; } .sc-stage { padding: 8px 10px; } }

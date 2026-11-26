@@ -120,7 +120,9 @@ def values_v3() -> dict:
     if bs.exists():
         b = pd.read_csv(bs)
         for _, r in b.iterrows():
-            for k in ("gap_pct", "certified_gap_pct", "saving_pct", "critical_downtime_h", "bill_rs"):
+            for k in ("gap_pct", "certified_gap_pct", "saving_pct", "critical_downtime_h", "bill_rs", "critical_downtime_1pct_h",
+                      "gap_novoll_pct", "unserved_kwh", "peak_kva", "co2_kg", "dg_litres", "battery_degradation_rs",
+                      "runtime_per_decision_s", "messages_per_decision", "battery_cycles"):
                 if f"{k}__mean" in r and not pd.isna(r[f"{k}__mean"]):
                     v[f"q3.b.{r.dataset}.{r.method}.{k}"] = float(r[f"{k}__mean"])
         v["q3.b.n_datasets"] = float(b.dataset.nunique())
@@ -128,6 +130,73 @@ def values_v3() -> dict:
     if rb.exists():
         h = json.loads(rb.read_text())["headline"]
         v["q3.headline"] = h["text"] + " " + h["detail"]
+        st = h.get("story") or {}
+        if st:
+            v["q3.story.step1"] = st["step1"]["text"]; v["q3.story.step7"] = st["step7"]["text"]; v["q3.story.comms"] = st["step7"]["comms"]
+            v["q3.story.n_days"] = float(st["n_days"])
+            for k, x in st["numbers"].items():
+                if x is not None:
+                    v[f"q3.n.{k}"] = float(x)
+            n = st["numbers"]
+            if n.get("central_comms_fail_gap_pct") is not None:
+                v["q3.n.central_comms_penalty"] = n["central_comms_fail_gap_pct"] - n["central_gap_pct"]
+                v["q3.n.qgrid_comms_penalty"] = n["qgrid_comms_fail_gap_pct"] - n["qgrid_gap_pct"]
+            if n.get("qgrid_downtime_h") is not None:
+                v["q3.n.qgrid_downtime_min"] = 60 * n["qgrid_downtime_h"]; v["q3.n.status_quo_downtime_min"] = 60 * n["status_quo_downtime_h"]
+        rv = h.get("rvce") or {}
+        if rv:
+            v["q3.alt_name"] = rv["alt"]; v["q3.alt_gap"] = float(rv["alt_gap"])
+        v["q3.best_on_n"] = float(len(h.get("best_on", []))); v["q3.n_campuses"] = float(h.get("n", 0))
+    im = ROOT / "results" / "impact" / "impact.json"
+    if im.exists():
+        m = json.loads(im.read_text())
+        c = m["central"]
+        for k, x in c.items():
+            if isinstance(x, (int, float)):
+                v[f"imp.{k}"] = float(x); v[f"imp.{k}_lakh"] = float(x) / 1e5
+        for side in ("npv_gross_rs", "npv_net_rs"):
+            for q, x in m["monte_carlo"][side].items():
+                v[f"imp.mc.{side}.{q}"] = float(x) * (100 if q == "prob_positive" else 1e-5)
+        v["imp.n_buildings"] = float(m["n_buildings"]); v["imp.hw_lo"] = float(m["per_building"][0]["hardware_rs"][0]); v["imp.hw_hi"] = float(m["per_building"][0]["hardware_rs"][1])
+        v["imp.throughput_kwh_day"] = float(m["benefit"]["extra_throughput_kwh_per_day_mean"])
+        if m.get("variant"):
+            vv = m["variant"]
+            v["imp.var.net_lakh"] = vv["net_rs_per_year"] / 1e5; v["imp.var.npv_lakh"] = vv["npv_net_rs"] / 1e5
+            v["imp.var.saving_day"] = vv["bill_saving_rs_per_day_mean"]; v["imp.var.prob_pos"] = 100 * vv["mc_npv_net_rs"]["prob_positive"]
+            v["imp.var.downtime_h"] = vv["critical_downtime_h"]; v["imp.var.wear"] = vv["wear_rs_per_kwh_in_objective"]
+    lv = ROOT / "results" / "replay" / "live.json"
+    if lv.exists():
+        L = json.loads(lv.read_text())
+        rm = L["remove"].get("heavy_labs")
+        if rm:
+            v["live.remove.rounds_after"] = float(rm["after"]["admm_rounds"]); v["live.remove.rounds_before"] = float(rm["before"]["admm_rounds"])
+            v["live.remove.crit_after"] = float(rm["others"]["crit_shed_after_kwh"]); v["live.remove.compute_s"] = float(rm["compute_s"])
+            v["live.remove.lines"] = float(len(rm["lines_dark"])); v["live.remove.time"] = rm["time"]
+        v["live.remove.max_s"] = float(max(r["compute_s"] for r in L["remove"].values()))
+        if L["qaoa"]:
+            v["live.qaoa.max_s"] = float(max(q["qaoa"]["time_s"] + q["exact"]["time_s"] for q in L["qaoa"]))
+            v["live.qaoa.n_qubits"] = float(L["qaoa"][0]["n_qubits"])
+            v["live.qaoa.match_n"] = float(sum(q["qaoa"]["matches_exact"] for q in L["qaoa"])); v["live.qaoa.n"] = float(len(L["qaoa"]))
+        for i, r in enumerate(L["rules"]):
+            v[f"live.rule{i}.text"] = r["text"]; v[f"live.rule{i}.s"] = float(r["time_s"])
+            v[f"live.rule{i}.ok"] = "accepted" if all(x["ok"] for x in r["results"]) else "rejected"
+            if not all(x["ok"] for x in r["results"]):
+                v[f"live.rule{i}.reason"] = "; ".join(x["reason"] for x in r["results"] if not x["ok"]).strip("; ")
+            e = r.get("effect")
+            if e and e["after"].get("status") == "Optimal":
+                for k in ("cost_rs", "objective_rs", "dg_hours", "shed_noncritical_kwh", "critical_downtime_h"):
+                    v[f"live.rule{i}.before.{k}"] = float(e["before"].get(k, 0.0)); v[f"live.rule{i}.after.{k}"] = float(e["after"].get(k, 0.0))
+                v[f"live.rule{i}.delta_cost"] = float(e["after"]["cost_rs"] - e["before"]["cost_rs"])
+                v[f"live.rule{i}.delta_obj"] = float(e["after"]["objective_rs"] - e["before"]["objective_rs"])
+    dly = ROOT / "results" / "bench_v3" / "daily.csv"
+    if dly.exists():
+        d = pd.read_csv(dly)
+        rv_ = d[d.dataset == "rvce"]
+        pv = rv_.pivot_table(index="day", columns="method", values="objective_rs")
+        if {"design_benders_exact", "design_benders_qaoa"} <= set(pv.columns):
+            v["cons.qaoa_beats_exact_days"] = float((pv.design_benders_qaoa < pv.design_benders_exact * (1 - 1e-8)).sum())
+            v["cons.days"] = float(len(pv))
+            v["cons.qaoa_agree_pct"] = 100 * float(rv_[rv_.method == "design_benders_qaoa"].master_opt_share.mean())
     return v
 
 

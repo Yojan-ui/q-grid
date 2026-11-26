@@ -1,0 +1,13 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "vite",
+  "installCommand": "npm ci",
+  "buildCommand": "npm run build:static",
+  "outputDirectory": "dist",
+  "cleanUrls": true,
+  "headers": [
+    { "source": "/assets/(.*)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }] },
+    { "source": "/replay/(.*)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=3600" }] }
+  ],
+  "rewrites": [{ "source": "/((?!assets/|replay/|favicon).*)", "destination": "/index.html" }]
+}
