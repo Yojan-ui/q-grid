@@ -294,7 +294,7 @@ function content(p: PanelProps): Body {
       support: <p>Each rule is parsed into a precise constraint, validated against the campus (impossible rules are refused with a reason), and priced: the best possible plan with and without it.</p>,
       extra: <RuleCard d={d} online={!!p.online} />,
     }
-    case '7a': case '7b': case '7c': case '7d': case '7e': return {
+    case '7a': case '7f': case '7b': case '7c': case '7d': case '7e': return {
       answer: <>The benchmark results are not in this replay yet.</>,
       support: <p>Run <code>python scripts/run_bench_v3.py</code>, <code>python scripts/write_bench_v3.py</code> and <code>make replay</code>.</p>,
     }
@@ -501,6 +501,17 @@ function step7(p: PanelProps, B: NonNullable<StoryData['bench']>, ds: string, pr
         answer: <>When the network fails for 3 hours, central control loses {Number.isNaN(pen('central_mpc')) ? '–' : pen('central_mpc').toFixed(2)} points of gap; Q-Grid loses {Number.isNaN(pen('qgrid')) ? '–' : pen('qgrid').toFixed(2)}.</>,
         support: <p>Same seeded 3-hour outage for both. The central controller’s buildings fall back to simple rules; Q-Grid’s buildings keep optimising on their own and resume sharing when links return.</p>,
         extra: <><CommsChart b={B} /><p className="muted small">Mean over {dsl?.n_days} days on {dsl?.label}; the chart shows one day. Network outages are synthetic and seeded.</p></>,
+      }
+    }
+    case '7f': {
+      const sk = p.d.sankey
+      if (!sk) return { answer: <>Energy flows are not in this replay yet.</>, support: <p>Run <code>python scripts/make_sankey.py</code>.</p> }
+      const src = sk.qgrid.sources_kwh, tot = Object.values(src).reduce((a, b) => a + b, 0) || 1
+      const sq = sk.status_quo?.sources_kwh
+      return {
+        answer: <>On the {sk.label.toLowerCase()} day, {Math.round(100 * (src.Solar ?? 0) / tot)}% of the campus’s energy came from its own solar.</>,
+        support: <p>Each 15-minute slot’s sources are shared out to that slot’s uses, then summed over the day. The diagram is on the left; with today’s practice the grid supplied {sq ? `${Math.round(sq.Grid ?? 0).toLocaleString('en-IN')} kWh` : '–'} and diesel {sq ? `${Math.round(sq.Diesel ?? 0).toLocaleString('en-IN')} kWh` : '–'}, against {Math.round(src.Grid ?? 0).toLocaleString('en-IN')} and {Math.round(src.Diesel ?? 0).toLocaleString('en-IN')} kWh with Q-Grid.</p>,
+        extra: <p className="muted small">Q-Grid’s run on {sk.day} from the replay (scripts/make_sankey.py → qgrid/operate/flows.py). {sk.qgrid.unserved_kwh > 0.5 ? `Unserved during the outage: ${Math.round(sk.qgrid.unserved_kwh).toLocaleString('en-IN')} kWh.` : ''}</p>,
       }
     }
     case '7d': {

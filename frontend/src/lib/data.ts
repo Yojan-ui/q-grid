@@ -116,6 +116,7 @@ export type Bench = {
   comms_day: { dataset: string; day: string; window: [number, number]; t: string[]; series: Record<string, number[]>; totals: Record<string, number> } | null
   headline: { text: string; detail: string; story?: { dataset: string; n_days: number; tariff_pending: boolean
     step1: { text: string; tariff_dependent: boolean }; step7: { text: string; comms: string; tariff_dependent: boolean }; numbers: Record<string, number | null> } }
+  shadow?: { day: string; outage: boolean; status_quo: ShadowSide; qgrid: ShadowSide }[]
   design_choices: { key: string; name: string; what_changed: string; gap_pct: number | null; certified_gap_pct: number | null; critical_downtime_h: number | null; runtime_per_decision_s: number | null; source: string }[]
 }
 
@@ -158,3 +159,5 @@ export type Impact = {
   variant: null | { name: string; wear_rs_per_kwh_in_objective: number; n_days: number; bill_saving_rs_per_day_mean: number; extra_throughput_kwh_per_day_mean: number
     critical_downtime_h: number; net_rs_per_year: number; npv_net_rs: number; payback_net_years: number | null; mc_npv_net_rs: Pct; source: string }
 }
+
+export type ShadowSide = { bill_rs: number; critical_downtime_h: number; dg_litres: number; co2_kg: number; import_kwh: number; unserved_kwh: number }

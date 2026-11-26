@@ -198,6 +198,96 @@ def live_rule(req: RuleReq):
     return rule_effect(campus, _day(req.scenario), req.text)
 
 
+# ---------------------------------------------------------------- Operate mode (control room)
+def _op():
+    """The operate session: created on first use (it loads a year of data and makes the first plan) and kept running."""
+    if "op" not in _STATE:
+        from .operate.session import Session
+        campus, proc = _ctx()
+        s = Session(campus, proc)
+        s.start()
+        _STATE["op"] = s
+    return _STATE["op"]
+
+
+@app.get("/operate/state")
+def operate_state():
+    return _op().snapshot()
+
+
+class ControlReq(BaseModel):
+    speed: float | None = None          # 0 pause, 1 live, 60 fast-forward
+    source: str | None = None           # "today" | "historical"
+    hist_day: str | None = None
+
+
+@app.post("/operate/control")
+def operate_control(req: ControlReq):
+    s = _op()
+    if req.source:
+        s.reset(req.source, req.hist_day)
+    if req.speed is not None:
+        if req.speed not in (0, 1, 60):
+            raise ValueError("speed must be 0, 1 or 60")
+        s.set_speed(req.speed)
+    return s.snapshot()
+
+
+class EventReq(BaseModel):
+    kind: str                           # "outage" | "comms_loss"
+    minutes: int = 60
+
+
+@app.post("/operate/event")
+def operate_event(req: EventReq):
+    return _op().inject(req.kind, max(5, min(req.minutes, 360)))
+
+
+class OverrideReq(BaseModel):
+    zone: str
+    device: str                         # battery | diesel | pump
+    state: str                          # on | off | hold
+    minutes: int = 30
+    confirm: bool = False
+    who: str = "operator"
+
+
+@app.post("/operate/override")
+def operate_override(req: OverrideReq):
+    if not req.confirm:
+        return {"ok": False, "error": "confirmation required"}
+    return _op().override(req.zone, req.device, req.state, max(5, min(req.minutes, 480)), who=req.who)
+
+
+@app.delete("/operate/override/{oid}")
+def operate_override_clear(oid: int):
+    return _op().clear_override(oid)
+
+
+@app.post("/operate/rule")
+def operate_rule(req: RuleReq):
+    return _op().add_rule(req.text)
+
+
+@app.get("/operate/report")
+def operate_report():
+    s = _op()
+    return s.reports[-1] if s.reports and s.snapshot()["clock"]["day_over"] else s.report()
+
+
+@app.websocket("/operate/ws")
+async def operate_ws(ws: WebSocket):
+    """One snapshot per second (the clock, set-points, plan, events, ADMM traffic, device health)."""
+    await ws.accept()
+    s = await asyncio.get_running_loop().run_in_executor(None, _op)
+    try:
+        while True:
+            await ws.send_json(s.snapshot())
+            await asyncio.sleep(1.0)
+    except Exception:
+        return
+
+
 @app.websocket("/live")
 async def live(ws: WebSocket):
     """Streams one ADMM (exact local solver for speed) slot result per message for the requested scenario."""

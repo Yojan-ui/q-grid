@@ -287,12 +287,22 @@ def main():
                            "source": "results/bench_v3/summary.csv"})
     hl = headline(s, w, labels)
     hl["story"] = story_headlines(s, labels, cfg)
+    # shadow mode (Deploy -> Phase 0): per RVCE day, what staff did (status quo) vs what Q-Grid recommended, same data
+    shadow = []
+    rv = r[r.dataset == "rvce"]
+    for day, g in rv.groupby("day"):
+        a, q = g[g.method == "status_quo"], g[g.method == "qgrid"]
+        if len(a) and len(q):
+            a, q = a.iloc[0], q.iloc[0]
+            pick = lambda x: {"bill_rs": float(x.bill_rs), "critical_downtime_h": float(x.critical_downtime_h), "dg_litres": float(x.dg_litres),   # noqa: E731
+                              "co2_kg": float(x.co2_kg), "import_kwh": float(x.import_kwh), "unserved_kwh": float(x.unserved_kwh)}
+            shadow.append({"day": day, "outage": bool(isinstance(a.outage, str) and a.outage), "status_quo": pick(a), "qgrid": pick(q)})
     out = {"tariff_status": cfg["tariff_v2"]["status"],
            "methods": [{"key": k, "name": v[0], "group": v[1], "without_coordinator": k not in ("central_mpc", "central_mpc_comms_fail")} for k, v in NAMES.items()],
            "reference": {"key": REF[0], "name": REF[1], "group": "Reference", "without_coordinator": False},
            "metrics": [{"key": k, "label": l, "group": g, "better": b, "unit": u, "digits": d} for k, l, g, b, u, d in METRICS],
            "datasets": [{"key": k, "label": labels[k], "n_days": int(r[r.dataset == k].day.nunique())} for k in order],
-           "table": table, "wilcoxon": wil, "comms_day": comms, "headline": hl, "design_choices": design}
+           "table": table, "wilcoxon": wil, "comms_day": comms, "headline": hl, "design_choices": design, "shadow": shadow}
     rp = ROOT / "results" / "replay"
     (rp / "bench_v3.json").write_text(json.dumps(out, allow_nan=False, default=lambda o: None).replace("NaN", "null"))
     shutil.copy(rp / "bench_v3.json", ROOT / "frontend" / "public" / "replay" / "bench_v3.json")
