@@ -508,13 +508,15 @@ function step7(p: PanelProps, B: NonNullable<StoryData['bench']>, ds: string, pr
       if (!m) return { answer: <>The impact figures are not in this replay yet.</>, support: <p>Run <code>python scripts/write_impact.py</code> (reads <code>results/bench_v3/daily.csv</code>).</p> }
       const c = m.central, v = m.variant
       return {
-        answer: <>Is it worth it? The hardware is cheap; battery wear decides{c.npv_net_rs > 0 ? ', and it still pays' : ''}.</>,
-        support: <p>{m.n_buildings} building nodes cost {lakh(c.hardware_rs)}; the bill falls by {lakh(c.bill_saving_rs_per_year)} a year (mean of {m.n_days} RVCE days), but cycling the existing batteries wears them by {lakh(c.battery_wear_rs_per_year)} a year.{v ? ` With wear priced in the objective (under test, not in the scorecard) the net is ${lakh(v.net_rs_per_year)} a year.` : ''}</p>,
+        answer: c.npv_net_rs > 0
+          ? <>Is it worth it? On these assumptions, yes: the nodes pay back in {c.payback_net_years?.toFixed(1)} years, battery wear included.</>
+          : <>Is it worth it? Not yet on these assumptions: after battery wear the 10-year value is negative.</>,
+        support: <p>{m.n_buildings} building nodes cost {lakh(c.hardware_rs)} (assumed). Over {m.n_days} RVCE days the bill falls by {lakh(c.bill_saving_rs_per_year)} a year; extra battery wear costs {lakh(c.battery_wear_rs_per_year)} a year, because every optimiser prices wear and cycles only when it pays.{v ? ` A design under test nets ${lakh(v.net_rs_per_year)} a year.` : ''}</p>,
         keys: <>
-          <Key label="Payback, before wear" pending="Tariff">{c.payback_gross_years !== null ? `${c.payback_gross_years.toFixed(1)} y` : 'none'}</Key>
+          <Key label="Payback, after wear" pending="Tariff">{c.payback_net_years !== null ? `${c.payback_net_years.toFixed(1)} y` : 'none'}</Key>
           <Key label="10-yr NPV, after wear" note={`P5–P95 ${lakh(m.monte_carlo.npv_net_rs.p5)} to ${lakh(m.monte_carlo.npv_net_rs.p95)}`}>{lakh(c.npv_net_rs)}</Key>
-          <Key label="Break-even wear" note={`assumed Rs ${c.wear_rs_per_kwh_throughput.toFixed(2)}/kWh`}>{c.breakeven_wear_rs_per_kwh !== null ? `Rs ${c.breakeven_wear_rs_per_kwh.toFixed(2)}/kWh` : '–'}</Key>
-          {v && <Key label="NPV with wear in objective" note={`${Math.round(100 * v.mc_npv_net_rs.prob_positive)}% chance positive`}>{lakh(v.npv_net_rs)}</Key>}
+          <Key label="Chance NPV is positive" note={`${m.monte_carlo.samples.toLocaleString('en-IN')} Monte Carlo samples`}>{`${Math.round(100 * m.monte_carlo.npv_net_rs.prob_positive)}%`}</Key>
+          <Key label="Net per year" note={`bill saving − maintenance − wear`}>{lakh(c.net_rs_per_year)}</Key>
         </>,
         extra: <ImpactDetail m={m} />,
       }

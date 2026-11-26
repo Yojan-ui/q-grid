@@ -52,7 +52,10 @@ def main():
     hw_mid = sum(mid(v) for v in pb.values()) * nb
     om_mid = mid(im["om_share_per_year"]) * hw_mid
     r_mid = mid(im["discount_rate"])
-    wear_kwh_mid = mid(im["battery_capex_rs_per_kwh"]) / (2 * mid(im["battery_cycle_life"]) * dod)
+    # central battery wear = the rate every optimiser prices (config economics + battery_wear), so the impact page and the
+    # scorecard agree; the Monte Carlo varies it over the impact ranges
+    eco = cfg["economics"]
+    wear_kwh_mid = float(eco["battery_capex_rs_per_kwh"]) / (2 * float(eco["battery_cycle_life"]) * dod)
     S = sav.mean() * 365; W = dthr.mean() * 365 * wear_kwh_mid
     central = {"hardware_rs": hw_mid, "om_rs_per_year": om_mid, "bill_saving_rs_per_year": S, "battery_wear_rs_per_year": W,
                "net_rs_per_year": S - om_mid - W, "discount_rate": r_mid,
@@ -96,7 +99,7 @@ def main():
                             "messages_per_decision": float(row.messages_per_decision__mean)})
     # ---- design change under test: wear priced in the objective (scripts/run_wear_variant.py), same days and draws
     variant = None
-    wv = ROOT / "results" / "impact" / "wear_variant.csv"
+    wv = ROOT / "results" / "impact" / "wear_variant.csv"   # only for a design not yet in the scorecard
     if wv.exists():
         v = pd.read_csv(wv).set_index("day")
         days = q.index.intersection(v.index)
@@ -176,10 +179,10 @@ def main():
              f"(Monte Carlo P5–P95 {lakh(variant['mc_npv_net_rs']['p5'])} to {lakh(variant['mc_npv_net_rs']['p95'])}, "
              f"{100 * variant['mc_npv_net_rs']['prob_positive']:.0f} % positive). Not part of the scorecard."] if variant else []),
          "", "## What this means\n",
-         "- The controller hardware is cheap next to the bill; the deciding number is battery wear. The optimisers in the "
-         "benchmark do not price battery wear in their objective, so they cycle the batteries for small price spreads. "
-         "Adding a wear cost to the objective (cycle only when the spread beats the wear) is the next design change; it has "
-         "not been run yet.",
+         "- Every optimiser in the scorecard prices battery wear in its objective (`config.yaml` → `battery_wear`), so the "
+         "batteries cycle only when a price spread beats the wear. An earlier run without that term cycled the batteries "
+         "for small spreads and lost money after wear (`results/impact/wear_pilot_2.96.csv` documents the pilot that "
+         "led to the change).",
          "- Reliability (critical downtime) and resilience to a network failure are benefits not priced here.",
          "", "## Assumptions\n", "| Assumption | Value | Source |", "|---|---|---|"]
     for a in out["assumptions"]:

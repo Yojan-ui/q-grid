@@ -8,6 +8,8 @@ Fairness protocol
   - the only oracle is the reference "best possible plan" (central MILP, perfect information), shown separately
   - same machine and process pool, fixed seeds; certified gap from proven lower bounds (qgrid/ablation/bounds.py)
   - comms-failure methods share one seeded 3 h campus network outage per day
+  - battery wear (config battery_wear) is priced in every optimiser's objective and in the scored objective; the
+    earlier design rows (Benders, first prototype) predate it and do not price it
 
   python scripts/run_bench_v3.py [--workers=8] [--days=30] [--qgrid=1111]   -> results/bench_v3/*.csv
 """
@@ -161,7 +163,7 @@ def run_one(ds: str, day: str, method: str, return_sched: bool = False) -> dict:
             "comms_window": f"{win[0]}-{win[1]}" if "comms" in method else "", "feasible": f["feasible"],
             **{k: m[k] for k in ("objective_rs", "cost_rs", "demand_charge_rs", "cost_incl_demand_rs", "peak_kva",
                                  "critical_downtime_h", "critical_unserved_kwh", "unserved_kwh", "import_kwh", "co2_kg",
-                                 "dg_litres", "spill_kwh", "voll_rs")}, **x,
+                                 "dg_litres", "spill_kwh", "voll_rs", "wear_rs")}, **x,
             "objective_incl_demand_rs": m["objective_incl_demand_rs"], "runtime_s": rt,
             "runtime_per_decision_s": st.get("plan_time_s", rt / decisions), "messages": st.get("messages", 0),
             "admm_converged_rate": st.get("admm_converged_rate", np.nan), "master_opt_share": st.get("master_opt_share", np.nan),

@@ -20,7 +20,7 @@ import numpy as np
 
 from .ablation.engine import ACfg, plan_hour
 from .ablation.local import LocalModel, LState
-from .model import T
+from .model import T, wear_rate
 
 ROOT = Path(__file__).resolve().parents[2]
 LABEL = "What-if (one decision, current Q-Grid design, actual solar and load over the horizon) — not a headline result"
@@ -57,7 +57,8 @@ def _models(campus, w, states, slot, cfg: ACfg):
     voll = (float(oc["voll_noncritical_rs_kwh"]), float(oc["voll_critical_rs_kwh"]))
     lam = float(campus.cfg["co2"]["lambda_rs_per_kg"])
     return [LocalModel(campus, i, w, copy.deepcopy(states[i]), slot, cfg.H, disc=False, disc_flows=False, term_slope=w.term_value,
-                       voll=voll, lam_co2=lam, quad_flows=False, time_limit=cfg.mip_time, mip_gap=cfg.mip_gap)
+                       voll=voll, lam_co2=lam, quad_flows=False, time_limit=cfg.mip_time, mip_gap=cfg.mip_gap,
+                       wear=wear_rate(campus.cfg))
             for i in range(campus.n)]
 
 

@@ -45,6 +45,9 @@ def solve_milp(campus: Campus, day: DayData, zones: list[int], with_lines: bool,
                 m += dis[t] <= bat.kw * (1 - md[t])
                 m += e[t + 1] == e[t] + (bat.eta_ch * ch[t] - dis[t] * (1 / bat.eta_dis)) * DT
             obj.append(-day.term_value * (e[T] - bat.e0))
+            wr = getattr(day, "wear", 0.0)
+            if wr > 0:                                       # battery wear per kWh charged or discharged
+                obj.append(wr * DT * pulp.lpSum(ch[t] + dis[t] for t in range(T)))
             zv["ch"], zv["dis"] = ch, dis
         flex_t = [0] * T
         for j in b.flex:

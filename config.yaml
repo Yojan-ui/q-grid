@@ -140,6 +140,10 @@ economics:                    # ASSUMPTIONS for payback / per-semester figures
   discount_rate: 0.08           # ASSUMPTION: for the 10-year NPV of savings
   semester_days: 120
 
+battery_wear:                 # battery wear priced in every optimiser's objective and in the scored objective
+  in_objective: true          # Rs per kWh charged or discharged = economics.battery_capex / (2 x cycle life x DoD)
+  depth_of_discharge: 0.75    # ASSUMPTION (same as the degradation metric)
+
 impact:                       # "Is it worth it?" (scripts/write_impact.py). Every value is an ASSUMPTION unless a source is
                               # given; [low, high] ranges are sampled uniformly in the Monte Carlo. Vendor quotes are PENDING.
   status: ASSUMPTION

@@ -40,7 +40,7 @@ An impossible rule is refused with a reason."
 **Step 7 · Results (2:20–3:00).**
 "Same days, same data, same forecasts for every method. {{q3.story.step7}}
 {{q3.story.comms}}
-Is it worth it? The hardware is cheap — about Rs {{imp.hardware_rs_lakh|1}} lakh for nine buildings — and battery wear decides
-the business case; the next design step prices that wear in. Every number on screen opens to its source file."
+Is it worth it? About Rs {{imp.hardware_rs_lakh|1}} lakh of hardware for nine buildings; with battery wear counted it pays back
+in about {{imp.payback_net_years|1}} years on assumed costs, and the Monte Carlo range is on screen. Every number opens to its source file."
 
 **Close (one line).** "Decentralised, verified, honest about quantum — ready for RVCE's real meter data."

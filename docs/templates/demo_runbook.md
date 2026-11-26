@@ -26,7 +26,7 @@ _Rendered from `docs/templates/demo_runbook.md`; numbers from `results/`. Rehear
 | 8 | → 5b, → Step 6 (battery fills before the outage). | "Batteries carry the outage." | — |
 | 9 | → Step 6b: click the chip **{{live.rule0.text}}**, then **{{live.rule2.text}}**. | "Checked, then priced. Impossible rules are refused." | Offline: only the three chips are precomputed; don't type a new rule without the backend. |
 | 10 | → 7a scorecard (pause 3 s), → 7b, → 7c. | "Same days, same data. When the network fails…" | — |
-| 11 | → 7d **Is it worth it?** | "Hardware is cheap; battery wear decides; next step prices it in." | — |
+| 11 | → 7d **Is it worth it?** | "About Rs {{imp.hardware_rs_lakh|1}} lakh of nodes; pays back in {{imp.payback_net_years|1}} years with battery wear counted (assumed costs)." | — |
 | 12 | → 7e bottom line. Stop. | Read the sentence on screen. | — |
 
 ## Recovery

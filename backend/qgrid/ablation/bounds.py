@@ -26,13 +26,15 @@ def _day_models(campus: Campus, yd, day: str, outage):
     oc = campus.cfg["outage_costs"]
     voll = (float(oc["voll_noncritical_rs_kwh"]), float(oc["voll_critical_rs_kwh"]))
     lam = float(campus.cfg["co2"]["lambda_rs_per_kg"])
+    from ..model import wear_rate
+    wear = wear_rate(campus.cfg)
     d0 = yd.day_start(day)
     w = yd.window(d0, 0, T, outage)
     models, const = [], 0.0
     for i, b in enumerate(campus.buildings):
         st = LState(e=b.battery.e0, level=b.tank.level0 if b.tank else 0.0)
         models.append(LocalModel(campus, i, w, st, 0, T, disc=False, disc_flows=False, term_slope=w.term_value,
-                                 voll=voll, lam_co2=lam, quad_flows=False, time_limit=60.0, mip_gap=1e-4))
+                                 voll=voll, lam_co2=lam, quad_flows=False, time_limit=60.0, mip_gap=1e-4, wear=wear))
         # settle() values stored energy relative to the start: term_value * (e0 - e_end) (+ water); the models
         # carry -term_value * e_end, so add the constants back
         if b.battery.present:

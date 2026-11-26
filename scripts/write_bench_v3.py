@@ -33,10 +33,10 @@ NAMES = {   # display names (never version numbers)
 REF = ("optimum", "Best possible plan (central MILP, perfect information)")
 DESIGN = {
     "design_prototype_1h_binary": ("1-hour horizon, discrete kW, binary coordination", "earlier design, realistic forecasts"),
-    "design_earlier_prototype": ("Earlier prototype: 3-slot QUBO per building, binary coordination with QAOA/annealing tiers", "first working version, realistic forecasts"),
-    "design_benders_exact": ("24 h hybrid Benders, exact master", "Benders between an hourly on/off master and the LP; realistic forecasts"),
-    "design_benders_qaoa": ("24 h hybrid Benders, QAOA master (verified, simulator)", "same with a QAOA block master; realistic forecasts"),
-    "design_benders_qiea": ("24 h hybrid Benders, QIEA master (quantum-inspired, classical)", "same with a QIEA master; realistic forecasts"),
+    "design_earlier_prototype": ("Earlier prototype: 3-slot QUBO per building, binary coordination with QAOA/annealing tiers", "first working version, realistic forecasts; battery wear not priced"),
+    "design_benders_exact": ("24 h hybrid Benders, exact master", "Benders between an hourly on/off master and the LP; realistic forecasts; battery wear not priced"),
+    "design_benders_qaoa": ("24 h hybrid Benders, QAOA master (verified, simulator)", "same with a QAOA block master; realistic forecasts; battery wear not priced"),
+    "design_benders_qiea": ("24 h hybrid Benders, QIEA master (quantum-inspired, classical)", "same with a QIEA master; realistic forecasts; battery wear not priced"),
 }
 METRICS = [  # key, label, group, better, unit, digits
     ("bill_rs", "Bill", "Cost", "lower", "Rs/day", 0), ("saving_pct", "Saving vs today", "Cost", "higher", "%", 1),
@@ -332,7 +332,7 @@ def write_docs(r, s, w, labels, order, hl, cfg):
          "- **Same information**: every non-oracle method uses the same gradient-boosted solar and load forecasts (day-ahead methods: "
          "the 00:00 forecast; MPC methods: rolling). Status quo and the rule-based controller react to the current measurement only. "
          "The best possible plan (central MILP with perfect information) is the only oracle and is shown as a reference line.",
-         f"- **Same objective and VoLL**: energy + diesel fuel + value of lost load (non-critical Rs {oc['voll_noncritical_rs_kwh']}/kWh, "
+         f"- **Same objective and VoLL**: energy + diesel fuel + battery wear (Rs per kWh charged or discharged, from the battery cost and cycle life — ASSUMPTION) + value of lost load (non-critical Rs {oc['voll_noncritical_rs_kwh']}/kWh, "
          f"critical Rs {oc['voll_critical_rs_kwh']}/kWh — ASSUMPTION, see docs/consistency.md) + terminal value. No method optimises the "
          "demand charge; it is reported in the bill. Every gap is also reported on money alone (no VoLL).",
          "- **Best plan**: the cheapest feasible plan known for the day — the central MILP with perfect information, or a "

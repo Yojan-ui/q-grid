@@ -46,7 +46,7 @@ class ACfg:
     comms_fail: tuple | None = None  # (first slot, last slot) of a campus network outage
     mip_gap: float = 0.01
     bin_rounds_cap: int = 6
-    wear_rs_per_kwh: float = 0.0     # battery wear priced in each building's objective (0 = scorecard design)
+    wear_rs_per_kwh: float | None = None   # battery wear Rs/kWh in each building's objective; None = config (model.wear_rate)
 
     @property
     def H(self) -> int:
@@ -254,6 +254,8 @@ def run_day(campus: Campus, yd, day: str, outage, cfg: ACfg, forecaster=None, ho
     lam_co2 = float(campus.cfg["co2"]["lambda_rs_per_kg"])
     d0 = yd.day_start(day)
     n = campus.n
+    from ..model import wear_rate
+    wear = cfg.wear_rs_per_kwh if cfg.wear_rs_per_kwh is not None else wear_rate(campus.cfg)
     sched = Schedule.empty(campus)
     states = [LState(e=b.battery.e0, level=b.tank.level0 if b.tank else 0.0) for b in campus.buildings]
     src = forecaster if (cfg.D and forecaster is not None) else yd
@@ -278,7 +280,7 @@ def run_day(campus: Campus, yd, day: str, outage, cfg: ACfg, forecaster=None, ho
                 slope = float(-(ctg[i](t0 + cfg.H, e + 0.5) - ctg[i](t0 + cfg.H, e - 0.5))) if b.battery.present else 0.0
             models.append(LocalModel(campus, i, w, states[i], t0, cfg.H, disc=not cfg.B, disc_flows=(not cfg.B and not cfg.C),
                                      term_slope=slope, voll=voll, lam_co2=lam_co2, quad_flows=not cfg.C,
-                                     time_limit=cfg.mip_time, mip_gap=cfg.mip_gap, wear=cfg.wear_rs_per_kwh))
+                                     time_limit=cfg.mip_time, mip_gap=cfg.mip_gap, wear=wear))
         failing = cfg.comms_fail is not None and cfg.comms_fail[0] <= t0 <= cfg.comms_fail[1]
         if failing and cfg.central:                    # coordinator unreachable: devices fall back to the rule-based controller
             stats["fallback_slots"] = stats.get("fallback_slots", 0) + cfg.replan

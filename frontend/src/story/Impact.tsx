@@ -32,9 +32,9 @@ export function ImpactBoard({ m }: { m: Impact }) {
   const C = useC()
   const rows: { label: string; p: { p5: number; p50: number; p95: number; prob_positive: number }; col: string }[] = [
     { label: 'Before battery wear', p: m.monte_carlo.npv_gross_rs, col: C.neutralMark },
-    { label: 'After battery wear (scorecard design)', p: m.monte_carlo.npv_net_rs, col: C.grid },
+    { label: 'After battery wear', p: m.monte_carlo.npv_net_rs, col: m.monte_carlo.npv_net_rs.p50 >= 0 ? C.solar : C.grid },
   ]
-  if (m.variant) rows.push({ label: 'After wear, wear priced in the objective (under test)', p: m.variant.mc_npv_net_rs, col: C.quantum })
+  if (m.variant) rows.push({ label: 'Design under test, after wear', p: m.variant.mc_npv_net_rs, col: C.quantum })
   const lo = Math.min(0, ...rows.map(r => r.p.p5)), hi = Math.max(0, ...rows.map(r => r.p.p95))
   const W = 600, x0 = 230, x1 = W - 16
   const x = (v: number) => x0 + ((v - lo) / (hi - lo || 1)) * (x1 - x0)

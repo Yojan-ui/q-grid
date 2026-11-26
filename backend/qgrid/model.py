@@ -179,6 +179,7 @@ class DayData:
     status: dict
     scen_name: str = ""
     day_type: str = ""
+    wear: float = 0.0             # Rs per kWh charged or discharged (battery wear), priced in the objective
 
     @property
     def term_value(self) -> float:
@@ -211,7 +212,19 @@ def make_day(campus: Campus, processed: dict, day: str, scenario: str, scen_name
                    pr[f"{scenario}_export"].to_numpy(), float(meta["co2"]["tco2_per_mwh"]),
                    float(campus.cfg["co2"]["lambda_rs_per_kg"]), grid, float(oc["voll_noncritical_rs_kwh"]),
                    float(oc["voll_critical_rs_kwh"]),
-                   {**meta["data_status"], "price_scenario": meta["prices"][scenario]["status"]}, scen_name, dtype)
+                   {**meta["data_status"], "price_scenario": meta["prices"][scenario]["status"]}, scen_name, dtype,
+                   wear_rate(campus.cfg))
+
+
+def wear_rate(cfg: dict) -> float:
+    """Battery wear in Rs per kWh charged or discharged = capex / (2 x cycle life x depth of discharge) (economics block,
+    ASSUMPTIONS), when config battery_wear.in_objective is true; 0 otherwise. The same rate is the scorecard's degradation
+    metric, so what the optimisers price and what the scorecard reports agree."""
+    bw = cfg.get("battery_wear", {})
+    if not bw.get("in_objective", False):
+        return 0.0
+    e = cfg["economics"]
+    return float(e["battery_capex_rs_per_kwh"]) / (2 * float(e["battery_cycle_life"]) * float(bw.get("depth_of_discharge", 0.75)))
 
 
 @dataclass
@@ -320,9 +333,10 @@ def settle(campus: Campus, day: DayData, sched: Schedule) -> dict:
     pv_kwh = float(day.pv.sum() * DT)
     voll = float((day.voll_nc * shed_nc + day.voll_c * shed_c).sum() * DT)
     crit_slots = (shed_c > 1e-6).any(axis=0)
+    wear = float(getattr(day, "wear", 0.0) * np.abs(sched.p_bat).sum() * DT)
     return {
         "cost_rs": energy_cost + fuel + term,
-        "objective_rs": energy_cost + fuel + term + voll,
+        "objective_rs": energy_cost + fuel + term + voll + wear, "wear_rs": wear,
         "energy_cost_rs": energy_cost, "fuel_cost_rs": fuel, "terminal_adj_rs": term, "voll_rs": voll,
         "co2_kg": imp_kwh * day.ef + dg_co2, "grid_co2_kg": imp_kwh * day.ef, "dg_co2_kg": dg_co2,
         "import_kwh": imp_kwh, "export_kwh": float(exp.sum() * DT), "spill_kwh": float(spill.sum() * DT),

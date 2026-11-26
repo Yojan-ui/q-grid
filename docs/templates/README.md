@@ -44,11 +44,11 @@ EUREKA Track 3 · Smart Decentralised Energy Systems · RVCE, Bengaluru
 method without a central controller on {{q3.best_on_n|0}}. Full tables with ± and 95 % intervals, Wilcoxon verdicts:
 [docs/benchmark_v3.md](docs/benchmark_v3.md) · consistency checks: [docs/consistency.md](docs/consistency.md).
 
-**Is it worth it?** Node hardware ≈ Rs {{imp.hardware_rs_lakh|1}} lakh for {{imp.n_buildings|0}} buildings (assumed costs);
-bill saving ≈ Rs {{imp.bill_saving_rs_per_year_lakh|1}} lakh/year; extra battery wear ≈ Rs {{imp.battery_wear_rs_per_year_lakh|1}}
-lakh/year at the assumed battery cost. The benchmarked optimisers don't price battery wear, so after wear the 10-year NPV is
-Rs {{imp.npv_net_rs_lakh|1}} lakh (Monte Carlo P5–P95: Rs {{imp.mc.npv_net_rs.p5|1}} to {{imp.mc.npv_net_rs.p95|1}} lakh). Pricing wear
-in the objective is the next design change: [docs/impact.md](docs/impact.md).
+**Is it worth it?** Node hardware ≈ Rs {{imp.hardware_rs_lakh|1}} lakh for {{imp.n_buildings|0}} buildings (assumed costs); bill
+saving ≈ Rs {{imp.bill_saving_rs_per_year_lakh|1}} lakh/year; extra battery wear ≈ Rs {{imp.battery_wear_rs_per_year_lakh|1}} lakh/year
+(every optimiser prices wear in its objective). Payback ≈ {{imp.payback_net_years|1}} years; 10-year NPV Rs {{imp.npv_net_rs_lakh|1}}
+lakh (Monte Carlo P5–P95: Rs {{imp.mc.npv_net_rs.p5|1}} to {{imp.mc.npv_net_rs.p95|1}} lakh). Assumptions and sources:
+[docs/impact.md](docs/impact.md).
 
 ## Architecture
 
@@ -120,7 +120,7 @@ Licences, URLs and fetch dates: `data/SOURCES.md` · what we asked RVCE for: `do
 - No quantum advantage: QAOA is simulated (ideal, noiseless) and is not in the control loop; it was tested and verified.
 - Tariff, demand charge, CO₂ factor, RVCE loads, calendar and asset sizes are stand-ins until the documents arrive.
 - Outages and network failures in the benchmark are synthetic (seeded). Cables are modelled as lossless, without AC power flow.
-- The optimisers don't price battery wear, which makes the after-wear economics negative at the assumed battery cost.
+- Battery wear is priced with an assumed battery cost and cycle life; real warranty data will change the rate.
 - Value of lost load (Rs 40 / 1,000 per kWh) is an assumption; every gap is also reported without it.
 - Feeder-scale operation is a plan, not a result.
 

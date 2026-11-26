@@ -1,7 +1,7 @@
 // The three live demo moments. Each one runs on the backend when it is reachable (one decision or one solve,
 // under 5 s) and otherwise shows the precomputed result written by the same code (scripts/make_live.py -> live.json).
 // Every result says which it is, how long it took, and that it is a what-if.
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { post, type QaoaResult, type RemoveResult, type RuleResult } from '../lib/data'
 import { zn } from '../lib/labels'
 import type { StoryData } from '../lib/story'
@@ -26,6 +26,13 @@ function useCall<T>() {
   return { st, run, reset }
 }
 
+/** Keep a live card's result on screen (presenter mode on a 720p projector has little room). */
+function useReveal(dep: unknown) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => { if (dep) ref.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }) }, [dep])
+  return ref
+}
+
 function SrcLine({ src, ms, compute }: { src: Src | null; ms: number | null; compute?: number }) {
   if (!src) return null
   return <p className="muted small livesrc">{src === 'live'
@@ -47,8 +54,9 @@ export function RemoveBuilding({ d, online, killed, setKilled }: { d: StoryData;
   }
   const r = st.res
   const k = r ? zones.indexOf(r.zone) : -1
+  const ref = useReveal(r)
   return (
-    <div className="card live" aria-live="polite">
+    <div className="card live" aria-live="polite" ref={ref}>
       <div className="row"><b>Live: remove a building</b>
         {killed ? <button className="btn small primary" onClick={() => { setKilled(null); reset() }}>Bring {zn(killed).toLowerCase()} back</button>
           : <button className="btn small ghost" onClick={() => go(zone)} disabled={st.busy}>{st.busy ? 'Re-planning…' : `Take ${zn(zone).toLowerCase()} offline`}</button>}
@@ -82,8 +90,9 @@ export function LiveQaoa({ d, online }: { d: StoryData; online: boolean }) {
   const r = st.res
   const top = r ? r.qaoa.shots.slice(0, 5) : []
   const mx = Math.max(...top.map(s => s.count), 1)
+  const ref = useReveal(r)
   return (
-    <div className="card live" aria-live="polite">
+    <div className="card live" aria-live="polite" ref={ref}>
       <div className="row"><b>Live: solve a slot</b>
         <button className="btn small ghost" onClick={go} disabled={st.busy}>{st.busy ? 'Measuring…' : r ? 'Measure again (new seed)' : `Measure the ${d.example.n_qubits}-qubit block`}</button></div>
       {st.err && <p className="small warn">{st.err}</p>}
@@ -119,8 +128,9 @@ export function RuleCard({ d, online }: { d: StoryData; online: boolean }) {
   const r = st.res
   const ok = r?.results.every(x => x.ok)
   const e = r?.effect
+  const ref = useReveal(r)
   return (
-    <div className="card live" aria-live="polite">
+    <div className="card live" aria-live="polite" ref={ref}>
       <b>Live: type a rule</b>
       <div className="chips sm" aria-label="example rules">{presets.map(t => <button key={t} className={`chip ${text === t ? 'on' : ''}`} onClick={() => go(t)}>{t}</button>)}</div>
       <form className="row" onSubmit={ev => { ev.preventDefault(); go() }}>

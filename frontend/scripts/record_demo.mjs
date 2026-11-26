@@ -38,7 +38,7 @@ async function main() {
     console.log('backend:', live)
     const frames = []
     cdp.on('Page.screencastFrame', p => { frames.push({ t: p.metadata.timestamp, data: p.data }); cdp.send('Page.screencastFrameAck', { sessionId: p.sessionId }) })
-    await cdp.send('Page.startScreencast', { format: 'jpeg', quality: 72, maxWidth: W, maxHeight: H, everyNthFrame: 2 })
+    await cdp.send('Page.startScreencast', { format: 'jpeg', quality: 70, maxWidth: W, maxHeight: H, everyNthFrame: 3 })
     const marks = []
     const t0 = Date.now()
     for (let i = 0; i < PLAN.length; i++) {
@@ -60,7 +60,7 @@ async function main() {
     console.log(`captured ${frames.length} frames over ${dur.toFixed(1)} s`)
     if (GIF) {   // every 4th frame for the README GIF (assembled by scripts/make_gif.py)
       mkdirSync(GIF, { recursive: true })
-      frames.forEach((f, k) => { if (k % 4 === 0) writeFileSync(join(GIF, `f${String(k).padStart(5, '0')}.jpg`), Buffer.from(f.data, 'base64')) })
+      frames.forEach((f, k) => { if (k % 3 === 0) writeFileSync(join(GIF, `f${String(k).padStart(5, '0')}.jpg`), Buffer.from(f.data, 'base64')) })
       writeFileSync(join(GIF, 'marks.json'), JSON.stringify({ marks, t0: frames[0]?.t }))
     }
     const tStart = frames[0].t
@@ -85,7 +85,7 @@ async function main() {
     await cdp.send('Runtime.evaluate', { expression: 'window.__frames = []' })
     for (let i = 0; i < frames.length; i += 40) {
       const batch = frames.slice(i, i + 40).map(f => `data:image/jpeg;base64,${f.data}`)
-      await cdp.send('Runtime.evaluate', { expression: `window.__frames.push(...${JSON.stringify(batch)})` })
+      await cdp.send('Runtime.evaluate', { expression: `window.__frames.push(...${JSON.stringify(batch)})` }, 300000)
     }
     const res = await cdp.send('Runtime.evaluate', { expression: enc, awaitPromise: true, returnByValue: true }, 900000)
     if (res.exceptionDetails) throw new Error(JSON.stringify(res.exceptionDetails).slice(0, 400))

@@ -38,16 +38,16 @@ BESCOM figure exists that we could cite. Every gap is also reported on money alo
 The energy tariff and demand charge are labelled stand-ins (PENDING the KERC/BESCOM order); the UI badges them. Comparisons
 between methods are fair because every method sees the same prices; absolute rupees will move.
 
-**8. You cycle the batteries much more. What about degradation?**
-Good catch — it's the deciding number. At the assumed battery cost, extra wear is about Rs {{imp.battery_wear_rs_per_year_lakh|1}}
-lakh a year against a bill saving of Rs {{imp.bill_saving_rs_per_year_lakh|1}} lakh. None of the benchmarked optimisers price wear
-in their objective; break-even wear is Rs {{imp.breakeven_wear_rs_per_kwh|2}} per kWh of throughput vs the Rs
-{{imp.wear_rs_per_kwh_throughput|2}} assumed. Pricing wear in the objective is the next design change (Step 7 "Is it worth it?").
+**8. What about battery degradation?**
+It's in the objective. Every optimiser — Q-Grid, both MPCs, GA/PSO and the best possible plan — prices wear at Rs per kWh
+charged or discharged (battery cost ÷ 2 × cycle life × depth of discharge, `config.yaml` → `battery_wear`), and the scorecard
+scores it. An earlier run without that term cycled the batteries for tiny spreads and lost money after wear; that pilot is why
+we changed it (`results/impact/wear_pilot_2.96.csv`). Q-Grid now cycles {{q3.b.rvce.qgrid.battery_cycles|2}} times a day.
 
 **9. So what's the payback?**
-Before battery wear, about {{imp.payback_gross_years|1}} years on Rs {{imp.hardware_rs_lakh|1}} lakh of node hardware (assumed
-costs). After wear, the 10-year NPV is Rs {{imp.npv_net_rs_lakh|1}} lakh at the central assumptions (Monte Carlo P5–P95
-Rs {{imp.mc.npv_net_rs.p5|1}} to {{imp.mc.npv_net_rs.p95|1}} lakh). We show both on screen.
+On assumed costs (Rs {{imp.hardware_rs_lakh|1}} lakh of node hardware), with battery wear counted: about {{imp.payback_net_years|1}} years;
+10-year NPV Rs {{imp.npv_net_rs_lakh|1}} lakh (Monte Carlo P5–P95 Rs {{imp.mc.npv_net_rs.p5|1}} to {{imp.mc.npv_net_rs.p95|1}} lakh,
+{{imp.mc.npv_net_rs.prob_positive|0}} % of samples positive). The tariff is a stand-in, so this moves when the real order arrives.
 
 **10. What happens if the network goes down?**
 Each building keeps optimising alone with its own forecast and safety layer; cables idle until links return. That's the

@@ -109,6 +109,24 @@ def main(d: Path):
           f"- Certified gap uses the best proven lower bound (LP relaxation, MILP dual bound, Lagrangian bound with ADMM prices). "
           f"A valid bound can never exceed a feasible plan; on {capped} of {r[['dataset', 'day']].drop_duplicates().shape[0]} "
           "dataset-days the computed bound did (solver tolerance or a time-limited solve) and was capped at the best plan.", ""]
+    # 5 ---------------------------------------------------------------- battery wear in every objective
+    sys.path[:0] = [str(ROOT / "backend")]
+    from qgrid.model import wear_rate
+    wr = wear_rate(cfg)
+    L += ["## 5. Battery wear is priced the same way everywhere
+",
+          f"- Every optimiser (Q-Grid, per-building and central MPC, GA, PSO, the best possible plan, the certified bounds) prices "
+          f"battery wear at Rs {wr:.2f} per kWh charged or discharged = battery cost / (2 × cycle life × depth of discharge) "
+          "(`config.yaml` → `economics`, `battery_wear`; ASSUMPTIONS). The scored objective includes the same term, and the "
+          "scorecard's degradation-cost column uses the same rate.",
+          "- The earlier design rows (hybrid Benders, first prototype) predate this and do not price wear; they are design "
+          "history under Verify, not scorecard rows.", ""]
+    if "wear_rs" in r:
+        g = r[r.method.isin(["qgrid", "optimum", "central_mpc"])]
+        L.append("| Method (all datasets, mean) | battery cycles per day | wear Rs/day |\n|---|---:|---:|")
+        for m, x in g.groupby("method"):
+            L.append(f"| {NAMES[m]} | {x.battery_cycles.mean():.2f} | {x.wear_rs.mean():,.0f} |")
+        L.append("")
     (ROOT / "docs" / "consistency.md").write_text("\n".join(L) + "\n")
     print("wrote docs/consistency.md")
 
