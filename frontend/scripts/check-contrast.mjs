@@ -131,6 +131,18 @@ try {
       scanned += n
       for (const b of bad) all.push({ theme, size: `${w}x${h}`, stop: STOPS[k], ...b })
     }
+    // the other modes: Operate (recorded session, report tab) and Deploy
+    for (const [name, qs, sel] of [['operate', '?mode=operate&offline', '.op-grid'], ['deploy', '?mode=deploy', '.arch']]) {
+      await cdp.send('Page.navigate', { url: `${server.url}/${qs}&theme=${theme}` })
+      await waitFor(cdp, `!!document.querySelector('${sel}')`, 40000)
+      await sleep(2500)
+      for (const tab of name === 'operate' ? ['Events', 'Messages', 'Override', 'Report'] : ['']) {
+        if (tab) { await evaluate(cdp, `[...document.querySelectorAll('.op-tabs button')].find(b => b.textContent === '${tab}')?.click()`); await sleep(600) }
+        const { n, bad } = await evaluate(cdp, SCAN)
+        scanned += n
+        for (const b of bad) all.push({ theme, size: `${w}x${h}`, stop: `${name}${tab ? ':' + tab : ''}`, ...b })
+      }
+    }
   }
 } finally { await close(); server.stop() }
 
