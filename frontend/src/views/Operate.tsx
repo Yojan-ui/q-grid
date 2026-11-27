@@ -8,6 +8,8 @@ import { useOperate, type OpReport, type OpSnapshot, type OpZone } from '../lib/
 import { zn } from '../lib/labels'
 import { useC, type Palette } from '../lib/theme'
 import { Sankey } from '../story/Sankey'
+import { StatusBadge } from '../story/Badges'
+import type { Zone } from '../lib/data'
 
 const kw = (v: number) => `${Math.round(v).toLocaleString('en-IN')} kW`
 const rs = (v: number) => `${v < 0 ? '−' : ''}Rs ${Math.abs(Math.round(v)).toLocaleString('en-IN')}`
@@ -27,7 +29,7 @@ export function OperateView({ d, online }: { d: StoryData; online: boolean }) {
       <div className="op-grid">
         <section className="op-col">
           <CampusMap d={d} s={s} />
-          <div className="bcards">{s.zones.map(z => <BuildingCard key={z.name} z={z} />)}</div>
+          <div className="bcards">{s.zones.map(z => <BuildingCard key={z.name} z={z} asset={d.sc.campus.zones.find(x => x.name === z.name)} />)}</div>
         </section>
         <section className="op-col">
           <Gantt s={s} />
@@ -111,13 +113,17 @@ function CampusMap({ d, s }: { d: StoryData; s: OpSnapshot }) {
   )
 }
 
-function BuildingCard({ z }: { z: OpZone }) {
+const ASSET_NAME: Record<string, string> = { pv: 'solar', battery: 'battery', dg: 'diesel set', ev: 'EV chargers' }
+function BuildingCard({ z, asset }: { z: OpZone; asset?: Zone }) {
+  // assets the replay marks as not on campus today (campus.zones[i].asset_status); nothing when the field is absent
+  const prop = Object.entries(asset?.asset_status ?? {}).filter(([, v]) => v === 'PROPOSED').map(([k]) => ASSET_NAME[k] ?? k)
   return (
     <div className={`bcard st-${z.state}`}>
       <div className="bc-top"><b>{zn(z.name)}</b>{z.source === 'hardware' ? <span className="hwbadge">LIVE HARDWARE</span> : <span className="simbadge">simulated</span>}</div>
       <div className="bc-row tn"><span>Solar <b>{kw(z.pv_kw)}</b></span><span>Load <b>{kw(z.load_kw)}</b></span></div>
       {z.has.battery && <div className="bc-bat" title={`battery ${Math.round(100 * (z.soc ?? 0))}%, ${z.battery_kw > 1 ? `charging ${kw(z.battery_kw)}` : z.battery_kw < -1 ? `discharging ${kw(-z.battery_kw)}` : 'idle'}`}><i style={{ width: `${Math.round(100 * (z.soc ?? 0))}%` }} /><span className="tn">battery {Math.round(100 * (z.soc ?? 0))}% · {z.battery_kw > 1 ? 'charging' : z.battery_kw < -1 ? 'discharging' : 'idle'}</span></div>}
       <div className="bc-row small"><span>{stateText[z.state]}</span>{z.dg_kw > 0 && <span className="warn">diesel on</span>}{z.pump && <span>pump on</span>}</div>
+      {prop.length > 0 && <div className="bc-prop small"><StatusBadge s="PROPOSED" what={zn(z.name)} /><span className="muted">{prop.join(', ')}</span></div>}
       <div className="bc-next small"><b>{z.next_action}</b><span className="muted"> — {z.reason}</span></div>
     </div>
   )

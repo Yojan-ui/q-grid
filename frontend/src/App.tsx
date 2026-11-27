@@ -16,13 +16,15 @@ import { DataBadge } from './views/Views'
 const VerifyView = lazy(() => import('./views/Views').then(m => ({ default: m.VerifyView })))
 const OperateView = lazy(() => import('./views/Operate').then(m => ({ default: m.OperateView })))
 const DeployView = lazy(() => import('./views/Deploy').then(m => ({ default: m.DeployView })))
+const PlanView = lazy(() => import('./views/Plan').then(m => ({ default: m.PlanView })))
 import { Sankey } from './story/Sankey'
 
 // the 3D stack (three, react-three-fiber, drei) is its own chunk: the panel renders first, the campus streams in
 const loadStage = () => import('./story/Stage')
 const Stage = lazy(loadStage)
 
-type Tab = 'story' | 'operate' | 'deploy' | 'verify'
+type Tab = 'story' | 'operate' | 'deploy' | 'plan' | 'verify'
+const isTab = (m: string | null): m is Tab => m === 'operate' || m === 'deploy' || m === 'plan' || m === 'verify' || m === 'story'
 const SCEN_NAME: Record<string, string> = { outage_fest: 'Outage during the fest', fest: 'Fest', teaching: 'Teaching day', exam_week: 'Exam week', vacation: 'Vacation', monsoon: 'Monsoon' }
 const DAY_SECONDS = 18
 // static deployment (npm run build:static, Vercel): replay only, never probes for a backend
@@ -71,7 +73,7 @@ export default function App() {
   const [warm, setWarm] = useState<'idle' | 'warming' | 'ready' | 'offline'>('idle')
   const [idx, setIdx] = useState<Index | null>(null)
   const [missing, setMissing] = useState<string[] | null>(null)
-  const [tab, setTab] = useState<Tab>(() => { const m = new URLSearchParams(location.search).get('mode'); return m === 'operate' || m === 'deploy' || m === 'verify' ? m : 'story' })
+  const [tab, setTab] = useState<Tab>(() => { const m = new URLSearchParams(location.search).get('mode'); return isTab(m) ? m : 'story' })
   const [i, setI] = useState(() => { const s = new URLSearchParams(location.search).get('stop'); const k = STOPS.findIndex(x => x.id === s); return k >= 0 ? k : 0 })
   const [t, setT] = useState(0)
   const [playing, setPlaying] = useState(false)
@@ -94,6 +96,12 @@ export default function App() {
     probe(); const id = setInterval(probe, 15000)
     loadStage()   // fetch the 3D chunk while the replay JSON loads
     return () => clearInterval(id)
+  }, [])
+  // other components ask for a mode change (e.g. the sources dialog opens Verify)
+  useEffect(() => {
+    const f = (e: Event) => { const m = (e as CustomEvent<string>).detail; if (isTab(m)) setTab(m) }
+    window.addEventListener('qgrid:mode', f)
+    return () => window.removeEventListener('qgrid:mode', f)
   }, [])
   const key = scen && idx?.scenarios.some(x => x.key === scen) ? scen : idx?.headline ?? ''
   const { d, err, missing: storyMissing, loading } = useStoryData(key)
@@ -210,7 +218,7 @@ export default function App() {
         <header className="top">
           <div className="brand"><b>Q-Grid</b><span className="muted">Decentralised, QAOA-verified scheduling for the RVCE microgrid</span></div>
           <nav className="tabs modes" role="tablist" aria-label="modes">
-            {([['story', 'Explain'], ['operate', 'Operate'], ['deploy', 'Deploy'], ['verify', 'Verify']] as [Tab, string][]).map(([k, l]) =>
+            {([['story', 'Explain'], ['operate', 'Operate'], ['deploy', 'Deploy'], ['plan', 'Plan'], ['verify', 'Verify']] as [Tab, string][]).map(([k, l]) =>
               <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>)}
           </nav>
           <div className="right">
@@ -249,7 +257,7 @@ export default function App() {
               replayPulse={() => setPulseKey(k => k + 1)} showMiss={showMiss} setShowMiss={setShowMiss}
               onPrev={prev} onNext={next} go={go} index={i} benchDs={benchDs} setBenchDs={setBenchDs} online={online} />
           </main>
-        ) : <Suspense fallback={<Loading text={`Loading ${tab}…`} />}>{tab === 'verify' ? <VerifyView d={d} idx={idx} online={online} /> : tab === 'operate' ? <OperateView d={d} online={online} /> : <DeployView d={d} />}</Suspense>}
+        ) : <Suspense fallback={<Loading text={`Loading ${tab}…`} />}>{tab === 'verify' ? <VerifyView d={d} idx={idx} online={online} /> : tab === 'operate' ? <OperateView d={d} online={online} /> : tab === 'plan' ? <PlanView d={d} /> : <DeployView d={d} />}</Suspense>}
       </div>
       <SummaryDoc d={d} idx={idx} ds={benchDs} />
     </ProvProvider>
