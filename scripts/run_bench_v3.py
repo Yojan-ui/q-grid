@@ -10,6 +10,10 @@ Fairness protocol
   - comms-failure methods share one seeded 3 h campus network outage per day
   - battery wear (config battery_wear) is priced in every optimiser's objective and in the scored objective; the
     earlier design rows (Benders, first prototype) predate it and do not price it
+  - the monthly-peak demand term (qgrid/ablation/demand.py; tariff from config tariff_ht2c, fallback tariff_v2) is in
+    the objective of every planning method (GA, PSO, per-building MPC, central MPC, Q-Grid, best possible plan) and in
+    the scored planning objective (objective_plan_rs); status quo and rule-based do not plan and are only settled.
+    The bill is settled monthly in scripts/write_bench_v3.py. --peak=0 switches the term off (earlier protocol).
 
   python scripts/run_bench_v3.py [--workers=8] [--days=30] [--qgrid=1111]   -> results/bench_v3/*.csv
 """
@@ -38,7 +42,24 @@ WITHOUT_COORDINATOR = {"status_quo": True, "rule_based": True, "ga": True, "pso"
                        "central_mpc": False, "central_mpc_comms_fail": False, "qgrid": True, "qgrid_comms_fail": True,
                        "optimum": False}
 QGRID = "1111"
+PEAK = True                                                       # monthly-peak term in every planner's objective
 _C: dict = {}
+
+
+def demand_for(ds: str, day: str) -> dict:
+    """Tariff demand parameters for a dataset-day: the RVCE contract demand applies to RVCE only (the other sites are
+    far larger or smaller; no contract demand is known for them, so no floor / excess there)."""
+    from qgrid.ablation.demand import tariff_params
+    c = ctx(ds)
+    return tariff_params(c["campus"].cfg, day, contract_kva="config" if ds == "rvce" else None)
+
+
+def planner_demand(ds: str, day: str) -> dict | None:
+    if not PEAK:
+        return None
+    from qgrid.ablation.demand import planner_params, static_weights
+    c = ctx(ds)
+    return planner_params(demand_for(ds, day), static_weights(c["proc"], c["campus"].names))
 
 
 def ctx(ds: str):
@@ -117,6 +138,7 @@ def run_one(ds: str, day: str, method: str, return_sched: bool = False) -> dict:
     dd = make_day(campus, proc, day, "A", "eval", outage)
     win = comms_window(ds, day)
     q = [ch == "1" for ch in QGRID]
+    dem = planner_demand(ds, day)
     t0 = time.perf_counter()
     st = {}
     with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
@@ -125,21 +147,22 @@ def run_one(ds: str, day: str, method: str, return_sched: bool = False) -> dict:
         elif method == "rule_based":
             sched = b1_rule_based.solve(campus, dd)
         elif method in ("ga", "pso"):
-            sched = b2_ga_pso.solve(campus, forecast_day(c, dd, day), method.upper())
+            sched = b2_ga_pso.solve(campus, forecast_day(c, dd, day), method.upper(), demand=dem)
         elif method == "optimum":
-            sched = b4_central_milp.solve(campus, dd)
+            sched = b4_central_milp.solve(campus, dd, demand=dem)
         elif method == "per_building_mpc":
-            sched, st = run_day(campus, yd, day, outage, ACfg(True, True, True, True, share=False), forecaster=fc)
+            sched, st = run_day(campus, yd, day, outage, ACfg(True, True, True, True, share=False, demand=dem), forecaster=fc)
         elif method == "central_mpc":
-            sched, st = run_day(campus, yd, day, outage, ACfg(True, True, True, True, central=True), forecaster=fc)
+            sched, st = run_day(campus, yd, day, outage, ACfg(True, True, True, True, central=True, demand=dem), forecaster=fc)
         elif method == "central_mpc_comms_fail":
-            sched, st = run_day(campus, yd, day, outage, ACfg(True, True, True, True, central=True, comms_fail=win), forecaster=fc)
+            sched, st = run_day(campus, yd, day, outage, ACfg(True, True, True, True, central=True, comms_fail=win, demand=dem),
+                                forecaster=fc)
         elif method == "qgrid":
-            sched, st = run_day(campus, yd, day, outage, ACfg(*q), forecaster=fc)
+            sched, st = run_day(campus, yd, day, outage, ACfg(*q, demand=dem), forecaster=fc)
         elif method == "qgrid_comms_fail":
-            sched, st = run_day(campus, yd, day, outage, ACfg(*q, comms_fail=win), forecaster=fc)
+            sched, st = run_day(campus, yd, day, outage, ACfg(*q, comms_fail=win, demand=dem), forecaster=fc)
         elif method == "design_prototype_1h_binary":
-            sched, st = run_day(campus, yd, day, outage, ACfg(False, False, False, True), forecaster=fc)
+            sched, st = run_day(campus, yd, day, outage, ACfg(False, False, False, True, demand=dem), forecaster=fc)
         elif method == "design_earlier_prototype":
             sched, s1 = v1_run_day(campus, forecast_day(c, dd, day), method="classical")
             st = {"admm_converged_rate": s1.summary()["admm_convergence_rate"]}
@@ -158,13 +181,19 @@ def run_one(ds: str, day: str, method: str, return_sched: bool = False) -> dict:
     m = settle_v2(campus, dd, sched)
     f = check_feasibility(campus, sched, dd)
     x = extra_metrics(campus, dd, sched, m)
+    from qgrid.ablation.demand import planning_term
+    tp = demand_for(ds, day)
+    peak_kva = m["peak_import_kw"] / tp["pf"]
+    pterm = planning_term(peak_kva, tp) if PEAK else 0.0
     decisions = 24 if method not in ("status_quo", "rule_based", "optimum", "ga", "pso", "design_earlier_prototype") else 1
     return {"dataset": ds, "day": day, "method": method, "outage": "-".join(outage) if outage else "",
             "comms_window": f"{win[0]}-{win[1]}" if "comms" in method else "", "feasible": f["feasible"],
             **{k: m[k] for k in ("objective_rs", "cost_rs", "demand_charge_rs", "cost_incl_demand_rs", "peak_kva",
                                  "critical_downtime_h", "critical_unserved_kwh", "unserved_kwh", "import_kwh", "co2_kg",
                                  "dg_litres", "spill_kwh", "voll_rs", "wear_rs")}, **x,
-            "objective_incl_demand_rs": m["objective_incl_demand_rs"], "runtime_s": rt,
+            "objective_incl_demand_rs": m["objective_incl_demand_rs"], "peak_import_kw": m["peak_import_kw"],
+            "peak_kva_tariff": peak_kva, "peak_term_rs": pterm, "objective_plan_rs": m["objective_rs"] + pterm,
+            "peak_priced": bool(PEAK), "tariff_source": tp["source"], "runtime_s": rt,
             "runtime_per_decision_s": st.get("plan_time_s", rt / decisions), "messages": st.get("messages", 0),
             "admm_converged_rate": st.get("admm_converged_rate", np.nan), "master_opt_share": st.get("master_opt_share", np.nan),
             "fallback_slots": st.get("fallback_slots", 0), "works_without_coordinator": WITHOUT_COORDINATOR.get(method, True)}
@@ -175,12 +204,13 @@ def run_bound(ds: str, day: str) -> dict:
     c = ctx(ds)
     outage = c["proc"]["meta"]["days"]["outages"].get(day)
     with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
-        return {"dataset": ds, "day": day, **day_bounds(c["campus"], c["yd"], day, outage)}
+        return {"dataset": ds, "day": day, "peak_priced": bool(PEAK),
+                **day_bounds(c["campus"], c["yd"], day, outage, demand=planner_demand(ds, day))}
 
 
-def _init(qg):
-    global QGRID
-    QGRID = qg
+def _init(qg, peak=True):
+    global QGRID, PEAK
+    QGRID, PEAK = qg, peak
 
 
 def main(workers: int, ndays: int, qgrid: str):
@@ -198,7 +228,7 @@ def main(workers: int, ndays: int, qgrid: str):
     tasks.sort(key=lambda t: -cost.get(t[3], 1))
     rows, bounds = [], []
     t_all = time.time()
-    with ProcessPoolExecutor(max_workers=workers, initializer=_init, initargs=(qgrid,)) as ex:
+    with ProcessPoolExecutor(max_workers=workers, initializer=_init, initargs=(qgrid, PEAK)) as ex:
         futs = {(ex.submit(run_one, ds, d, m) if k == "run" else ex.submit(run_bound, ds, d)): (k, ds, d, m)
                 for k, ds, d, m in tasks}
         for n, fu in enumerate(as_completed(futs), 1):
@@ -217,7 +247,8 @@ def main(workers: int, ndays: int, qgrid: str):
     pd.DataFrame(rows).to_csv(OUT / "runs.csv", index=False)
     pd.DataFrame(bounds).to_csv(OUT / "bounds.csv", index=False)
     json.dump({"runtime_s": time.time() - t_all, "workers": workers, "days_per_dataset": ndays, "qgrid_combo": qgrid,
-               "datasets": DATASETS, "methods": MAIN, "design_choices": DESIGN}, open(OUT / "run_info.json", "w", encoding="utf-8"), indent=1)
+               "datasets": DATASETS, "methods": MAIN, "design_choices": DESIGN,
+               "peak_priced": bool(PEAK)}, open(OUT / "run_info.json", "w", encoding="utf-8"), indent=1)
     print(f"done in {time.time() - t_all:.0f} s", flush=True)
 
 
@@ -226,4 +257,5 @@ if __name__ == "__main__":
     nd = next((int(a.split("=")[1]) for a in sys.argv if a.startswith("--days=")), 30)
     qg = next((a.split("=")[1] for a in sys.argv if a.startswith("--qgrid=")), QGRID)
     QGRID = qg
+    PEAK = next((a.split("=")[1] != "0" for a in sys.argv if a.startswith("--peak=")), True)
     main(w, nd, qg)
