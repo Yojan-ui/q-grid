@@ -17,7 +17,9 @@ def cfg():
 
 @pytest.fixture(scope="module")
 def layout0():
-    return json.loads((qd.PROC / "campus.json").read_text())
+    # the OSM layout before the estate rescale (written by campus.build_layout); older checkouts only have campus.json
+    p = qd.PROC / "campus_osm.json"
+    return json.loads((p if p.exists() else qd.PROC / "campus.json").read_text())
 
 
 def test_pv_existing(cfg):

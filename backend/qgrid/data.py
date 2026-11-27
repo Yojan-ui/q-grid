@@ -353,12 +353,24 @@ def build_prices(cfg: dict) -> tuple[pd.DataFrame, dict]:
     status = {}
 
     a = pc["A"]
-    imp = np.full(len(idx), float(a["import_base_rs_kwh"]))
-    for w in a["tod"]:
-        imp += w["adder"] * _window_mask(idx, w["start"], w["end"])
-    out = pd.DataFrame({"A_import": imp, "A_export": float(a["export_rs_kwh"])}, index=idx)
-    status["A"] = {"status": a["status"], "source": a["source"],
-                   "note": a["standin_note"] if a["status"] != "REAL" else ""}
+    th = cfg.get("tariff_ht2c")
+    if th:   # official BESCOM HT-2(c)(ii) (KERC orders, date-dependent, ToD by month), marginal slab rate per slot
+        from .v2.tariff import energy_price_slots, order_for
+        days = pd.date_range(idx[0].normalize(), idx[-1].normalize(), freq="D")
+        imp = np.concatenate([energy_price_slots(cfg, str(d.date()), 96) for d in days])[:len(idx)]
+        out = pd.DataFrame({"A_import": imp, "A_export": float(th["export_rs_kwh"])}, index=idx)
+        sts = sorted({str(order_for(cfg, str(d.date())).get("status", th.get("status"))) for d in days})
+        status["A"] = {"status": "REAL" if sts == ["VERIFIED"] else "PARTLY VERIFIED",
+                       "source": th.get("category", "HT-2(c)(ii)") + " — " + "; ".join(sorted({str(o.get("source")) for o in th["orders"]})),
+                       "note": "official KERC TO-2022 rates; FY2023-24 rates carried over until the TO-2023 schedule is obtained"
+                               if sts != ["VERIFIED"] else ""}
+    else:
+        imp = np.full(len(idx), float(a["import_base_rs_kwh"]))
+        for w in a["tod"]:
+            imp += w["adder"] * _window_mask(idx, w["start"], w["end"])
+        out = pd.DataFrame({"A_import": imp, "A_export": float(a["export_rs_kwh"])}, index=idx)
+        status["A"] = {"status": a["status"], "source": a["source"],
+                       "note": a["standin_note"] if a["status"] != "REAL" else ""}
 
     b = pc["B"]
     real = iex_series(year)
@@ -384,7 +396,10 @@ def load_co2_factor(cfg: dict) -> dict:
         assert 0.3 < v < 1.5
         return {"status": "REAL", "tco2_per_mwh": v, **d}
     c = cfg["co2"]
-    return {"status": "PENDING", "tco2_per_mwh": float(c["standin_tco2_per_mwh"]), "note": c["standin_note"]}
+    # the CEA PDFs are git-ignored; when the value was checked against them (config co2.status VERIFIED) say so
+    st = "REAL" if str(c.get("status", "")).upper() in ("VERIFIED", "REAL") else "PENDING"
+    return {"status": st, "tco2_per_mwh": float(c.get("tco2_per_mwh", c["standin_tco2_per_mwh"])),
+            "note": c.get("source", c.get("standin_note", ""))}
 
 
 # ----------------------------------------------------------------------------- scenarios & eval days

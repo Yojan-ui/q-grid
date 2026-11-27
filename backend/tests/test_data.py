@@ -75,6 +75,6 @@ def test_price_scenarios_standin_shapes():
     assert {"A_import", "A_export", "B_import", "B_export"} <= set(prices.columns)
     assert len(prices) == 365 * 96
     for k in ("A", "B"):
-        assert status[k]["status"] in ("REAL", "PENDING")
+        assert status[k]["status"] in ("REAL", "PENDING", "PARTLY VERIFIED")
         if status[k]["status"] == "PENDING":
             assert "STAND-IN" in status[k]["note"]

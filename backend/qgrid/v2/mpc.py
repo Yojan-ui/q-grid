@@ -337,7 +337,7 @@ def _run_day_v2(campus: Campus, yd: YearData, day: str, outage: list[str] | None
                 want = float(lay.D_on[0] @ y) > 0.5
                 run_on = s.dg_run if s.dg_on else 0
                 allowed = s.dg_on or s.dg_run >= cfg.min_off          # minimum down time
-                on = dg_decision(b.dg, want, run_on, allowed)
+                on = (not bool(w.grid[0])) and dg_decision(b.dg, want, run_on, allowed)   # backup only
                 pg = float(np.clip(bl.get(xi, "pg")[0], b.dg.p_min, b.dg.kw)) if on else 0.0
                 sched.dg_kw[i, t0] = pg
                 s.dg_run = s.dg_run + 1 if on == s.dg_on else 1

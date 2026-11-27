@@ -34,3 +34,6 @@ results/bench_v3_prev/
 
 # live forecast cache (Operate)
 data/cache/
+
+# agent worktrees
+.claude/worktrees/

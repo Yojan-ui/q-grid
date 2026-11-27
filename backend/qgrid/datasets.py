@@ -163,7 +163,13 @@ def _rvce_rescaled(cfg: dict, proc: dict) -> tuple[Campus, dict]:
     layout = campus_scale.rescale_layout(cfg, layout0)
     cfg2 = campus_scale.apply_dg_sets(cfg)
     campus = load_campus(cfg2, layout)
-    if layout is layout0:
+    if layout is layout0:      # processed data already built from the rescaled layout: only record the facts
+        proc = dict(proc)
+        meta = copy.deepcopy(proc["meta"])
+        meta["campus_rescale"] = {k: v for k, v in layout["rescale"].items() if k != "floor_m2_after_exclusion"}
+        meta.setdefault("data_status", {})["campus_assets"] = "TEAM BRIEF (RVCE estate data pending); " + ", ".join(
+            f"{k}: {v}" for k, v in campus_scale.asset_status(cfg).items())
+        proc["meta"] = meta
         return campus, proc
     proc = dict(proc)
     pv = proc["pv"].copy()

@@ -309,9 +309,10 @@ class Session:
                     if o["zone"] == b.name and o["device"] == "diesel":
                         want = o["state"] == "on"
                 run = self.dg_run[i]
-                on = dg_decision(b.dg, want, run if st.dg_on else 0, True)
+                on = (not grid) and dg_decision(b.dg, want, run if st.dg_on else 0, True)   # backup only
                 if on != want and minute % 15 == 0:
-                    self._event("safety", f"Safety kept the {b.name.replace('_', ' ')} diesel {'on' if on else 'off'} (minimum run time)", sev="warn", zone=b.name)
+                    why = "the grid is up; diesel is backup only" if grid else "minimum run time"
+                    self._event("safety", f"Safety kept the {b.name.replace('_', ' ')} diesel {'on' if on else 'off'} ({why})", sev="warn", zone=b.name)
                 dg = float(np.clip(z["dg_kw"][h] if z else b.dg.p_min, b.dg.p_min, b.dg.kw)) if on else 0.0
                 if minute % 15 == 0:
                     self.dg_run[i] = run + 1 if on == st.dg_on else 1
