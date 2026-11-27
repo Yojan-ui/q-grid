@@ -22,7 +22,7 @@ const CHROME = arg('chrome', [
   'C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe',
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/google-chrome',
 ].find(p => existsSync(p)))
-const STOPS = ['1', '2', '3', '4a', '4b', '4c', '4d', '4e', '4f', '4g', '5', '5b', '6', '6b', '7a', '7b', '7c', '7d', '7e']
+const STOPS = ['1', '2', '3', '4a', '4b', '4c', '4d', '4e', '4f', '4g', '5', '5b', '6', '6b', '7a', '7f', '7b', '7c', '7d', '7e']
 // how long to let each stop's motion play before the screenshot (ms)
 const WAIT = { '1': 9000, '3': 4200, '4c': 4200, '4d': 2600, '4e': 2200, '5': 9000, '6': 12000, '7a': 6000, '7b': 3000 }
 const sleep = ms => new Promise(r => setTimeout(r, ms))

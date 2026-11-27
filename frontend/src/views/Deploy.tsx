@@ -7,6 +7,9 @@ import type { StoryData } from '../lib/story'
 import { useC } from '../lib/theme'
 import { lakh } from '../story/Impact'
 import { reg } from '../lib/numcheck'
+import { StatusBadge } from '../story/Badges'
+import { zn } from '../lib/labels'
+import type { AssetKey } from '../lib/data'
 
 type Box = { id: string; x: number; y: number; w: number; h: number; title: string; sub: string; does: string; hw: string[]; cost?: string }
 const BOXES: Box[] = [
@@ -77,8 +80,10 @@ export function DeployView({ d }: { d: StoryData }) {
           <div className="key"><span className="kl">10-year NPV</span><b className="kv">{lakh(m.central.npv_net_rs)}</b><span className="kn">P5–P95 {lakh(m.monte_carlo.npv_net_rs.p5)} to {lakh(m.monte_carlo.npv_net_rs.p95)}</span></div>
           <div className="key"><span className="kl">Chance the NPV is positive</span><b className="kv">{Math.round(100 * m.monte_carlo.npv_net_rs.prob_positive)}%</b><span className="kn">{m.monte_carlo.samples.toLocaleString('en-IN')} Monte Carlo samples</span></div>
         </div>
-        <p className="muted small">From the economics module (scripts/write_impact.py, docs/impact.md). Batteries, solar and diesel sets are already on campus in this model; their wear is counted.</p>
+        <p className="muted small">From the economics module (scripts/write_impact.py, docs/impact.md). {d.sc.campus.zones.some(z => Object.values(z.asset_status ?? {}).some(v => v === 'PROPOSED')) ? 'Some batteries, solar or EV chargers in this model are proposed, not on campus today (see the table below); this node cost does not include them. Battery wear is counted.' : 'Batteries, solar and diesel sets are already on campus in this model; their wear is counted.'}</p>
       </section>}
+
+      <AssetTable d={d} />
 
       <section className="card"><h3>Safety and security</h3>
         <div className="safety">
@@ -99,6 +104,23 @@ export function DeployView({ d }: { d: StoryData }) {
 
       <Shadow d={d} />
     </main>
+  )
+}
+
+/** On campus today vs proposed, per zone, from the replay (campus.zones[i].asset_status, campus.cables_status).
+ *  Hidden when the replay does not carry asset status. */
+function AssetTable({ d }: { d: StoryData }) {
+  const zs = d.sc.campus.zones
+  if (!zs.some(z => z.asset_status) && !d.sc.campus.cables_status) return null
+  const cols: [AssetKey, string][] = [['pv', 'Solar'], ['battery', 'Battery'], ['dg', 'Diesel set'], ['ev', 'EV chargers']]
+  const cell = (s?: string) => !s ? <span className="muted">–</span> : s === 'EXISTING' ? <span className="okc">on campus</span> : <StatusBadge s={s as 'PROPOSED' | 'PENDING'} />
+  return (
+    <section className="card"><h3>On campus today, and what is proposed</h3>
+      <div className="tablewrap"><table className="tbl assets"><thead><tr><th>Building</th>{cols.map(([k, l]) => <th key={k}>{l}</th>)}</tr></thead>
+        <tbody>{zs.map(z => <tr key={z.name}><td>{zn(z.name)}</td>{cols.map(([k]) => <td key={k}>{cell(z.asset_status?.[k])}</td>)}</tr>)}</tbody></table></div>
+      {d.sc.campus.cables_status && <p className="small">Cables between buildings: {d.sc.campus.cables_status === 'EXISTING' ? <span className="okc">on campus</span> : <StatusBadge s="PROPOSED" what="Inter-building cables" />}{d.sc.campus.cables_status === 'PROPOSED' ? ' — the shared-power results assume they are built.' : ''}</p>}
+      <p className="muted small">Status from the replay (campus asset status, scripts/make_replay.py). Proposed assets are part of the plan being evaluated, not equipment RVCE has today.</p>
+    </section>
   )
 }
 

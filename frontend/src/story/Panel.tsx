@@ -10,6 +10,10 @@ import { CommsChart, SmallMultiples } from './Scorecard'
 import { Tex } from './Tex'
 import { LiveQaoa, RemoveBuilding, RuleCard } from './Live'
 import { ImpactDetail, lakh } from './Impact'
+import { StatusBadge } from './Badges'
+import { SourcesButton } from '../panels/Sources'
+import { regText } from '../lib/numcheck'
+import { anyNotExisting, cablesProposed } from '../lib/labels'
 
 
 export type PanelProps = {
@@ -25,7 +29,7 @@ export type PanelProps = {
 
 const Pending = ({ what }: { what: string }) => <span className="pending" title={`${what} is a labelled stand-in until the official data arrives`}>stand-in</span>
 
-function Key({ label, children, pending, note }: { label: string; children: React.ReactNode; pending?: string; note?: string }) {
+function Key({ label, children, pending, note }: { label: React.ReactNode; children: React.ReactNode; pending?: string; note?: string }) {
   return <div className="key"><span className="kl">{label}{pending && <Pending what={pending} />}</span><b className="kv">{children}</b>{note && <span className="kn">{note}</span>}</div>
 }
 
@@ -88,20 +92,24 @@ function content(p: PanelProps): Body {
       const pr = d.problem
       const noonPrice = sc.slots.price_export[48], evePrice = Math.max(...sc.slots.price_import)
       const hs = d.bench?.headline.story
+      const day = <>{hs ? `Average of ${hs.n_days} modelled RVCE days${hs.numbers.optimum_saving_pct ? `; the best possible plan would pay ${Number(hs.numbers.optimum_saving_pct).toFixed(1)}% less` : ''}. ` : ''}One {SCENARIO(sc)} day up close ({fmtDate(sc.scenario.date)}{out ? `, BESCOM supply down ${slotT(out[0])}–${slotT(out[1])}` : ''}): {pr ? <>around noon it exported <b className="tn">{num(Number(pr.noon_export_kwh))} kWh</b> at Rs {noonPrice}/kWh, and in the evening imported <b className="tn">{num(Number(pr.evening_import_kwh))} kWh</b> at up to Rs {evePrice}/kWh.</> : 'every building acts on its own.'}</>
+      const pts = (sc.problem_points ?? []).filter(x => x && x.title).slice(0, 4)
       return {
         answer: hs ? <>{hs.step1.text}{hs.tariff_pending && <> <Pending what="Tariff" /></>}</>
           : out ? <>Today the campus sells noon solar cheaply, buys power back expensively in the evening, and runs diesel when the grid fails.</>
           : <>Today the campus sells noon solar cheaply and buys power back expensively in the evening.</>,
-        support: <>
-          <p>{hs ? `Average of ${hs.n_days} modelled RVCE days${hs.numbers.optimum_saving_pct ? `; the best possible plan would pay ${Number(hs.numbers.optimum_saving_pct).toFixed(1)}% less` : ''}. ` : ''}One {SCENARIO(sc)} day up close ({fmtDate(sc.scenario.date)}{out ? `, BESCOM supply down ${slotT(out[0])}–${slotT(out[1])}` : ''}): {pr ? <>around noon it exported <b className="tn">{num(Number(pr.noon_export_kwh))} kWh</b> at Rs {noonPrice}/kWh, and in the evening imported <b className="tn">{num(Number(pr.evening_import_kwh))} kWh</b> at up to Rs {evePrice}/kWh.</> : 'every building acts on its own.'}</p>
-        </>,
+        // problem cards (scenario.problem_points) when the replay has them; the day in numbers moves into a fold
+        support: pts.length
+          ? <div className="problems" role="list">{pts.map(x => <div key={x.key} className={`problem pk-${x.key}`} role="listitem"><b>{regText(x.title, 'problem_points title (replay text)')}</b><span>{regText(x.text, 'problem_points text (replay text)')}</span></div>)}</div>
+          : <p>{day} <SourcesButton rows={sc.data_provenance} /></p>,
         keys: sc.problem && <>
           <Key label="Value lost that day" pending={priceStatus ? 'Tariff' : undefined}><CountUp value={sc.problem.rs_lost} format={rs} /></Key>
           <Key label="CO₂ that day" pending={cea ? 'CEA CO₂ factor' : undefined}><CountUp value={sc.problem.co2_kg} format={v => `${num(v)} kg`} delay={0.1} /></Key>
           <Key label="Diesel running" note={`critical loads unserved ${sc.problem.critical_downtime_h.toFixed(1)} h`}><CountUp value={sc.problem.dg_hours} format={v => `${v.toFixed(1)} h`} delay={0.2} /></Key>
         </>,
         extra: <>
-          <DayChart sc={sc} t={p.t} />
+          {pts.length > 0 && <details className="assume defn"><summary>One day up close</summary><p className="small">{day} <SourcesButton rows={sc.data_provenance} /></p><DayChart sc={sc} t={p.t} /></details>}
+          {!pts.length && <DayChart sc={sc} t={p.t} />}
           {sc.problem && <details className="assume defn"><summary>How “value lost” is computed</summary><p className="muted small">Σ over zones of min(kWh exported by day, kWh bought back later) × (average later import price − average export price). {num(sc.problem.reusable_kwh)} kWh qualify on this day.</p></details>}
           <div className="row"><button className="btn ghost small" onClick={p.onPlay}>{p.playing ? 'Pause the day' : 'Replay the day'}</button></div>
         </>,
@@ -112,10 +120,10 @@ function content(p: PanelProps): Body {
       const sel = zs.find(z => z.name === p.zone)
       return {
         answer: <>Every 15 minutes we decide what each of these does.</>,
-        support: <p>RVCE as {zs.length} zones traced from OpenStreetMap, joined by {sc.campus.lines.length} cables. Click a building to see what it can control.</p>,
+        support: <p>RVCE as {zs.length} zones traced from OpenStreetMap, joined by {sc.campus.lines.length} cables{cablesProposed(sc) && <> <StatusBadge s="PROPOSED" what="Inter-building cables" /></>}. Click a building to see what it can control. <SourcesButton rows={sc.data_provenance} /></p>,
         keys: <>
-          <Key label="Rooftop solar">{num(zs.reduce((a, z) => a + z.pv_kwp, 0))} kWp</Key>
-          <Key label="Batteries">{num(zs.reduce((a, z) => a + z.battery_kwh, 0))} kWh</Key>
+          <Key label={<>Rooftop solar{anyNotExisting(sc, 'pv') && <StatusBadge s="PROPOSED" what="Some rooftop solar" />}</>}>{num(zs.reduce((a, z) => a + z.pv_kwp, 0))} kWp</Key>
+          <Key label={<>Batteries{anyNotExisting(sc, 'battery') && <StatusBadge s="PROPOSED" what="Some batteries" />}</>}>{num(zs.reduce((a, z) => a + z.battery_kwh, 0))} kWh</Key>
           <Key label="Diesel sets">{num(zs.reduce((a, z) => a + z.dg_kw, 0))} kW</Key>
         </>,
         extra: <>
@@ -123,7 +131,7 @@ function content(p: PanelProps): Body {
           {sel ? (
             <div className="card">
               <h3>{zn(sel.name)}</h3>
-              <ul className="devlist">{devices(sel, sc).map(dv => <li key={dv.id ?? dv.key}><i className={`dot ${dv.key}`} /><span>{dv.label}</span><span className="muted tn">{dv.detail}</span></li>)}</ul>
+              <ul className="devlist">{devices(sel, sc).map(dv => <li key={dv.id ?? dv.key}><i className={`dot ${dv.key}`} /><span>{dv.label} <StatusBadge s={dv.status} what={dv.label} /></span><span className="muted tn">{dv.detail}</span></li>)}</ul>
               <p className="muted small">Loads are area-based estimates until RVCE meter data arrives.</p>
             </div>
           ) : <p className="muted small">Tip: hover lifts a building; click focuses it.</p>}

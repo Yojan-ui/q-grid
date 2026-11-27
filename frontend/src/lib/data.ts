@@ -4,7 +4,16 @@ export const API = (import.meta as any).env?.VITE_QGRID_API ?? 'http://localhost
 
 export type Zone = { name: string; cx: number; cy: number; pv_kwp: number; battery_kwh: number; battery_kw: number;
   dg_kw: number; tank_m3: number; critical_frac: number; source: string; flex?: { name: string; kw: number; slots: number }[];
-  buildings: { name: string | null; levels: number; polygon: [number, number][] }[] }
+  buildings: { name: string | null; levels: number; polygon: [number, number][] }[]
+  asset_status?: Partial<Record<AssetKey, AssetStatus>> }
+
+/** Whether an asset is on campus today or proposed (scripts/make_replay.py -> campus.zones[i].asset_status). */
+export type AssetStatus = 'EXISTING' | 'PROPOSED' | 'PENDING'
+export type AssetKey = 'pv' | 'battery' | 'dg' | 'ev'
+/** One input of the model and where it comes from (scenario_<key>.json -> data_provenance). */
+export type DataProvenanceRow = { item: string; value_label: string; source: string; page?: string | null; status: string }
+/** Step 1 problem cards (scenario_<key>.json -> problem_points). */
+export type ProblemPoint = { key: 'outages' | 'diesel' | 'demand_charges' | 'roofs' | string; title: string; text: string }
 
 export type Run = { p_bat: number[][]; soc: number[][]; flows: number[][]; dg_kw: number[][]; pump_on: number[][];
   tank_m3: Record<string, number[]>; net_kw: number[][]; grid_import_kw: number[]; grid_export_kw: number[];
@@ -14,13 +23,16 @@ export type Run = { p_bat: number[][]; soc: number[][]; flows: number[][]; dg_kw
 export type Scenario = {
   label: string; qiea_label: string; scenario: { key: string; date: string; day_type: string; note: string; outage: string[] | null }
   price_scenario: string; price_status: string; data_status: Record<string, string>
-  campus: { name: string; credit: string; outline: [number, number][] | null; zones: Zone[]; lines: [string, string][]; line_step_kw: number }
+  campus: { name: string; credit: string; outline: [number, number][] | null; zones: Zone[]; lines: [string, string][]; line_step_kw: number
+    cables_status?: 'PROPOSED' | 'EXISTING' }
   slots: { t: string[]; sun: { elevation_deg: number[]; azimuth_deg: number[] }; pv_kw: number[][]; load_kw: number[][];
     crit_kw: number[][]; price_import: number[]; price_export: number[]; grid_up: number[]; co2_kg_per_kwh: number }
   runs: { qgrid: Run; status_quo?: Run; qgrid_v2?: Run }; replay_matches_benchmark: boolean
   admm: { iterations: Record<string, { k: number; r_primal: number; r_dual: number; agreed: boolean; proposals: Record<string, number[]> }[]>; summary: Record<string, any>; lines: [string, string][] }
   explanations: Record<string, Record<string, string[]>>; qaoa_file: string; benchmark: Record<string, any>[]
   headline?: any; live_solve?: LiveSolve[]; provenance: Provenance
+  data_provenance?: DataProvenanceRow[]
+  problem_points?: ProblemPoint[]
   v2?: V2Data
   qgrid_story?: QStory
   problem?: { rs_lost: number; reusable_kwh: number; co2_kg: number; dg_hours: number; cost_rs: number; critical_downtime_h: number; definition: string } | null
@@ -161,3 +173,22 @@ export type Impact = {
 }
 
 export type ShadowSide = { bill_rs: number; critical_downtime_h: number; dg_litres: number; co2_kg: number; import_kwh: number; unserved_kwh: number }
+
+// ---- investment planner (results/replay/planner.json from scripts/plan_investment.py)
+export type PlanOutcome = { extra_kwp: Record<string, number>; battery_kwh: number; contract_kva: number
+  capex_rs: number; annual_saving_rs: number; payback_years: number | null; npv10_rs: number; peak_kva: number
+  diesel_litres_year: number; co2_t_year: number }
+export type Planner = {
+  status: string; generated_by: string; labels: { tariff?: string; costs?: string } & Record<string, string | undefined>
+  roof_groups: { key: string; label: string; existing_kwp: number; max_extra_kwp: number; step_kwp: number }[]
+  battery: { max_kwh: number; step_kwh: number }; contract_demand_options: number[]
+  cases: PlanOutcome[]; optimum: PlanOutcome & { note?: string }
+  assumptions: { name: string; value: number | string | [number, number] | null; unit: string; source: string }[]
+}
+/** The planner grid, or null when replay/planner.json has not been generated (or is not a planner file). */
+export async function loadPlanner(): Promise<Planner | null> {
+  try {
+    const p = await getJSON<Planner>('planner.json')
+    return p && Array.isArray(p.cases) && Array.isArray(p.roof_groups) && p.battery ? p : null
+  } catch { return null }
+}
