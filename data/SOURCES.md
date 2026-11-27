@@ -11,10 +11,14 @@ Status legend: **REAL** = official/primary data in `data/raw/` and used for resu
 | NASA POWER hourly clear-sky (CLRSKY_SFC_SW_DWN), same site, 2023 | **REAL** | v2 solar forecast (clear-sky envelope) | `data/raw/nasa_power/bengaluru_2023_hourly_clearsky.json` |
 | Building Data Genome Project 2 (BDG2): hourly electricity meters, 1,578 non-residential buildings, 2016-17 | **REAL** | zone load shapes (7 of 9 zones) | `data/raw/bdg2/electricity_cleaned.csv`, `metadata.csv`, `LICENSE` |
 | Ausgrid Solar Home Electricity Data 2012-13 (half-hourly, 300 homes) | REAL, **superseded by BDG2** (used only if `loads.source: templates`) | hostel load shape (v1) | `data/raw/ausgrid/Solar home 2012-2013.csv` (+ archive zip, notes PDF) |
-| BESCOM HT educational tariff with ToD + KERC solar export rate | **PENDING** | price scenario A (headline) | `data/raw/tariff/` |
+| BESCOM HT educational tariff with ToD + KERC solar export rate | **PENDING** (stand-in, scenario A) | price scenario A (headline) | `data/raw/tariff/` |
+| KERC Tariff Order 2022 (BESCOM) HT-2(c)(ii), FY2022-23: energy slabs, demand charge, ToD, billing-demand rules | **VERIFIED** (PDF pages cited) | `tariff_ht2c` FY2022-23 order | `data/raw/tariff/bescom_tariff_2023.pdf` |
+| KERC Tariff Order 2023 (BESCOM) HT-2(c)(ii), FY2023-24 rate schedule | **PENDING** (PDF missing; team-brief values) | `tariff_ht2c` FY2023-24 order | expected `data/raw/tariff/bescom_tariff_2024.pdf` |
+| KERC rooftop solar export tariff (Rs 3.74/kWh) | **PENDING** (team brief) | `tariff_ht2c.export_rs_kwh` | expected `data/raw/tariff/kerc_solar_rooftop_tariff_order.pdf` |
 | IEX Day-Ahead Market 15-min MCP, 2023 | **PENDING** | price scenario B | `data/raw/iex/` |
-| CEA CO2 Baseline Database (grid weighted-average emission factor) | **PENDING** | CO2 accounting | `data/raw/cea/` |
+| CEA CO2 Baseline Database (grid weighted-average emission factor) | **REAL** (0.727 tCO2/MWh, FY2023-24) | CO2 accounting | `data/raw/cea/CEA_CO2_Baseline_User_Guide_v20.0.pdf`, `v21.0.pdf`, `emission_factor.yaml` |
 | OpenStreetMap: RVCE campus outline + building footprints | **REAL** | zones, roof area → PV kWp, tie-line layout, 3D campus | `data/raw/osm_rvce.json`, `osm_rvce.geojson` |
+| RVCE estate figures (500.48 kWp PV on 21 roofs, 67,721 m² built-up, boys' hostels 38,659 m² / 1,450 beds, DG 980 kVA in two sets) | **TEAM BRIEF** (RVCE estate data pending) | campus rescale (`config.yaml campus.facts / pv_existing / dg_sets`) | none (no document) |
 | RVCE academic calendar | **PENDING** (fest dates sourced) | day types / scenario dates | `data/raw/rvce_calendar.csv` (optional) |
 | RVCE BESCOM bills / meter data | **PENDING RVCE DATA** | campus load totals | `data/raw/rvce_bills.csv` (optional) |
 | Faculty lab schedule | **TEMPLATE** | lab loads, critical labs | `data/raw/lab_schedule.csv` |
@@ -93,6 +97,7 @@ Status legend: **REAL** = official/primary data in `data/raw/` and used for resu
     therefore peak in the evening more than a real lab block would.
 
 ## Price scenario A — BESCOM HT educational ToD tariff + KERC solar export rate — PENDING
+(The HT-2(c)(ii) monthly tariff `tariff_ht2c` below supersedes this stand-in once the settlement engine reads it.)
 - Needed: the KERC tariff order applicable to 2023 (BESCOM HT educational institutions category,
   energy charge + ToD adders) and the KERC order fixing the solar (rooftop/export) tariff.
 - STAND-IN currently used (config.yaml `prices.A`, labelled STAND-IN everywhere): base 8.00 Rs/kWh,
@@ -103,13 +108,39 @@ Status legend: **REAL** = official/primary data in `data/raw/` and used for resu
   (Excel export). Parser: `qgrid.data.parse_iex_file` (tolerant to header rows / merged date cells).
 - STAND-IN currently used: synthetic hour-window price shape (config.yaml `prices.B.standin_profile_rs_kwh`).
 
-## CEA CO2 baseline — PENDING
-- Needed: latest "CO2 Baseline Database for the Indian Power Sector — User Guide" PDF from `https://cea.nic.in/`.
-- STAND-IN currently used: 0.727 tCO2/MWh — the v20.0 weighted average for FY2023-24 as quoted by
-  secondary sources (Climatiq `https://www.climatiq.io/data/source/government-of-india-_-central-electricity-authority`;
-  Saur Energy `https://www.saurenergy.com/solar-energy-news/ceas-co2-baseline-database-impact-of-re-on-indian-grid-emissions-intensity`).
-  A later version (v22.0) may revise it; to be verified against the PDF and recorded in
-  `data/raw/cea/emission_factor.yaml` with the page number.
+## HT-2(c)(ii) tariff (`config.yaml tariff_ht2c`, `qgrid/v2/tariff.py`) — FY2022-23 VERIFIED, FY2023-24 PENDING
+Official files from BESCOM's tariff page `https://bescom.karnataka.gov.in/62/bescom-tariff/en`, fetched 2026-11-27
+(the KERC site `kerc.karnataka.gov.in` failed TLS verification from the fetch host, so nothing was taken from it).
+The two tariff PDFs are scans: values were read from the rendered page images; page = printed page [PDF page].
+
+| File | URL | SHA-256 | What it is |
+|---|---|---|---|
+| `data/raw/tariff/bescom_tariff_2023.pdf` | `https://bescom.karnataka.gov.in/storage/pdf-files/RA%20section/Tariff-2023.pdf` | 84662da9160dd429a68971f91c07c0832d804094062444caeece61d91d109c07 | KERC Tariff Order 2022 (BESCOM), dated 04.04.2022, Annexure-5 "Electricity Tariff-2023", effective from the first meter-reading date on or after 01.04.2022 (printed pp. 375-415, 41 PDF pages) |
+| `data/raw/tariff/bescom_tariff_order_2023_highlights.pdf` | `https://bescom.karnataka.gov.in/storage/pdf-files/RA%20section/engnotification.pdf` | 51f2d18614ec753a15b1a5309f89974598014799b7532ef2ac8ad0ca6bd3fb8b | BESCOM public notice (Times of India, 24.05.2023): Tariff Order 2023 dated 12.05.2023 applies from the first meter-reading date on or after 01.04.2023; no category rates |
+| `data/raw/tariff/bescom_other_tariff_issues_FY23_en.pdf` | `https://bescom.karnataka.gov.in/storage/pdf-files/RA%20section/Other%20tariff%20related%20issues%20for%20FY-23%20-%20English.pdf` | f35a951b201d17499db6eaefb227f7f3c3bb49b35528d78f075a5f363ab3cb66 | FY-23 cross-subsidy surcharge (HT-2(c)(ii) 215 paise/unit, p.2), electricity tax 9 % (p.3), incentive schemes (p.3) |
+
+Values used (TO-2022, `bescom_tariff_2023.pdf`): HT-2(c)(ii) demand Rs 265/kVA/month, energy 825 paise/unit for the
+first one lakh units and 865 paise for the balance, p.412 [38]; ToD Dec-Jun +100 paise 18-22 h, -100 paise 22-06 h,
+Jul-Nov 0, p.412 [38] and notes 10-12 p.408 [34]; billing demand = max(recorded MD, 85 % of CD) and excess over CD at
+two times the rate, p.404 [30]; billing demand rounding and PF 0.90, p.405 [31].
+Inspected and NOT used: `Tariff rates FY-2021-22.pdf` (Tariff Order 2021, FY2021-22) and `ElectricityTariff-2024.xlsx`
+(a BESCOM working file with FY16-era tables; it does not hold the TO-2023 rate schedule). Missing PDFs:
+docs/data_verification.md.
+
+## CEA CO2 baseline — REAL
+- Files (fetched 2026-11-27 from CEA's report API, links on `https://cea.nic.in/`):
+  - `data/raw/cea/CEA_CO2_Baseline_User_Guide_v20.0.pdf` — `https://cea.nic.in/api/cdm-report-version/view-pdf/en/76`,
+    "CO2 Baseline Database for the Indian Power Sector, User Guide, Version 20.0, December 2024",
+    SHA-256 b881c258f58fd77c8faeb36479ccd1ed8bd111c45e708196df8a66ff7b29afc6.
+  - `data/raw/cea/CEA_CO2_Baseline_User_Guide_v21.0.pdf` — `https://cea.nic.in/api/cdm-report-version/view-pdf/en/78`,
+    Version 21.0, November 2025, SHA-256 212a9f7d7a4c2502418924765288b3e4edd3a35d5a87ac87aa611819c16431fa.
+  - (`.../view-pdf/en/74` = Version 19.0, Dec 2023, FY2022-23 = 0.716, inspected, not kept.)
+- Value: weighted average emission factor of the Indian grid, FY2023-24 = **0.727 tCO2/MWh** (v20.0, Table S, printed
+  p.1 [PDF p.4]; worked calculation 1204.51 Mt / 1655.7 BU, p.12 [15]). v21.0 Annexure-I, p.21 [27], after final
+  captive data: 2022-23 = 0.716, 2023-24 = 0.727, 2024-25 = 0.710. Recorded in `data/raw/cea/emission_factor.yaml`.
+- Licence: Government of India publication (CEA). Like the other raw files, the PDFs are not committed (data/raw is
+  git-ignored); re-fetch from the URLs above and check the SHA-256. `emission_factor.yaml` is committed;
+  `qgrid.data.load_co2_factor` reports REAL only when it and a CEA PDF are both present.
 
 ## Synthetic data
 Synthetic inputs appear only in unit tests (`backend/tests/`), labelled SYNTHETIC in the test code.
@@ -123,6 +154,21 @@ Synthetic inputs appear only in unit tests (`backend/tests/`), labelled SYNTHETI
   regex; floor area = footprint × `building:levels` (or zone default, ASSUMPTION); PV kWp = footprint × 45 % usable
   roof × 0.18 kWp/m² (ASSUMPTION); tie-lines = minimum spanning tree on zone centroids + 2 shortest extra links,
   degree ≤ 3. The pump house is not mapped in OSM; its location/size are ASSUMPTIONS.
+- Campus rescale (`config.yaml campus.rescale`, `qgrid/v2/campus_scale.py`, applied in `qgrid/datasets.py` "rvce"):
+  OSM buildings that are not RVCE's own are dropped (`campus.osm_exclude`):
+
+  | OSM id | name | zone | footprint m² | reason |
+  |---|---|---|---:|---|
+  | way/1286468169 | RVU Block | academic | 2,649.6 | RV University building (OSM name) |
+  | way/1286468170 | RVU A Block | academic | 2,967.4 | RV University building (OSM name) |
+  | way/1313225782 | RVU C Block | academic | 1,200.5 | RV University building (OSM name) |
+  | way/1467210438 | RVU Admin Block | admin | 1,094.1 | RV University building (OSM name) |
+
+  Not loaded at all by `campus.py` (unchanged): OSM *relations* (Mechanical Engineering, Chemical Engineering/Chemistry/
+  Physics, Biotechnology, Telecommunication Department, Krishna Hostel, Diamond Jubilee Hostel, RVU F Block) and
+  buildings tagged construction/roof/garage. Unnamed OSM buildings cannot be attributed to RVCE or RVU from OSM alone and
+  are kept. Floor areas are then scaled to the team-brief totals and 500.48 kWp of existing PV is spread over the zones
+  by footprint (ASSUMPTION); see docs/data_verification.md.
 
 ## Campus loads — PENDING RVCE DATA
 - Annual kWh per zone = floor area × energy-use intensity (kWh/m²/yr, ASSUMPTION per zone in `config.yaml`).

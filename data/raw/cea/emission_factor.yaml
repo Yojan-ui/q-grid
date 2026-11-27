@@ -1,0 +1,7 @@
+# Read by backend/qgrid/data.py load_co2_factor() (REAL when this file and a CEA PDF are present in data/raw/cea/).
+weighted_average_tco2_per_mwh: 0.727
+fy: "2023-24"
+source: "CEA CO2 Baseline Database for the Indian Power Sector, User Guide Version 20.0 (December 2024), Table S, PDF page 4"
+confirmed_in: "User Guide Version 21.0 (November 2025), Annexure-I, printed page 21 (PDF page 27): 2023-24 = 0.727; 2022-23 = 0.716"
+file: data/raw/cea/CEA_CO2_Baseline_User_Guide_v20.0.pdf
+sha256: b881c258f58fd77c8faeb36479ccd1ed8bd111c45e708196df8a66ff7b29afc6

@@ -15,6 +15,40 @@ campus:
   slug: rvce
   pv: {usable_roof_frac: 0.45, kwp_per_m2: 0.18}      # ASSUMPTION: 45 % of roof usable, 180 Wp/m2 modules
   tie_lines: {max_degree: 3, extra_links: 2, step_kw: 120}   # ASSUMPTION: flow levels {-120, 0, +120} kW
+  # ---- campus rescale to RVCE's own estate (backend/qgrid/v2/campus_scale.py; applied in qgrid/datasets.py "rvce").
+  # Figures: "team brief, RVCE estate data pending" unless a document is named. Table: docs/data_verification.md.
+  rescale: {enabled: true}
+  asset_status: {pv: EXISTING, dg: EXISTING, battery: PROPOSED, ev: PROPOSED, cables: PROPOSED}
+  facts:
+    status: TEAM BRIEF
+    source: "team brief, RVCE estate data pending"
+    built_up_m2: 67721               # TEAM BRIEF: built-up area of RVCE's own buildings
+    built_up_includes_hostels: false # ASSUMPTION / OPEN QUESTION: brief does not say whether 67,721 m2 includes hostels
+    hostel_zone: hostels
+    boys_hostels_m2: 38659           # TEAM BRIEF
+    boys_hostel_beds: 1450           # TEAM BRIEF (metadata; loads still floor area x EPI)
+  pv_existing:                       # replaces roof area x usable fraction x kWp/m2 for the RVCE case study
+    status: TEAM BRIEF
+    source: "team brief, RVCE estate data pending"
+    roofs: 21
+    modules: 1564
+    module_wp: 320                   # 1,564 x 320 Wp = 500.48 kWp
+    total_kwp: 500.48
+    allocation: "footprint x pv_roof share per zone (ASSUMPTION: the 21 roofs are not identified)"
+  dg_sets:                           # 980 kVA in two sets; host = zone where the set is modelled, backs = zones it feeds
+    status: TEAM BRIEF
+    source: "team brief, RVCE estate data pending"
+    total_kva: 980
+    rated_pf: 0.8                    # ASSUMPTION: genset kW rating = kVA x 0.8 (usual rating convention)
+    operating: {min_load_frac: 0.3, min_on_slots: 4}   # ASSUMPTIONS (as before)
+    sets:                            # ASSUMPTION: the 490 + 490 kVA split and the host/backs mapping are not in the brief
+      - {name: DG-1, kva: 490, host: hostels, backs: [hostels, health_centre, pumping_station]}
+      - {name: DG-2, kva: 490, host: admin, backs: [admin, server_room, library]}
+  osm_exclude:                       # OSM buildings inside the RVCE outline that are not RVCE's (RV University = RVU)
+    - {osm_id: way/1286468169, name: "RVU Block", reason: "RV University building (OSM name), not RVCE"}
+    - {osm_id: way/1286468170, name: "RVU A Block", reason: "RV University building (OSM name), not RVCE"}
+    - {osm_id: way/1313225782, name: "RVU C Block", reason: "RV University building (OSM name), not RVCE"}
+    - {osm_id: way/1467210438, name: "RVU Admin Block", reason: "RV University building (OSM name), not RVCE"}
   # first matching rule wins (regex on OSM name / tags); exclude=true drops the feature
   zone_rules:
     - {exclude: true, tags: {building: "construction|roof|garage"}}
@@ -32,7 +66,9 @@ campus:
     - {zone: heavy_labs, name_regex: "mechanical|workshop|industrial|civil|chemical|aerospace|pg lab|kriya"}
     - {zone: academic, tags: {building: "."}}
   # per-zone ASSUMPTIONS: levels (if OSM has no building:levels), EPI kWh/m2/yr of floor area,
-  # critical share of load, battery, diesel generator, flexible loads
+  # critical share of load, battery, diesel generator, flexible loads.
+  # Status per asset type: campus.asset_status. Batteries, EV chargers (ev_charging flex job) and inter-building
+  # cables (tie-lines) are PROPOSED, not installed; PV and DG exist. Battery sizes below are PROPOSED (ASSUMPTION).
   zones:
     academic:
       levels: 3
@@ -58,7 +94,7 @@ campus:
       profile: hostel          # Ausgrid residential shape (real data), scaled
       critical_frac: 0.10
       battery: {kwh: 300, kw: 150}
-      dg: {kw: 100, min_load_frac: 0.3, min_on_slots: 4}
+      dg: {kw: 392, min_load_frac: 0.3, min_on_slots: 4}   # = campus.dg_sets DG-1: 490 kVA x 0.8
       flex:
         - {name: water_heaters, kw: 60, slots: 8, earliest: "01:00", latest: "04:00", default: "04:00"}
         - {name: laundry, kw: 25, slots: 8, earliest: "08:00", latest: "18:00", default: "18:00"}
@@ -84,7 +120,7 @@ campus:
       profile: office
       critical_frac: 0.10
       battery: {kwh: 150, kw: 75}
-      dg: {kw: 200, min_load_frac: 0.3, min_on_slots: 4}
+      dg: {kw: 392, min_load_frac: 0.3, min_on_slots: 4}   # = campus.dg_sets DG-2: 490 kVA x 0.8
     server_room:
       levels: 2
       epi_kwh_m2_yr: 1200
@@ -190,11 +226,17 @@ prices:
       - {start: "23:00", end: "24:00", price: 6.00}
 
 co2:
-  status: PENDING
-  standin_tco2_per_mwh: 0.727
+  status: VERIFIED            # checked against the CEA PDFs below (data/raw/cea/, SHA-256 in data/SOURCES.md)
+  tco2_per_mwh: 0.727
+  standin_tco2_per_mwh: 0.727   # kept under the old key: qgrid/data.py load_co2_factor() reads this name
   standin_note: >-
-    CEA CO2 Baseline Database v20.0 weighted average (FY2023-24) as quoted by secondary sources
-    (Climatiq; Saur Energy); not yet verified against the CEA PDF.
+    CEA CO2 Baseline Database for the Indian Power Sector, User Guide v20.0 (Dec 2024), Table S, PDF page 4: weighted
+    average emission factor of the Indian grid, FY2023-24 (incl. RES and captive injection) = 0.727 tCO2/MWh.
+    Unchanged in v21.0 (Nov 2025), Annexure-I, printed page 21 (PDF 27), after final captive data.
+  source: "CEA CO2 Baseline Database User Guide v20.0, Table S (PDF p.4); v21.0 Annexure-I (p.21)"
+  by_fy:                      # VERIFIED, v21.0 Annexure-I p.21 [27]; the model year 2023 spans FY2022-23 (Jan-Mar)
+    "2022-23": 0.716
+    "2023-24": 0.727
   lambda_rs_per_kg: 0.0
 
 # ----------------------------------------------------------------------------- calendar & scenarios
@@ -245,6 +287,78 @@ tariff_v2:                    # demand charge on the campus peak (one HT connect
   power_factor: 0.95          # ASSUMPTION
   days_per_month: 30          # ASSUMPTION: daily figures carry 1/30 of the monthly charge on the day's peak kVA
   pages: {}
+
+# ----------------------------------------------------------------------------- HT-2(c)(ii) tariff (monthly billing)
+# Read by backend/qgrid/v2/tariff.py (ht2c_params, order_for, energy_price_slots, monthly_bill).
+# Every value carries its source; page numbers are the PRINTED page numbers of the cited PDF (PDF page in brackets).
+# Raw PDFs + SHA-256: data/SOURCES.md. Full table: docs/data_verification.md.
+#   TO-2022 = KERC Tariff Order 2022 (BESCOM), dated 04.04.2022, Annexure-5 "Electricity Tariff-2023", effective from
+#             the first meter-reading date on or after 01.04.2022 (data/raw/tariff/bescom_tariff_2023.pdf, p.375 [1]).
+#   TO-2023 = KERC Tariff Order 2023 (BESCOM), dated 12.05.2023, effective from the first meter-reading date on or after
+#             01.04.2023 (BESCOM public notice, data/raw/tariff/bescom_tariff_order_2023_highlights.pdf). Its rate
+#             schedule PDF ("Electricity Tariff-2024") is NOT in the repo: FY2023-24 values are TEAM BRIEF / PENDING.
+#
+# ENERGY CHARGE FLAG FOR THE LEAD: the team brief says Rs 8.50/kWh; secondary sources say ~Rs 7.5-7.9/kWh.
+#   TO-2022 (FY2022-23) HT-2(c)(ii), p.412 [38]: 825 paise/unit for the first one lakh units, 865 paise for the balance
+#   (two slabs) -> neither 8.50 nor 7.5-7.9. The ~7.25/7.65 slabs belong to HT-2(c)(i) (government/aided institutions,
+#   hostels of all educational institutions, p.411 [37]), which may be where the "7.5-7.9" figure comes from.
+#   RESOLVED (lead decision): the brief's 8.50 / Rs 350 are dropped; both orders use the TO-2022 slabs and Rs 265.
+#   The FY2023-24 order carries the TO-2022 values over (status PENDING_CARRIED_OVER) until TO-2023 is obtained.
+# DEMAND CHARGE: TO-2022 HT-2(c)(ii) is Rs 265/kVA/month (p.412 [38]).
+tariff_ht2c:
+  status: PENDING            # REAL only if every value below is checked against the PDF with a page number
+  category: "HT-2(c)(ii) educational institutions"
+  category_note: >-
+    HT-2(c)(ii) = hospitals and educational institutions other than HT-2(c)(i) (TO-2022 p.412 [38]). HT-2(c)(i) covers
+    government/local-body and aided institutions and hostels of all educational institutions (p.411 [37]); whether
+    RVCE (private, aided status not checked) and its hostels are billed under (ii) needs an RVCE bill. PENDING RVCE bill.
+  orders:                    # date-dependent; order_for() picks the one with valid_from <= date <= valid_to
+    - valid_from: "2022-04-01"
+      valid_to: "2023-03-31"
+      energy_rs_kwh: 8.65    # marginal rate = "balance units" slab (campus import is far above one lakh units/month)
+      energy_slabs:          # used by monthly_bill(); VERIFIED TO-2022 p.412 [38]
+        - {upto_kwh: 100000, rs_kwh: 8.25}
+        - {upto_kwh: null, rs_kwh: 8.65}
+      demand_rs_kva_month: 265     # VERIFIED TO-2022 p.412 [38] (the brief's 350 does NOT match this order)
+      tod_min_contract_kva: 0      # TO-2022 states ToD for HT-2(a)/(b)/(c) with no demand threshold (p.412 [38]);
+                                   # peak +100 paise Dec-Jun "applicable to all the HT consumers" (p.408 [34], note 11)
+      source: "KERC Tariff Order 2022 (BESCOM), dated 04.04.2022, Annexure-5 Electricity Tariff-2023, HT-2(c)(ii)"
+      file: data/raw/tariff/bescom_tariff_2023.pdf
+      page: 412
+      status: VERIFIED
+    - valid_from: "2023-04-01"
+      valid_to: "2024-03-31"
+      # LEAD DECISION: TO-2022 values carried over until the TO-2023 rate schedule is obtained (NOT verified for FY2023-24)
+      energy_rs_kwh: 8.65          # carried over from TO-2022 p.412 (balance-units slab)
+      energy_slabs:                # carried over from TO-2022 p.412 [38]
+        - {upto_kwh: 100000, rs_kwh: 8.25}
+        - {upto_kwh: null, rs_kwh: 8.65}
+      demand_rs_kva_month: 265     # carried over from TO-2022 p.412 [38]
+      tod_min_contract_kva: null   # null -> tod.min_contract_kva (500 kVA, TEAM BRIEF)
+      source: "KERC Tariff Order 2023 (BESCOM), dated 12.05.2023, HT-2(c)(ii) (rate schedule PDF missing)"
+      values_from: "KERC Tariff Order 2022 (BESCOM), dated 04.04.2022, HT-2(c)(ii), p.412"
+      note: "TO-2022 values carried over until the TO-2023 rate schedule is obtained"
+      file: null
+      page: null
+      status: PENDING_CARRIED_OVER
+  tod:                       # hours are [start, end) local time; offpeak wraps midnight
+    months: [12, 1, 2, 3, 4, 5, 6]   # VERIFIED TO-2022 p.412 [38]: Dec-Jun; Jul-Nov (monsoon) 0
+    peak_hours: [18, 22]
+    peak_adder_rs_kwh: 1.00          # VERIFIED TO-2022 p.412 [38]: (+) 100 paise
+    offpeak_hours: [22, 6]
+    offpeak_adder_rs_kwh: -1.00      # VERIFIED TO-2022 p.412 [38]: (-) 100 paise (not for Special Incentive Scheme, p.408)
+    min_contract_kva: 500            # TEAM BRIEF (not found in TO-2022; check TO-2023)
+  export_rs_kwh: 3.74        # TEAM BRIEF, PENDING: KERC rooftop solar tariff order not in the repo
+  billing_demand_floor_frac: 0.85    # VERIFIED TO-2022 p.404 [30] cond. 1(A): max(recorded MD, 85 % of CD)
+  excess_demand_multiplier: 2.0      # VERIFIED TO-2022 p.404 [30] cond. 1(D): excess over CD at two times the rate
+  round_billing_demand: true         # VERIFIED TO-2022 p.405 [31] cond. 1(G): >= 0.5 kVA rounds up, < 0.5 ignored
+  power_factor: 0.95         # ASSUMPTION (TO-2022 p.405 [31]: specified PF 0.90, 3 paise/unit surcharge per 0.01 below)
+  contract_demand_kva: 1300  # TEAM BRIEF / ASSUMPTION, PENDING RVCE bill
+  contract_demand_sweep: [1000, 1300, 1600]
+  billing_month: calendar    # ASSUMPTION: BESCOM bills meter-reading date to meter-reading date
+  not_modelled: >-
+    Electricity tax 9 % ad valorem (GoK notification 24 of 19.07.2018, BESCOM 'Other tariff related issues FY-23'
+    p.3), fuel-cost adjustment (quarterly KERC orders), PF surcharge, Special Incentive / Discounted Energy Rate schemes.
 
 v2:
   horizon_slots: 96           # 24 h rolling horizon, re-planned every slot (MPC)
