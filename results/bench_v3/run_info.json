@@ -1,6 +1,6 @@
 {
- "runtime_s": 31437.46649289131,
- "workers": 8,
+ "runtime_s": 10230.713327884674,
+ "workers": 9,
  "days_per_dataset": 30,
  "qgrid_combo": "1111",
  "datasets": [
