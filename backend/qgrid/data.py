@@ -31,7 +31,19 @@ def load_config(path: Path | None = None) -> dict:
     """config.yaml, or the file named by QGRID_CONFIG (another campus, see scripts/new_campus.py)."""
     import os
     p = path or (ROOT / os.environ["QGRID_CONFIG"] if os.environ.get("QGRID_CONFIG") else ROOT / "config.yaml")
-    return yaml.safe_load(Path(p).read_text())
+    cfg = yaml.safe_load(Path(p).read_text(encoding="utf-8"))
+    # sensitivity runs: QGRID_CONFIG_OVERRIDE='{"outage_costs.voll_critical_rs_kwh": 500, ...}' (dotted keys); inherited
+    # by worker processes, and recorded by the scripts that use it
+    ov = os.environ.get("QGRID_CONFIG_OVERRIDE")
+    if ov:
+        import json
+        for k, v in json.loads(ov).items():
+            d = cfg
+            *path_, last = k.split(".")
+            for part in path_:
+                d = d.setdefault(part, {})
+            d[last] = v
+    return cfg
 
 
 def year_index(year: int) -> pd.DatetimeIndex:

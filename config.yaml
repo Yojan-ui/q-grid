@@ -180,6 +180,24 @@ battery_wear:                 # battery wear priced in every optimiser's objecti
   in_objective: true          # Rs per kWh charged or discharged = economics.battery_capex / (2 x cycle life x DoD)
   depth_of_discharge: 0.75    # ASSUMPTION (same as the degradation metric)
 
+planner:                      # investment planner (scripts/plan_investment.py). Costs are ASSUMPTIONS (vendor quotes PENDING)
+  status: ASSUMPTION
+  roof_groups:                # zones grouped by roof; extra kWp limited by each zone's usable OSM roof (campus.pv)
+    academic: {label: "Academic blocks and labs", zones: [academic, heavy_labs]}
+    hostels: {label: "Hostels", zones: [hostels]}
+    other: {label: "Library, food court, admin and others", zones: [library, canteen, admin, server_room, health_centre]}
+  extra_kwp_fracs: [0.0, 0.5, 1.0]     # grid of cases: share of each group's remaining roof
+  battery_kwh_steps: [0, 250, 500, 1000]
+  battery_kw_per_kwh: 0.5              # ASSUMPTION: 2-hour battery
+  pv_capex_rs_per_kwp: 45000           # ASSUMPTION: rooftop PV installed cost, quote PENDING
+  pv_om_frac_per_year: 0.01            # ASSUMPTION
+  pv_life_years: 25                    # ASSUMPTION
+  battery_capex_rs_per_kwh: 25000      # ASSUMPTION (= economics.battery_capex_rs_per_kwh)
+  battery_om_frac_per_year: 0.02       # ASSUMPTION
+  battery_life_years: 10               # ASSUMPTION
+  npv_years: 10
+  baseline: {extra_kwp: 0, battery_kwh: 0}   # "today": existing PV, no battery, configured contract demand
+
 impact:                       # "Is it worth it?" (scripts/write_impact.py). Every value is an ASSUMPTION unless a source is
                               # given; [low, high] ranges are sampled uniformly in the Monte Carlo. Vendor quotes are PENDING.
   status: ASSUMPTION

@@ -33,6 +33,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / "backend"), str(ROOT), str(ROOT / "scripts")]
 OUT = ROOT / "results" / "bench_v3"
+CACHE = ROOT / "results" / "bench_v3"        # trained forecasters live here whatever --out is
 DATASETS = ["rvce", "bdg2_fox", "bdg2_bull", "bdg2_cockatoo", "cubems"]
 MAIN = ["status_quo", "rule_based", "ga", "pso", "per_building_mpc", "central_mpc", "central_mpc_comms_fail",
         "qgrid", "qgrid_comms_fail", "optimum"]
@@ -71,7 +72,7 @@ def ctx(ds: str):
         yd = YearData(campus, proc, "A", forecast=False)
         meta = proc["meta"]
         hold = meta["days"]["eval_days"] + [v["date"] for v in meta["days"].get("scenarios", {}).values()]
-        fc = GBMForecaster(campus, proc, yd, hold, cache=OUT / f"gbm_{ds}.pkl")
+        fc = GBMForecaster(campus, proc, yd, hold, cache=CACHE / f"gbm_{ds}.pkl")
         _C[ds] = {"campus": campus, "proc": proc, "yd": yd, "fc": fc}
     return _C[ds]
 
@@ -220,7 +221,7 @@ def main(workers: int, ndays: int, qgrid: str):
         c = ctx(ds)                                   # trains and caches each dataset's forecaster up front
         days = c["proc"]["meta"]["days"]["eval_days"][:ndays]
         for d in days:
-            tasks += [("run", ds, d, m) for m in MAIN] + [("bound", ds, d, "")]
+            tasks += [("run", ds, d, m) for m in MAIN] + ([] if globals().get("NO_BOUNDS") else [("bound", ds, d, "")])
             if ds == "rvce":
                 tasks += [("run", ds, d, m) for m in DESIGN]
     cost = {"design_benders_qaoa": 9, "design_benders_qiea": 6, "design_benders_exact": 4, "design_earlier_prototype": 3,
@@ -248,7 +249,8 @@ def main(workers: int, ndays: int, qgrid: str):
     pd.DataFrame(bounds).to_csv(OUT / "bounds.csv", index=False)
     json.dump({"runtime_s": time.time() - t_all, "workers": workers, "days_per_dataset": ndays, "qgrid_combo": qgrid,
                "datasets": DATASETS, "methods": MAIN, "design_choices": DESIGN,
-               "peak_priced": bool(PEAK)}, open(OUT / "run_info.json", "w", encoding="utf-8"), indent=1)
+               "peak_priced": bool(PEAK), "config_override": os.environ.get("QGRID_CONFIG_OVERRIDE")},
+              open(OUT / "run_info.json", "w", encoding="utf-8"), indent=1)
     print(f"done in {time.time() - t_all:.0f} s", flush=True)
 
 
@@ -258,4 +260,17 @@ if __name__ == "__main__":
     qg = next((a.split("=")[1] for a in sys.argv if a.startswith("--qgrid=")), QGRID)
     QGRID = qg
     PEAK = next((a.split("=")[1] != "0" for a in sys.argv if a.startswith("--peak=")), True)
+    # quick / sensitivity runs: --datasets=rvce --methods=qgrid,optimum,... --no-design --no-bounds --out=results/sensitivity/x
+    ds_ = next((a.split("=")[1] for a in sys.argv if a.startswith("--datasets=")), None)
+    if ds_:
+        DATASETS = ds_.split(",")
+    me_ = next((a.split("=")[1] for a in sys.argv if a.startswith("--methods=")), None)
+    if me_:
+        MAIN = me_.split(",")
+    if "--no-design" in sys.argv:
+        DESIGN = []
+    NO_BOUNDS = "--no-bounds" in sys.argv
+    out_ = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--out=")), None)
+    if out_:
+        OUT = (ROOT / out_).resolve()
     main(w, nd, qg)
