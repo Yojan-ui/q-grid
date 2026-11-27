@@ -197,8 +197,9 @@ def main(workers: int):
     cfg = C["cfg"]; pc = cfg["planner"]; G = C["groups"]
     r = float(cfg["economics"]["discount_rate"]); N = int(pc["npv_years"])
     ann = sum(1 / (1 + r) ** y for y in range(1, N + 1))
-    cds = [float(c) for c in cfg["tariff_ht2c"].get("contract_demand_sweep", [1300])]
     cd0 = float(cfg["tariff_ht2c"].get("contract_demand_kva", 1300))
+    cds = [float(c) for c in cfg["tariff_ht2c"].get("contract_demand_sweep", [1300])]
+    cds = [cd0] + [c for c in cds if c != cd0]      # today's contract first: the Plan tab starts on the first option
     base = solve({g["key"]: 0.0 for g in G}, 0.0, cd0)
     grid = []
     for fr in itertools.product(pc["extra_kwp_fracs"], repeat=len(G)):

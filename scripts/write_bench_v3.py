@@ -379,7 +379,7 @@ def write_docs(r, s, w, labels, order, hl, cfg):
          "the CO₂ factor are PENDING stand-ins; outages are SYNTHETIC (seeded); Rs figures are not headline results.\n",
          "## Headline (generated from the results)\n", f"**{hl['text']}** {hl['detail']}\n",
          *([f"Step 1 (problem): {hl['story']['step1']['text']}\n", f"Step 7 (result): {hl['story']['step7']['text']} {hl['story']['step7']['comms']}"
-            + (" Bill figures use a stand-in tariff (PENDING).\n" if hl['story']['tariff_pending'] else "\n")] if hl.get("story") else []),
+            + (" Bill figures use BESCOM HT-2(c)(ii) at KERC TO-2022 rates (FY2023-24 rates carried over).\n" if hl['story']['tariff_pending'] else "\n")] if hl.get("story") else []),
          "## Protocol\n",
          "- **Datasets** (same for every method): " + "; ".join(f"{labels[k]}" for k in order) +
          ". Licences and mappings: `data/SOURCES.md`; asset sizing rule for sites without asset data: `qgrid/datasets.py`.",
@@ -434,7 +434,7 @@ def write_docs(r, s, w, labels, order, hl, cfg):
     (ROOT / "docs" / "benchmark_v3.md").write_text("\n".join(L) + "\n", encoding="utf-8")
     # one-page scorecard (RVCE + per-dataset gap)
     S = ["# Q-Grid scorecard\n", f"**{hl['text']}** {hl['detail']}\n",
-         "_All figures: mean over evaluation days, from `results/bench_v3/summary.csv`. Stand-in tariff (PENDING), synthetic outages._\n",
+         "_All figures: mean over evaluation days, from `results/bench_v3/summary.csv`. Tariff BESCOM HT-2(c)(ii), KERC TO-2022 rates (FY2023-24 carried over); synthetic outages._\n",
          "| Method (RVCE) | Gap to best plan % | Certified gap % | Bill Rs/day | Saving vs today % | Critical downtime h | Peak kVA | Works without a central controller |",
          "|---|---:|---:|---:|---:|---:|---:|:---:|"]
     for m in list(NAMES) + [REF[0]]:

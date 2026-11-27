@@ -197,6 +197,23 @@ def values_v3() -> dict:
             v["cons.qaoa_beats_exact_days"] = float((pv.design_benders_qaoa < pv.design_benders_exact * (1 - 1e-8)).sum())
             v["cons.days"] = float(len(pv))
             v["cons.qaoa_agree_pct"] = 100 * float(rv_[rv_.method == "design_benders_qaoa"].master_opt_share.mean())
+    pl = ROOT / "results" / "planner" / "planner.json"       # investment planner (scripts/plan_investment.py)
+    if pl.exists():
+        P = json.loads(pl.read_text(encoding="utf-8"))
+        o, b0 = P["optimum"], P["baseline"]
+        v["plan.extra_kwp"] = float(sum(o["extra_kwp"].values())); v["plan.battery_kwh"] = float(o["battery_kwh"])
+        v["plan.contract_kva"] = float(o["contract_kva"]); v["plan.capex_lakh"] = o["capex_rs"] / 1e5
+        v["plan.saving_lakh"] = o["annual_saving_rs"] / 1e5; v["plan.npv_lakh"] = o["npv10_rs"] / 1e5
+        v["plan.payback_years"] = float(o["payback_years"] or 0.0); v["plan.peak_kva"] = float(o["peak_kva"])
+        v["plan.base_cost_lakh"] = b0["annual_cost_rs"] / 1e5; v["plan.base_peak_kva"] = float(b0["peak_kva"])
+        v["plan.base_contract_kva"] = float(b0["contract_kva"]); v["plan.n_cases"] = float(len(P["cases"]))
+        v["plan.existing_kwp"] = float(sum(g["existing_kwp"] for g in P["roof_groups"]))
+    sj = ROOT / "results" / "sensitivity" / "summary.json"    # scripts/write_sensitivity.py
+    if sj.exists():
+        for case, d in json.loads(sj.read_text(encoding="utf-8")).items():
+            for k, x in d.items():
+                if isinstance(x, (int, float)):
+                    v[f"sens.{case}.{k}"] = float(x)
     return v
 
 

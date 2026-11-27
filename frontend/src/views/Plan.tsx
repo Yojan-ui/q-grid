@@ -74,7 +74,7 @@ function PlanBody({ p, d }: { p: Planner; d: StoryData }) {
         <div className="plan-labels small">
           <span className="pill src">{regText(p.generated_by, 'planner generated_by (replay text)')}</span>
           {p.status && <span className={`pill ${p.status === 'REAL' || p.status === 'FINAL' ? 'ok' : 'warn'}`}>{p.status.toLowerCase()}</span>}
-          {tariff && <span title={tariff}><span className="pending">stand-in tariff</span> {regText(tariff, 'planner tariff label (replay text)')}</span>}
+          {tariff && <span title={tariff}><span className="pending">FY24 tariff carried over</span> {regText(tariff, 'planner tariff label (replay text)')}</span>}
           {costs && <span title={costs}><span className="pending">assumed costs</span> {regText(costs, 'planner cost label (replay text)')}</span>}
         </div>
       </section>
@@ -115,7 +115,7 @@ function PlanBody({ p, d }: { p: Planner; d: StoryData }) {
           {!c ? <p className="muted small">planner.json has no cases.</p> : <>
             {!hit?.exact && <p className="small muted">No case was computed for exactly this choice; showing the closest one: {p.roof_groups.map(g => `+${n0(c.extra_kwp?.[g.key] ?? 0)} kWp ${g.label.toLowerCase()}`).join(', ')}, +{n0(c.battery_kwh)} kWh battery, {n0(c.contract_kva)} kVA.</p>}
             <div className="keys-row k2">
-              <div className="key"><span className="kl">Payback{tariff && <span className="pending">stand-in tariff</span>}</span><b className="kv">{c.payback_years !== null && c.payback_years !== undefined ? `${c.payback_years.toFixed(1)} y` : c.capex_rs > 0 ? 'not reached' : 'nothing added'}</b></div>
+              <div className="key"><span className="kl">Payback{tariff && <span className="pending">FY24 tariff carried over</span>}</span><b className="kv">{c.payback_years !== null && c.payback_years !== undefined ? `${c.payback_years.toFixed(1)} y` : c.capex_rs > 0 ? 'not reached' : 'nothing added'}</b></div>
               <div className="key"><span className="kl">10-year NPV</span><b className="kv">{lakh(c.npv10_rs)}</b></div>
               <div className="key"><span className="kl">Investment{costs && <span className="pending">assumed</span>}</span><b className="kv">{lakh(c.capex_rs)}</b><span className="kn">saves {lakh(c.annual_saving_rs)} a year</span></div>
               <div className="key"><span className="kl">Peak demand</span><b className="kv">{n0(c.peak_kva)} kVA</b><span className="kn">contract {n0(c.contract_kva)} kVA</span></div>

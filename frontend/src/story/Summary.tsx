@@ -33,10 +33,10 @@ export function SummaryDoc({ d, idx, ds }: { d: StoryData; idx: Index; ds: strin
       <p className="sd-sub">One-page summary · EUREKA Track 3 · headline day {sc.scenario.key.replace(/_/g, ' ')}, {fmtDate(sc.scenario.date)} · generated {new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} from the replay files</p>
 
       <h2>The problem</h2>
-      <p>{B?.headline.story ? <>{B.headline.story.step1.text}{tariffPending ? ' (stand-in tariff)' : ''} </> : <>Today every building at RVCE acts on its own: it sells noon solar cheaply, buys power back at the evening peak and runs diesel when the BESCOM supply fails. </>}On the modelled headline day:</p>
+      <p>{B?.headline.story ? <>{B.headline.story.step1.text}{tariffPending ? ' (FY2023-24 tariff carried over)' : ''} </> : <>Today every building at RVCE acts on its own: it sells noon solar cheaply, buys power back at the evening peak and runs diesel when the BESCOM supply fails. </>}On the modelled headline day:</p>
       {pr ? (
         <div className="sd-keys">
-          <div><span>Value lost per day {tariffPending && <i className="sd-pend">stand-in tariff</i>}</span><b>{rs(pr.rs_lost)}</b></div>
+          <div><span>Value lost per day {tariffPending && <i className="sd-pend">FY24 tariff carried over</i>}</span><b>{rs(pr.rs_lost)}</b></div>
           <div><span>CO₂ per day {ceaPending && <i className="sd-pend">stand-in factor</i>}</span><b>{num(pr.co2_kg)} kg</b></div>
           <div><span>Diesel running · critical loads unserved</span><b>{pr.dg_hours.toFixed(1)} h · {pr.critical_downtime_h.toFixed(1)} h</b></div>
         </div>

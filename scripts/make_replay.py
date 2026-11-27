@@ -256,6 +256,74 @@ def build_scenario(key: str) -> dict:
     return out
 
 
+def product_fields(cfg: dict, lay: dict, out: dict) -> None:
+    """Fields the Plan tab, the asset badges, the provenance dialog and the Step 1 cards read (all from config/results)."""
+    from qgrid.v2 import campus_scale
+    from qgrid.v2.tariff import ht2c_params
+    st = campus_scale.asset_status(cfg) if "asset_status" in cfg.get("campus", {}) else {}
+    for z in out["campus"]["zones"]:
+        z["asset_status"] = {k: st[k] for k in ("pv", "battery", "dg", "ev") if k in st}
+    if "cables" in st:
+        out["campus"]["cables_status"] = st["cables"]
+    tp = ht2c_params(cfg) if cfg.get("tariff_ht2c") else {}
+    co2 = cfg.get("co2", {})
+    pe = cfg.get("campus", {}).get("pv_existing", {})
+    facts = cfg.get("campus", {}).get("facts", {})
+    dgs = cfg.get("campus", {}).get("dg_sets", {})
+    rows = []
+    if tp:
+        rows += [{"item": "Energy charge, HT-2(c)(ii)", "value_label": "Rs 8.25 / 8.65 per kWh (first 1 lakh units / balance)",
+                  "source": "KERC Tariff Order 2022 (BESCOM)", "page": "p.412", "status": "VERIFIED (FY2023-24 carried over)"},
+                 {"item": "Demand charge", "value_label": f"Rs {tp['orders'][0]['demand_rs_kva_month']:g} per kVA per month",
+                  "source": "KERC Tariff Order 2022 (BESCOM)", "page": "p.412", "status": "VERIFIED (FY2023-24 carried over)"},
+                 {"item": "Time-of-day", "value_label": "+Rs 1.00 18-22 h, -Rs 1.00 22-06 h, Dec-Jun",
+                  "source": "KERC Tariff Order 2022 (BESCOM)", "page": "p.412", "status": "VERIFIED"},
+                 {"item": "Billing demand", "value_label": f"max(recorded maximum, {100 * tp['billing_demand_floor_frac']:.0f} % of contract demand)",
+                  "source": "KERC Tariff Order 2022, HT billing conditions", "page": "p.404", "status": "VERIFIED"},
+                 {"item": "Contract demand", "value_label": f"{tp['contract_demand_kva']:,.0f} kVA", "source": "modelling choice (RVCE bill pending)",
+                  "page": "", "status": "ASSUMPTION"},
+                 {"item": "Solar export rate", "value_label": f"Rs {tp['export_rs_kwh']:.2f} per kWh", "source": "team brief (KERC rooftop order pending)",
+                  "page": "", "status": "PENDING"}]
+    if co2:
+        rows.append({"item": "Grid CO2 factor", "value_label": f"{float(co2.get('tco2_per_mwh', co2.get('standin_tco2_per_mwh', 0))):.3f} t per MWh",
+                     "source": "CEA CO2 Baseline Database", "page": "", "status": str(co2.get("status", "PENDING"))})
+    if pe:
+        rows.append({"item": "Rooftop solar today", "value_label": f"{pe['modules']:,} modules x {pe['module_wp']} Wp = {pe['modules'] * pe['module_wp'] / 1000:,.2f} kWp on {pe['roofs']} roofs",
+                     "source": "team brief (RVCE estate data pending)", "page": "", "status": "TEAM BRIEF"})
+    if facts:
+        rows.append({"item": "Built-up area", "value_label": f"{facts['built_up_m2']:,} m2 + {facts['boys_hostels_m2']:,} m2 boys' hostels ({facts['boys_hostel_beds']:,} beds)",
+                     "source": "team brief (RVCE estate data pending)", "page": "", "status": "TEAM BRIEF"})
+    if dgs:
+        rows.append({"item": "Diesel generators", "value_label": f"{len(dgs['sets'])} sets, {dgs['total_kva']:,} kVA in total, backup only",
+                     "source": "team brief (RVCE estate data pending)", "page": "", "status": "TEAM BRIEF"})
+    rows.append({"item": "Battery, EV chargers, campus cables", "value_label": "not on campus today", "source": "proposed by this project",
+                 "page": "", "status": "PROPOSED"})
+    rows.append({"item": "Building loads", "value_label": "floor area x energy intensity, BDG2 university load shapes", "source": "stand-in until RVCE meter data",
+                 "page": "", "status": "PENDING"})
+    out["data_provenance"] = rows
+    m = out["runs"]["status_quo"]["metrics"]
+    day = out["scenario"]["date"]
+    pts = []
+    if (np.asarray(out["slots"]["grid_up"]) == 0).any():
+        h = 0.25 * int((np.asarray(out["slots"]["grid_up"]) == 0).sum())
+        pts.append({"key": "outages", "title": f"A {h:g}-hour grid outage on this day",
+                    "text": f"Diesel and UPS carry the campus today; critical load is unserved for {m['critical_downtime_h']:.2f} h."})
+    else:
+        pts.append({"key": "outages", "title": "Grid outages hit labs and hostels",
+                    "text": "When BESCOM supply drops, only diesel and UPS keep the campus running."})
+    pts.append({"key": "diesel", "title": f"{m['dg_litres']:,.0f} litres of diesel on this day" if m["dg_litres"] > 0 else "Diesel is the only backup",
+                "text": f"{len(dgs.get('sets', []))} generator sets ({dgs.get('total_kva', 0):,} kVA) run only in outages (status-quo simulation)." if dgs
+                        else "Generators run only in outages."})
+    if tp:
+        pts.append({"key": "demand_charges", "title": f"Every kVA of peak costs Rs {tp['orders'][0]['demand_rs_kva_month']:g} a month",
+                    "text": f"Billed on the month's peak, at least {100 * tp['billing_demand_floor_frac']:.0f} % of the {tp['contract_demand_kva']:,.0f} kVA contract. Peak today: {m['peak_import_kw'] / tp.get('power_factor', 0.95):,.0f} kVA."})
+    if pe:
+        rk = sum(float(lay["zones"][z].get("pv_kwp_osm_roof", 0.0)) for z in lay["zones"])
+        pts.append({"key": "roofs", "title": f"{pe['modules'] * pe['module_wp'] / 1000:,.0f} kWp on {pe['roofs']} roofs, more roof unused",
+                    "text": f"Usable roofs could hold about {rk:,.0f} kWp (assumed 45 % of roof, 180 Wp/m2). Plan sizes the next step."})
+    out["problem_points"] = pts
+
+
 def shot_table(samples, lp, qubos, exr):
     """Distinct measured bitstrings with their counts, true objective (Rs), feasibility and optimality."""
     from qgrid import qubo as Q
@@ -396,6 +464,7 @@ def main():
     attach_qgrid(campus, meta, outs)
     for k, o in outs.items():
         o["provenance"] = prov
+        product_fields(campus.cfg, campus.layout, o)
         (RDIR / f"scenario_{k}.json").write_text(dump(o), encoding="utf-8")
         index["scenarios"].append({"key": k, "date": o["scenario"]["date"], "note": o["scenario"]["note"],
                                    "replay_matches_benchmark": o["replay_matches_benchmark"]})

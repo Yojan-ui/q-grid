@@ -76,7 +76,7 @@ export function DeployView({ d }: { d: StoryData }) {
             <tr><td><b>Per building node</b></td><td className="tn"><b>Rs {m.per_building[0].hardware_rs[0].toLocaleString('en-IN')}–{m.per_building[0].hardware_rs[1].toLocaleString('en-IN')}</b></td><td className="muted">sum of the above</td></tr></tbody></table></div>
         <div className="keys-row k4">
           <div className="key"><span className="kl">Campus, {m.n_buildings} buildings (central case)</span><b className="kv">{lakh(m.central.hardware_rs)}</b></div>
-          <div className="key"><span className="kl">Payback, battery wear included <span className="pending">stand-in tariff</span></span><b className="kv">{m.central.payback_net_years !== null ? `${m.central.payback_net_years.toFixed(1)} y` : 'not reached'}</b></div>
+          <div className="key"><span className="kl">Payback, battery wear included <span className="pending">FY24 tariff carried over</span></span><b className="kv">{m.central.payback_net_years !== null ? `${m.central.payback_net_years.toFixed(1)} y` : 'not reached'}</b></div>
           <div className="key"><span className="kl">10-year NPV</span><b className="kv">{lakh(m.central.npv_net_rs)}</b><span className="kn">P5–P95 {lakh(m.monte_carlo.npv_net_rs.p5)} to {lakh(m.monte_carlo.npv_net_rs.p95)}</span></div>
           <div className="key"><span className="kl">Chance the NPV is positive</span><b className="kv">{Math.round(100 * m.monte_carlo.npv_net_rs.prob_positive)}%</b><span className="kn">{m.monte_carlo.samples.toLocaleString('en-IN')} Monte Carlo samples</span></div>
         </div>
@@ -141,7 +141,7 @@ function Shadow({ d }: { d: StoryData }) {
         <div className="seg">{[7, 14, rows.length].map(k => <button key={k} className={n === k ? 'on' : ''} onClick={() => setN(k)}>{k === rows.length ? `all ${k} days` : `${k} days`}</button>)}</div></div>
       <div className="mailreport" aria-label="would-have-saved report as staff receive it">
         <div className="mr-head"><b>Q-Grid shadow report</b><span className="muted small">to: estate office · {pick.length} days, {pick[0]?.day} to {pick[pick.length - 1]?.day}</span></div>
-        <p>Over these {pick.length} days, following Q-Grid’s recommendations would have {save >= 0 ? 'saved' : 'cost'} <b>{rs(Math.abs(save))}</b> on the electricity bill <span className="pending">stand-in tariff</span>,
+        <p>Over these {pick.length} days, following Q-Grid’s recommendations would have {save >= 0 ? 'saved' : 'cost'} <b>{rs(Math.abs(save))}</b> on the electricity bill <span className="pending">FY24 tariff carried over</span>,
           with critical-load downtime of <b>{sum('critical_downtime_h', 'qgrid').toFixed(2)} h</b> instead of {sum('critical_downtime_h', 'status_quo').toFixed(2)} h and <b>{Math.round(sum('dg_litres', 'qgrid'))} L</b> of diesel instead of {Math.round(sum('dg_litres', 'status_quo'))} L.</p>
         <table className="tbl small"><thead><tr><th>Day</th><th>Bill as run</th><th>Bill recommended</th><th>Would have saved</th><th>Downtime h (as run → rec.)</th><th>Diesel L</th></tr></thead>
           <tbody>{pick.map(r => <tr key={r.day}><td>{new Date(r.day + 'T00:00').toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}{r.outage ? ' · outage' : ''}</td>

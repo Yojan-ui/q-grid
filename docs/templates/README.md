@@ -7,7 +7,9 @@ EUREKA Track 3 · Smart Decentralised Energy Systems · RVCE, Bengaluru
 **{{q3.story.step7}}** {{q3.story.comms}}
 
 > QAOA on a local simulator: verified against exact solutions, no quantum advantage claimed.
-> Tariffs and the CO₂ factor are labelled stand-ins (PENDING the official documents); Rs figures are not headline results.
+> Tariff: BESCOM HT-2(c)(ii) at the official KERC Tariff Order 2022 rates (FY2023-24 carried over until the 2023 schedule is
+> obtained). CO₂: CEA baseline 0.727 t/MWh (verified). RVCE loads, battery, EV chargers and cables are stand-ins or
+> proposals and are labelled; see [docs/data_verification.md](docs/data_verification.md).
 > Every number in this README is rendered from `results/` by `scripts/write_results_md.py`.
 
 ## Open the demo
@@ -40,7 +42,7 @@ EUREKA Track 3 · Smart Decentralised Energy Systems · RVCE, Bengaluru
 | Q-Grid, 3 h network failure | {{q3.b.rvce.qgrid_comms_fail.gap_pct|2}} | {{q3.b.rvce.qgrid_comms_fail.certified_gap_pct|2}} | {{q3.b.rvce.qgrid_comms_fail.saving_pct|1}} | {{q3.b.rvce.qgrid_comms_fail.critical_downtime_h|2}} | {{q3.b.rvce.qgrid_comms_fail.critical_downtime_1pct_h|2}} | ✓ |
 | _Best possible plan (central MILP, perfect information; reference)_ | _{{q3.b.rvce.optimum.gap_pct|2}}_ | _{{q3.b.rvce.optimum.certified_gap_pct|2}}_ | _{{q3.b.rvce.optimum.saving_pct|1}}_ | _{{q3.b.rvce.optimum.critical_downtime_h|2}}_ | _{{q3.b.rvce.optimum.critical_downtime_1pct_h|2}}_ | — |
 
-\* stand-in tariff (PENDING). Across {{q3.n_campuses|0}} campuses (RVCE + four public meter datasets), Q-Grid is the closest
+\* BESCOM HT-2(c)(ii), KERC TO-2022 rates, monthly demand charge (FY2023-24 rates carried over). Across {{q3.n_campuses|0}} campuses (RVCE + four public meter datasets), Q-Grid is the closest
 method without a central controller on {{q3.best_on_n|0}}. Full tables with ± and 95 % intervals, Wilcoxon verdicts:
 [docs/benchmark_v3.md](docs/benchmark_v3.md) · consistency checks: [docs/consistency.md](docs/consistency.md).
 
@@ -49,6 +51,14 @@ saving ≈ Rs {{imp.bill_saving_rs_per_year_lakh|1}} lakh/year; extra battery we
 (every optimiser prices wear in its objective). Payback ≈ {{imp.payback_net_years|1}} years; 10-year NPV Rs {{imp.npv_net_rs_lakh|1}}
 lakh (Monte Carlo P5–P95: Rs {{imp.mc.npv_net_rs.p5|1}} to {{imp.mc.npv_net_rs.p95|1}} lakh). Assumptions and sources:
 [docs/impact.md](docs/impact.md).
+
+**What should RVCE build next?** The investment planner (Plan tab, `scripts/plan_investment.py`) sizes extra rooftop
+solar per roof group, a battery and the contract demand with one linear programme over the 30 RVCE days at the real
+tariff. Today: {{plan.existing_kwp|0}} kWp, contract {{plan.base_contract_kva|0}} kVA, energy + demand + diesel ≈ Rs
+{{plan.base_cost_lakh|1}} lakh/year. The cost-minimising plan adds {{plan.extra_kwp|0}} kWp and a {{plan.battery_kwh|0}} kWh
+battery at {{plan.contract_kva|0}} kVA contract: investment ≈ Rs {{plan.capex_lakh|1}} lakh, saving ≈ Rs
+{{plan.saving_lakh|1}} lakh/year, payback ≈ {{plan.payback_years|1}} years. PV and battery costs are ASSUMPTIONS (quotes
+pending) and operation is planned with perfect information, so this is an upper bound on savings.
 
 ## Architecture
 
@@ -96,10 +106,11 @@ make verify                                # recompute headline numbers, PASS/FA
 | Building Data Genome 2 (CC BY-SA 4.0) | load shapes for 7 of the 9 RVCE zones; three other campuses in the benchmark | real |
 | CU-BEMS (CC BY 4.0) | fifth campus in the benchmark (Bangkok office building) | real |
 | Ausgrid Solar Home Electricity Data (CC BY 3.0 AU) | earlier hostel load shape (superseded by BDG2) | real |
-| KERC / BESCOM tariff order | energy tariff, demand charge | **PENDING** — {{price_A_status}} stand-in |
+| KERC Tariff Order 2022 (BESCOM), HT-2(c)(ii) | energy charge, ToD, demand charge, billing demand | verified (p.404–412); FY2023-24 carried over — {{price_A_status}} |
 | IEX day-ahead prices | sensitivity scenario | **PENDING** — {{price_B_status}} |
-| CEA CO₂ baseline | grid emission factor | **PENDING** — stand-in |
-| RVCE meter data, calendar, asset list | loads, day types, battery/diesel sizes | **PENDING** — area-based estimates |
+| CEA CO₂ Baseline Database v20/v21 | grid emission factor 0.727 t/MWh | verified |
+| RVCE team brief | 500.48 kWp on 21 roofs, 67,721 m² built-up, 38,659 m² hostels, 2 × 490 kVA diesel | team brief (estate data pending) |
+| RVCE meter data, calendar | loads, day types | **PENDING** — area-based estimates |
 
 Licences, URLs and fetch dates: `data/SOURCES.md` · what we asked RVCE for: `docs/data_request.md`.
 
@@ -118,7 +129,9 @@ Licences, URLs and fetch dates: `data/SOURCES.md` · what we asked RVCE for: `do
 ## Honest limits
 
 - No quantum advantage: QAOA is simulated (ideal, noiseless) and is not in the control loop; it was tested and verified.
-- Tariff, demand charge, CO₂ factor, RVCE loads, calendar and asset sizes are stand-ins until the documents arrive.
+- RVCE loads and calendar are stand-ins until meter data arrives; solar, diesel and floor areas are from the team brief.
+- Battery, EV chargers and inter-building cables do not exist on campus today: they are PROPOSED, and labelled so.
+- FY2023-24 tariff rates are carried over from the 2022 order; the solar export rate (Rs 3.74) is from the team brief.
 - Outages and network failures in the benchmark are synthetic (seeded). Cables are modelled as lossless, without AC power flow.
 - Battery wear is priced with an assumed battery cost and cycle life; real warranty data will change the rate.
 - Value of lost load (Rs 40 / 1,000 per kWh) is an assumption; every gap is also reported without it.

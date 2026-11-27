@@ -42,11 +42,11 @@ export function DataBadge({ idx }: { idx: Index }) {
 const FORMULA: Record<string, string> = {
   gap_pct: '100 × (objective − best plan for the day) / best plan; objective = energy + diesel + battery wear + value of lost load + terminal value',
   certified_gap_pct: '100 × (objective − proven lower bound) / lower bound (LP relaxation, MILP dual bound, Lagrangian bound)',
-  saving_pct: '100 × (status-quo bill − bill) / status-quo bill, same day; bill = energy + demand charge (stand-in tariff)',
+  saving_pct: '100 × (status-quo bill − bill) / status-quo bill, same day; bill = energy + monthly demand charge (BESCOM HT-2(c)(ii); FY2023-24 rates carried over)',
   critical_downtime_h: '15-min slots with any unserved critical load × 0.25 h',
   critical_downtime_1pct_h: '15-min slots with more than 1 % of critical load unserved × 0.25 h',
-  bill_rs: 'energy charges + demand charge on the day’s peak kVA (stand-in tariff, PENDING)',
-  co2_kg: 'grid import kWh × CEA factor (PENDING) + diesel litres × 2.68 kg/L',
+  bill_rs: 'energy charges + the day’s share of the monthly demand charge (BESCOM HT-2(c)(ii), KERC TO-2022; FY2023-24 carried over)',
+  co2_kg: 'grid import kWh × CEA factor 0.727 t/MWh (verified) + diesel litres × 2.68 kg/L',
   runtime_per_decision_s: 'wall time of one 15-minute decision (planning + coordination)',
 }
 const COLS = ['gap_pct', 'certified_gap_pct', 'saving_pct', 'critical_downtime_h', 'bill_rs', 'co2_kg', 'runtime_per_decision_s']
@@ -75,7 +75,7 @@ export function VerifyView({ d, idx, online }: { d: StoryData; idx: Index; onlin
                 return <td key={k}><N v={v} info={{ label: `${me.name} · ${m.label}`, unit: m.unit, formula: FORMULA[k] ?? m.label, file: 'results/bench_v3/summary.csv',
                   fn: 'scripts/run_bench_v3.py → scripts/write_bench_v3.py', row: `dataset=${ds}, method=${me.key}, mean of ${s.n} days, 95 % interval ${s.ci_lo?.toFixed(m.digits)} to ${s.ci_hi?.toFixed(m.digits)}` }} /></td>
               })}</tr>))}</tbody></table></div>
-        <p className="muted small">Mean over {B.datasets.find(x => x.key === ds)?.n_days} days per method. Bill and saving use a stand-in tariff (PENDING). Full tables with ± and Wilcoxon tests: docs/benchmark_v3.md.</p>
+        <p className="muted small">Mean over {B.datasets.find(x => x.key === ds)?.n_days} days per method. Bill and saving use BESCOM HT-2(c)(ii) at KERC TO-2022 rates (FY2023-24 carried over). Full tables with ± and Wilcoxon tests: docs/benchmark_v3.md.</p>
       </section>}
       {B && B.design_choices.length > 0 && <section className="card">
         <h3>How the design got here</h3>

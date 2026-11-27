@@ -3,8 +3,8 @@
 _Rendered by `scripts/write_results_md.py` from `docs/templates/pitch_3min.md`; every number comes from `results/`. Re-render
 after any re-run; never edit numbers by hand. Timings are targets; total ≈ 3:00. Press **P** for presenter mode before you start._
 
-> Say once, early: "QAOA on a local simulator: verified against exact solutions, no quantum advantage claimed. Tariffs are
-> labelled stand-ins until the official BESCOM/KERC order arrives."
+> Say once, early: "QAOA on a local simulator: verified against exact solutions, no quantum advantage claimed. The tariff is
+> BESCOM HT-2(c)(ii) at the official 2022 KERC rates; RVCE loads are stand-ins and the battery and cables are proposals."
 
 **Step 1 · The problem (0:00–0:25).**
 "{{q3.story.step1}}

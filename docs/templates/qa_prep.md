@@ -35,8 +35,10 @@ It's an assumption, stated: Rs 40/kWh non-critical, Rs 1,000/kWh critical (`conf
 BESCOM figure exists that we could cite. Every gap is also reported on money alone: Q-Grid {{q3.b.rvce.qgrid.gap_novoll_pct|2}} %.
 
 **7. Are your rupee figures real?**
-The energy tariff and demand charge are labelled stand-ins (PENDING the KERC/BESCOM order); the UI badges them. Comparisons
-between methods are fair because every method sees the same prices; absolute rupees will move.
+The tariff is the official BESCOM HT-2(c)(ii) schedule from the KERC Tariff Order 2022 (energy 8.25 / 8.65 Rs/kWh, demand
+Rs 265/kVA/month billed on the month's peak, ToD ±Rs 1), read from the order at p.404–412 (docs/data_verification.md).
+FY2023-24 rates are carried over until the 2023 schedule is obtained, and the export rate is from the team brief. Every
+method sees the same prices; absolute rupees will move with RVCE's real loads.
 
 **8. What about battery degradation?**
 It's in the objective. Every optimiser — Q-Grid, both MPCs, GA/PSO and the best possible plan — prices wear at Rs per kWh
@@ -47,7 +49,7 @@ we changed it (`results/impact/wear_pilot_2.96.csv`). Q-Grid now cycles {{q3.b.r
 **9. So what's the payback?**
 On assumed costs (Rs {{imp.hardware_rs_lakh|1}} lakh of node hardware), with battery wear counted: about {{imp.payback_net_years|1}} years;
 10-year NPV Rs {{imp.npv_net_rs_lakh|1}} lakh (Monte Carlo P5–P95 Rs {{imp.mc.npv_net_rs.p5|1}} to {{imp.mc.npv_net_rs.p95|1}} lakh,
-{{imp.mc.npv_net_rs.prob_positive|0}} % of samples positive). The tariff is a stand-in, so this moves when the real order arrives.
+{{imp.mc.npv_net_rs.prob_positive|0}} % of samples positive). FY2023-24 tariff rates are carried over from the 2022 order, and costs are assumed, so this moves when the 2023 schedule and quotes arrive.
 
 **10. What happens if the network goes down?**
 Each building keeps optimising alone with its own forecast and safety layer; cables idle until links return. That's the
@@ -59,16 +61,18 @@ Each building talks only to its neighbours: {{q3.b.rvce.qgrid.messages_per_decis
 network. Not yet tested on a feeder model — that's in the scale path.
 
 **12. Is the data real?**
-Solar: NASA POWER (real). Hostel load shape: Ausgrid (real). Layout: OpenStreetMap (real). RVCE meter loads, calendar, tariff,
-CO₂ factor: PENDING, labelled stand-ins. Four other campuses use public BDG2 and CU-BEMS meter data.
+Solar: NASA POWER (real). Layout: OpenStreetMap (real), rescaled to RVCE's own buildings. Tariff: KERC TO-2022 (verified;
+FY2023-24 carried over). CO₂: CEA 0.727 t/MWh (verified). Solar 500.48 kWp, floor areas and 2 × 490 kVA diesel: team brief.
+RVCE meter loads and calendar: PENDING, labelled stand-ins (BDG2 load shapes). Four other campuses use public BDG2 and CU-BEMS meter data.
 
 **13. Does it work on other campuses?**
 Among methods without a central controller, Q-Grid is closest to the best plan on {{q3.best_on_n|0}} of {{q3.n_campuses|0}}
 campuses. Where it isn't, we name the method that was closer (docs/benchmark_v3.md, Wilcoxon verdicts).
 
-**14. On the US sites every optimiser raises the bill. Why?**
-No method optimises the demand charge; batteries charged from the grid raise the peak, and the stand-in demand charge bills
-it. Q-Grid on BDG2 Fox: {{q3.b.bdg2_fox.qgrid.saving_pct|1}} % bill change. It's reported, not hidden.
+**14. What about the bill on the US sites?**
+Every planner now prices the month's peak in its objective (the same monthly demand charge the bill uses), so a battery
+is no longer charged into a new peak for free. The bill change on each site is reported as measured, including where it
+goes up. Q-Grid on BDG2 Fox: {{q3.b.bdg2_fox.qgrid.saving_pct|1}} % bill change. It's reported, not hidden.
 
 **15. Why not reinforcement learning?**
 Out of scope for this build and not in the benchmark; we didn't want an under-tuned RL baseline to flatter us.

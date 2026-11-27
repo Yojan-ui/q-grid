@@ -2,7 +2,7 @@
 
   python scripts/record_operate.py [--day=2023-06-15]   -> results/replay/operate_session.json (+ frontend/public/replay)
 
-Historical day (actual solar from NASA POWER, the plan uses the solar forecast; BDG2-derived loads; stand-in tariff), with
+Historical day (actual solar from NASA POWER, the plan uses the solar forecast; BDG2-derived loads; BESCOM HT-2(c)(ii) tariff), with
 scripted operator actions so every Operate screen has something to show: a rule at 07:00, a manual override at 11:00,
 a campus network failure at 13:00 for 45 min and a BESCOM outage at 18:00 for 3 h. Frames every 5 simulated minutes."""
 from __future__ import annotations

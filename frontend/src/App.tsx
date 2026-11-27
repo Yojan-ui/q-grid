@@ -216,7 +216,7 @@ export default function App() {
       <div className="app">
         <a className="skip" href="#panel">Skip to the explanation</a>
         <header className="top">
-          <div className="brand"><b>Q-Grid</b><span className="muted">Decentralised, QAOA-verified scheduling for the RVCE microgrid</span></div>
+          <div className="brand"><b>Q-Grid</b><span className="muted">Decentralised scheduling for the RVCE microgrid</span></div>
           <nav className="tabs modes" role="tablist" aria-label="modes">
             {([['story', 'Explain'], ['operate', 'Operate'], ['deploy', 'Deploy'], ['plan', 'Plan'], ['verify', 'Verify']] as [Tab, string][]).map(([k, l]) =>
               <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>)}

@@ -25,6 +25,6 @@ until we get the KERC/BESCOM documents — every number on screen is clickable t
 ## 1-minute version
 "RVCE, nine zones, real solar data. In a BESCOM outage during the fest, the status quo loses critical power for
 {{headline.before.critical_downtime_h|2}} h. Q-Grid turns each building's decisions into a ≤{{search.max_qubits}}-qubit QUBO, solves it
-with QAOA verified against the exact optimum, and lets buildings negotiate power with neighbours — no central server. Result:
+with a QAOA block tested on a simulator against the exact optimum (not in the control loop), and lets buildings negotiate power with neighbours — no central server. Result:
 {{headline.after.critical_downtime_h|2}} h downtime, {{OURS.eval30_mean.A.gap_to_B4_pct|1}} % from the global optimum, survives a
 building going offline. Honest labels: simulated QAOA, no quantum advantage, prices pending official tariffs."
