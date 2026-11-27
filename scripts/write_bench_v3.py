@@ -38,6 +38,20 @@ DESIGN = {
     "design_benders_qaoa": ("24 h hybrid Benders, QAOA master (verified, simulator)", "same with a QAOA block master; realistic forecasts; battery wear not priced"),
     "design_benders_qiea": ("24 h hybrid Benders, QIEA master (quantum-inspired, classical)", "same with a QIEA master; realistic forecasts; battery wear not priced"),
 }
+
+
+def display_name(method: str) -> str:
+    """Display name for any method id in runs.csv: main methods, the reference optimum and the design variants.
+    Unknown ids are shown as themselves (never silently as another method's name)."""
+    if method in NAMES:
+        return NAMES[method][0]
+    if method == REF[0]:
+        return REF[1]
+    if method in DESIGN:
+        return DESIGN[method][0]
+    return method
+
+
 METRICS = [  # key, label, group, better, unit, digits
     ("bill_rs", "Bill", "Cost", "lower", "Rs/day", 0), ("saving_pct", "Saving vs today", "Cost", "higher", "%", 1),
     ("npv10_rs_lakh", "10-yr NPV of saving", "Cost", "higher", "Rs lakh", 1),
@@ -357,7 +371,7 @@ def write_docs(r, s, w, labels, order, hl, cfg):
         L.append("| Method | " + " | ".join(lab[k] for k, _ in key_metrics) + " |")
         L.append("|---|" + "---:|" * len(key_metrics))
         for m in list(NAMES) + [REF[0]]:
-            nm = NAMES[m][0] if m in NAMES else REF[1]
+            nm = display_name(m)
             nm = f"**{nm}**" if m == "qgrid" else nm
             L.append(f"| {nm} | " + " | ".join(_cell(s, ds, m, k, d) for k, d in key_metrics) + " |")
         L.append("")
@@ -367,7 +381,7 @@ def write_docs(r, s, w, labels, order, hl, cfg):
     L.append("|---|---|---:|---:|---|")
     for _, x in w[w.metric == "gap_pct"].iterrows():
         v = "tie (not significant)" if pd.isna(x.p) or x.p >= 0.05 else ("Q-Grid better" if x.median_diff_qgrid_minus_method < 0 else "Q-Grid worse")
-        L.append(f"| {labels.get(x.dataset, x.dataset)} | {NAMES.get(x.method, (REF[1],))[0]} | {x.median_diff_qgrid_minus_method:+.2f} | "
+        L.append(f"| {labels.get(x.dataset, x.dataset)} | {display_name(x.method)} | {x.median_diff_qgrid_minus_method:+.2f} | "
                  f"{'–' if pd.isna(x.p) else f'{x.p:.3g}'} | {v} |")
     L += ["", "## Honest interpretation\n",
           "- Read the verdict column: it is the test, not the means, that says whether a difference is real on these days.",
@@ -381,7 +395,7 @@ def write_docs(r, s, w, labels, order, hl, cfg):
          "| Method (RVCE) | Gap to best plan % | Certified gap % | Bill Rs/day | Saving vs today % | Critical downtime h | Peak kVA | Works without a central controller |",
          "|---|---:|---:|---:|---:|---:|---:|:---:|"]
     for m in list(NAMES) + [REF[0]]:
-        nm = NAMES[m][0] if m in NAMES else REF[1]
+        nm = display_name(m)
         S.append(f"| {('**' + nm + '**') if m == 'qgrid' else nm} | " + " | ".join(_cell(s, 'rvce', m, k, d).split(' ±')[0] for k, d in
                  (("gap_pct", 2), ("certified_gap_pct", 2), ("bill_rs", 0), ("saving_pct", 1), ("critical_downtime_h", 2), ("peak_kva", 0))) +
                  f" | {'—' if m == 'optimum' else ('✓' if m not in ('central_mpc', 'central_mpc_comms_fail') else '✗')} |")
