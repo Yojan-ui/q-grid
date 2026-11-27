@@ -83,6 +83,8 @@ def _lp_admm(campus, models, ints, cfg: ACfg, z0, u0, trace: list | None = None)
     conv, it = False, 0
     for it in range(1, cfg.lp_iter + 1):
         for i, (m, q) in enumerate(zip(models, qps)):
+            if not m.inc and xs[i] is not None:          # no cables: nothing to coordinate, its LP never changes
+                continue
             c = m.cost0.copy()
             for k, (l, _) in enumerate(m.inc):
                 c[m.fcols[k]] += cfg.rho_lp * (u[(i, l)] - z[l])

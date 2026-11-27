@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
-import { getJSON, liveAvailable, missingReplayFiles, MissingReplay, type Index } from './lib/data'
+import { getJSON, liveAvailable, missingReplayFiles, MissingReplay, post, type Index } from './lib/data'
 import { reducedMotion, ThemeCtx } from './lib/theme'
 import { useTheme } from './lib/useTheme'
 import { fmtDate } from './lib/labels'
@@ -11,9 +11,11 @@ import { ImpactBoard } from './story/Impact'
 import { WhoDoesWhat } from './story/WhoDoesWhat'
 import { Scorecard } from './story/Scorecard'
 import { ProvProvider } from './panels/Prov'
-import { VerifyView, DataBadge } from './views/Views'
-import { OperateView } from './views/Operate'
-import { DeployView } from './views/Deploy'
+import { DataBadge } from './views/Views'
+// secondary modes load on first use, so the first screen ships only the story
+const VerifyView = lazy(() => import('./views/Views').then(m => ({ default: m.VerifyView })))
+const OperateView = lazy(() => import('./views/Operate').then(m => ({ default: m.OperateView })))
+const DeployView = lazy(() => import('./views/Deploy').then(m => ({ default: m.DeployView })))
 import { Sankey } from './story/Sankey'
 
 // the 3D stack (three, react-three-fiber, drei) is its own chunk: the panel renders first, the campus streams in
@@ -64,7 +66,9 @@ function PresenterTimer({ stopKey }: { stopKey: string }) {
 export default function App() {
   const theme = useTheme()
   const cycleTheme = theme.cycle
-  const [present, setPresent] = useState(() => document.documentElement.hasAttribute('data-present'))
+  const demo = new URLSearchParams(location.search).has('demo')
+  const [present, setPresent] = useState(() => demo || document.documentElement.hasAttribute('data-present'))
+  const [warm, setWarm] = useState<'idle' | 'warming' | 'ready' | 'offline'>('idle')
   const [idx, setIdx] = useState<Index | null>(null)
   const [missing, setMissing] = useState<string[] | null>(null)
   const [tab, setTab] = useState<Tab>(() => { const m = new URLSearchParams(location.search).get('mode'); return m === 'operate' || m === 'deploy' || m === 'verify' ? m : 'story' })
@@ -93,6 +97,13 @@ export default function App() {
   }, [])
   const key = scen && idx?.scenarios.some(x => x.key === scen) ? scen : idx?.headline ?? ''
   const { d, err, missing: storyMissing, loading } = useStoryData(key)
+  // demo preset: warm the backend once it is reachable so the first live moment answers fast
+  useEffect(() => {
+    if (!demo || warm !== 'idle') return
+    if (!online) { const id = setTimeout(() => setWarm(w => (w === 'idle' ? 'offline' : w)), 2500); return () => clearTimeout(id) }
+    setWarm('warming')
+    post<{ ok: boolean }>(`/live/warm?scenario=${key || 'outage_fest'}`, {}).then(() => setWarm('ready')).catch(() => setWarm('offline'))
+  }, [demo, online, warm, key])
   const stop = STOPS[i].id
 
   // each stop sets its clock: the day plays in steps 1, 6 and 7; otherwise it holds the slot being explained
@@ -205,11 +216,14 @@ export default function App() {
           <div className="right">
             <span className={`livebadge ${online ? 'on' : ''}`} title={online ? 'Live demo moments run on the backend (localhost:8000)' : OFFLINE_BUILD ? 'Static demo: every result is precomputed by the pipeline' : 'No backend found: live moments show precomputed results'}>{online ? 'Live backend' : 'Offline replay'}</span>
             {present && <PresenterTimer stopKey={stop} />}
+            {demo && <span className={`pill ${warm === 'ready' ? 'ok' : warm === 'offline' ? '' : 'warn'}`} title="Demo preset: presenter mode, step 1, live moments warmed on the backend (or precomputed offline)">
+              {warm === 'ready' ? 'Demo ready · live' : warm === 'offline' ? `Demo ready · offline${d.live ? '' : ' (no precomputed live moments!)'}` : 'Demo: warming up…'}</span>}
             <select className="scenpick devonly" value={key} onChange={e => setScen(e.target.value)} aria-label="scenario day">
               {idx.scenarios.map(x => <option key={x.key} value={x.key}>{SCEN_NAME[x.key] ?? x.key}, {fmtDate(x.date)}</option>)}
             </select>
             <span className="devonly"><DataBadge idx={idx} /></span>
             <button className="btn ghost small devonly" onClick={printSummary} title="Opens the print dialog: choose “Save as PDF”. Printed in the light theme.">Download summary (PDF)</button>
+            {!demo && <a className="btn ghost small devonly" href="?demo&stop=1" title="Demo preset: Explain step 1, presenter mode, live moments ready">Demo</a>}
             <button className={`btn small ${present ? 'primary' : 'ghost'}`} onClick={() => setPresent(x => !x)} aria-pressed={present} title="Presenter mode (P)" style={{ marginLeft: 8 }}>
               {present ? 'Exit presenter' : 'Present'}</button>
             <ThemeToggle mode={theme.mode} name={theme.name} setMode={theme.setMode} />
@@ -235,7 +249,7 @@ export default function App() {
               replayPulse={() => setPulseKey(k => k + 1)} showMiss={showMiss} setShowMiss={setShowMiss}
               onPrev={prev} onNext={next} go={go} index={i} benchDs={benchDs} setBenchDs={setBenchDs} online={online} />
           </main>
-        ) : tab === 'verify' ? <VerifyView d={d} idx={idx} online={online} /> : tab === 'operate' ? <OperateView d={d} online={online} /> : <DeployView d={d} />}
+        ) : <Suspense fallback={<Loading text={`Loading ${tab}…`} />}>{tab === 'verify' ? <VerifyView d={d} idx={idx} online={online} /> : tab === 'operate' ? <OperateView d={d} online={online} /> : <DeployView d={d} />}</Suspense>}
       </div>
       <SummaryDoc d={d} idx={idx} ds={benchDs} />
     </ProvProvider>

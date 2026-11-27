@@ -177,6 +177,21 @@ def live_remove(req: RemoveReq):
     return out
 
 
+@app.post("/live/warm")
+def live_warm(scenario: str = "outage_fest"):
+    """Demo preset: load the year data and compute the remove-a-building baseline once, so the first live click is fast."""
+    import time as _t
+    from .live import remove_building
+    t0 = _t.perf_counter()
+    campus, _ = _ctx()
+    key = (scenario, None)
+    if key not in _STATE.setdefault("remove_base", {}):
+        with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
+            out = remove_building(campus, _yd(), scenario, campus.names[1])
+        _STATE["remove_base"][key] = out["before"]
+    return {"ok": True, "warm_s": _t.perf_counter() - t0}
+
+
 class QaoaReq(BaseModel):
     scenario: str = "outage_fest"
     seed: int = 1234

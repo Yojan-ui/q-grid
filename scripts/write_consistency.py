@@ -113,8 +113,7 @@ def main(d: Path):
     sys.path[:0] = [str(ROOT / "backend")]
     from qgrid.model import wear_rate
     wr = wear_rate(cfg)
-    L += ["## 5. Battery wear is priced the same way everywhere
-",
+    L += ["## 5. Battery wear is priced the same way everywhere\n",
           f"- Every optimiser (Q-Grid, per-building and central MPC, GA, PSO, the best possible plan, the certified bounds) prices "
           f"battery wear at Rs {wr:.2f} per kWh charged or discharged = battery cost / (2 × cycle life × depth of discharge) "
           "(`config.yaml` → `economics`, `battery_wear`; ASSUMPTIONS). The scored objective includes the same term, and the "

@@ -162,8 +162,8 @@ def main():
          f"({out['benefit']['extra_throughput_kwh_per_day_mean']:,.0f} kWh more throughput per day × Rs {c['wear_rs_per_kwh_throughput']:.2f}/kWh).",
          f"- Net value per year: {lakh(c['net_rs_per_year'])}.",
          f"- 10-year NPV at {100 * c['discount_rate']:.0f} %: {lakh(c['npv_gross_rs'])} before battery wear, {lakh(c['npv_net_rs'])} after.",
-         f"- Payback: {c['payback_gross_years']:.1f} years before battery wear" if c["payback_gross_years"] else "- Payback: not reached before battery wear",
-         (f"; {c['payback_net_years']:.1f} years after." if c["payback_net_years"] else "; not reached after battery wear."),
+         (f"- Payback: {c['payback_gross_years']:.1f} years before battery wear" if c["payback_gross_years"] else "- Payback: not reached before battery wear")
+         + (f", {c['payback_net_years']:.1f} years after (stand-in tariff, assumed costs)." if c["payback_net_years"] else ", not reached after battery wear."),
          (f"- Break-even battery wear: Rs {c['breakeven_wear_rs_per_kwh']:.2f} per kWh of throughput (the central assumption is "
           f"Rs {c['wear_rs_per_kwh_throughput']:.2f})." if c["breakeven_wear_rs_per_kwh"] is not None else ""),
          "",
