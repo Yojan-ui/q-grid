@@ -1,9 +1,9 @@
 mode,method,scenario,price_scenario,day,killed,kill_slot,feasible,tie_line_flows_consistent,recovery_time_s,critical_downtime_h,wall_time_s,slot,iters_at_kill_slot,agreed_at_kill_slot,replan_time_s,slots_to_reconverge
-networked,OURS,outage_fest,A,2023-06-15,heavy_labs,74,True,True,3.161339083002531,3.0,14.02,,,,,
-networked,B5,outage_fest,A,2023-06-15,heavy_labs,74,True,True,3.064364249999926,3.0,8.07,,,,,
-in-process,OURS (classical tiers),teaching,A,2023-09-13,heavy_labs,48,True,,,0.0,,48.0,15.0,True,0.6041458330000751,0.0
-in-process,OURS (classical tiers),fest,A,2023-06-14,heavy_labs,48,True,,,0.0,,48.0,15.0,False,0.7277698329999112,34.0
-in-process,OURS (classical tiers),exam_week,A,2023-07-12,heavy_labs,48,True,,,0.0,,48.0,15.0,False,0.7619502920006198,17.0
-in-process,OURS (classical tiers),monsoon,A,2023-07-25,heavy_labs,48,True,,,0.0,,48.0,15.0,False,0.745074915999794,14.0
-in-process,OURS (classical tiers),vacation,A,2023-08-09,heavy_labs,48,True,,,0.0,,48.0,15.0,False,0.6461749579993921,
-in-process,OURS (classical tiers),outage_fest,A,2023-06-15,heavy_labs,74,True,,,3.0,,74.0,15.0,False,0.5612249580008211,13.0
+networked,OURS,outage_fest,A,2023-06-15,heavy_labs,74,True,True,3.172000000020489,2.25,14.67,,,,,
+networked,B5,outage_fest,A,2023-06-15,heavy_labs,74,True,True,3.047000000020489,2.25,9.05,,,,,
+in-process,OURS (classical tiers),fest,A,2023-06-14,heavy_labs,48,True,,,0.0,,48.0,15.0,False,0.8364556999877095,24.0
+in-process,OURS (classical tiers),outage_fest,A,2023-06-15,heavy_labs,74,True,,,1.0,,74.0,15.0,False,0.7342232998926193,14.0
+in-process,OURS (classical tiers),exam_week,A,2023-07-12,heavy_labs,48,True,,,0.0,,48.0,14.0,True,0.6801043001469225,0.0
+in-process,OURS (classical tiers),monsoon,A,2023-07-25,heavy_labs,48,True,,,0.0,,48.0,15.0,False,0.7492835000157356,46.0
+in-process,OURS (classical tiers),vacation,A,2023-08-09,heavy_labs,48,True,,,0.0,,48.0,14.0,True,0.7024649002123624,0.0
+in-process,OURS (classical tiers),teaching,A,2023-09-13,heavy_labs,48,True,,,0.0,,48.0,15.0,False,0.7424782998859882,47.0

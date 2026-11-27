@@ -20,7 +20,9 @@ export function SummaryDoc({ d, idx, ds }: { d: StoryData; idx: Index; ds: strin
   const { sc } = d
   const B = d.bench
   const pr = sc.problem
-  const tariffPending = sc.price_status !== 'REAL' || (B?.tariff_status ?? 'PENDING') !== 'REAL'
+  const L = B?.headline.story?.locked
+  const ok = (s: string | undefined) => s === 'REAL' || s === 'VERIFIED'
+  const tariffPending = !ok(sc.price_status) || !ok(B?.tariff_status ?? 'PENDING')
   const ceaPending = sc.data_status?.cea !== 'REAL'
   const pl = d.qs?.placement
   const dsl = B?.datasets.find(x => x.key === ds)
@@ -33,15 +35,21 @@ export function SummaryDoc({ d, idx, ds }: { d: StoryData; idx: Index; ds: strin
       <p className="sd-sub">One-page summary · EUREKA Track 3 · headline day {sc.scenario.key.replace(/_/g, ' ')}, {fmtDate(sc.scenario.date)} · generated {new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} from the replay files</p>
 
       <h2>The problem</h2>
-      <p>{B?.headline.story ? <>{B.headline.story.step1.text}{tariffPending ? ' (tariff not fully verified)' : ''} </> : <>Today every building at RVCE acts on its own: it sells noon solar cheaply, buys power back at the evening peak and runs diesel when the BESCOM supply fails. </>}On the modelled headline day:</p>
-      {pr ? (
+      <p>{B?.headline.story ? <>{B.headline.story.step1.text}{tariffPending ? ' (tariff not fully verified)' : ''} </> : <>Today every building at RVCE acts on its own, and only diesel keeps critical loads up when the BESCOM supply fails. </>}{L ? `Mean of ${L.n_days} modelled RVCE days (${L.n_outage_days} with an outage):` : 'On the modelled headline day:'}</p>
+      {L && L.n_outage_days > 0 ? (
         <div className="sd-keys">
-          <div><span>Value lost per day {tariffPending && <i className="sd-pend">tariff not fully verified</i>}</span><b>{rs(pr.rs_lost)}</b></div>
+          <div><span>Critical loads dark, per outage</span><b>{L.outage_downtime_h.status_quo.toFixed(1)} h</b></div>
+          <div><span>Diesel per outage day · CO₂</span><b>{num(L.outage_diesel_l.status_quo)} L · {num(L.outage_diesel_l.status_quo * (L.diesel_co2_kg_per_l ?? 2.68))} kg</b></div>
+          <div><span>Electricity bill per day {tariffPending && <i className="sd-pend">tariff not fully verified</i>}</span><b>{rs(L.status_quo_bill_rs)}</b></div>
+        </div>
+      ) : pr ? (
+        <div className="sd-keys">
+          <div><span>Cost that day {tariffPending && <i className="sd-pend">tariff not fully verified</i>}</span><b>{rs(pr.cost_rs)}</b></div>
           <div><span>CO₂ per day {ceaPending && <i className="sd-pend">stand-in factor</i>}</span><b>{num(pr.co2_kg)} kg</b></div>
           <div><span>Diesel running · critical loads unserved</span><b>{pr.dg_hours.toFixed(1)} h · {pr.critical_downtime_h.toFixed(1)} h</b></div>
         </div>
       ) : <p>Not in this replay.</p>}
-      {pr && <p className="sd-foot" style={{ marginTop: 0 }}>{pr.definition}.</p>}
+      {L && <p className="sd-foot" style={{ marginTop: 0 }}>Status-quo simulation, results/bench_v3/daily.csv. Outages are synthetic and seeded; bill = energy + the day’s share of the monthly demand charge at {num(L.contract_kva_base)} kVA contract demand (assumed); diesel CO₂ {L.diesel_co2_kg_per_l ?? 2.68} kg/L (assumed).</p>}
 
       <h2>The method</h2>
       {d.qs ? (

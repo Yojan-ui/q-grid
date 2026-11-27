@@ -1,4 +1,7 @@
-## Headline: BESCOM outage during the fest evening (price scenario A, {{price_A_status}} prices)
+## v1 headline day: BESCOM outage during the fest evening (price scenario A, {{price_A_status}} prices)
+
+_The project's locked headline is in [headline.md](headline.md) (five-campus scorecard). This card is the v1 pipeline's
+single headline day._
 
 | | Status quo (B0) | Q-Grid (OURS) | B4 optimum |
 |---|---:|---:|---:|

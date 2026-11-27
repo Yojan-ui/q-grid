@@ -1,7 +1,7 @@
 {
- "checked_at": "2026-11-27 12:58",
- "n_real": 3,
- "n_pending": 6,
+ "checked_at": "2026-11-28 01:11",
+ "n_real": 5,
+ "n_pending": 4,
  "items": [
   {
    "key": "nasa_power",
@@ -68,47 +68,40 @@
   {
    "key": "tariff_A",
    "label": "KERC / BESCOM tariff order (HT educational, ToD) and solar export order",
-   "status": "PENDING",
-   "real": false,
+   "status": "REAL",
+   "real": true,
    "files": [
     {
      "path": "data/raw/tariff/KERC_tariff_order_BESCOM_FY2023-24.pdf",
-     "present": false
+     "present": true
     },
     {
      "path": "data/raw/tariff/KERC_solar_export_tariff.pdf",
-     "present": false
+     "present": true
     },
     {
      "path": "config.yaml prices.A.status: REAL",
      "present": false
     }
    ],
-   "missing": [
-    "data/raw/tariff/KERC_tariff_order_BESCOM_FY2023-24.pdf",
-    "data/raw/tariff/KERC_solar_export_tariff.pdf",
-    "config.yaml prices.A.status: REAL"
-   ]
+   "missing": []
   },
   {
    "key": "cea",
    "label": "CEA CO\u2082 baseline database (user guide PDF)",
-   "status": "PENDING",
-   "real": false,
+   "status": "REAL",
+   "real": true,
    "files": [
     {
      "path": "data/raw/cea/*.pdf",
-     "present": false
+     "present": true
     },
     {
      "path": "data/raw/cea/emission_factor.yaml",
-     "present": false
+     "present": true
     }
    ],
-   "missing": [
-    "data/raw/cea/*.pdf",
-    "data/raw/cea/emission_factor.yaml"
-   ]
+   "missing": []
   },
   {
    "key": "calendar",

@@ -1,5 +1,9 @@
 # Q-Grid: Decentralised, QAOA-Verified Scheduling for a Campus Solar–Battery–Diesel Microgrid (RVCE case study)
 
+> **Note.** Sections that quote the v1 headline day and the 30-day v1 set come from the earlier pipeline. The current
+> result is the five-campus scorecard ([benchmark_v3.md](benchmark_v3.md)) and the locked headline
+> ([headline.md](headline.md)): In a BESCOM outage Q-Grid cuts critical-load downtime from 2.6 h to 55 min per outage (41 L more diesel, 110 kg CO₂, to keep those loads up); on normal days the bill is 0.4% higher and the demand charge rises by Rs 16,685 a month at 1,300 kVA contract demand; with no central controller it averages 8.4% from the best possible plan against 9.2% for Per-building MPC, a lead made on the outage days (normal days: 7.4% against 0.3%).
+
 *Technical report, EUREKA Track 3. QAOA on a local simulator: verified against exact solutions, no quantum advantage claimed.*
 
 ## Abstract
@@ -7,9 +11,9 @@ We schedule batteries, diesel generators, borewell pumps, flexible loads and int
 campus (layout from OpenStreetMap) every 15 minutes. Each zone solves a ≤14-qubit QUBO with QAOA (simulated),
 verified against exhaustive search with a QAOA → QIEA → annealing → exact fallback; zones agree on tie-line flows with consensus
 ADMM without a coordinator. On the headline stress test — a BESCOM outage during the fest evening — critical-load downtime falls
-from 3.00 h (status quo) to 2.50 h (centralised optimum:
-0.00 h). On a 30-day evaluation set the method is 7.63 %
-above the centralised MILP optimum (status quo 14.41 %). Prices, the CO2 factor, the academic
+from 3.00 h (status quo) to 0.00 h (centralised optimum:
+0.00 h). On a 30-day evaluation set the method is 5.52 %
+above the centralised MILP optimum (status quo 0.10 %). Prices, the CO2 factor, the academic
 calendar and campus loads are PENDING official/RVCE data; all figures are reproducible from `results/*.csv`.
 
 ## 1 Problem
@@ -53,10 +57,10 @@ data, constraints, horizon and settlement for all methods. QAOA in the loop on t
 30-day set.
 
 ## 8 Results
-See `docs/results.md` (all tables generated from CSV). Key numbers (scenario A): 30-day mean cost B0 166,645,
-B3 161,686, OURS 162,163, B4 156,919 Rs/day; per semester (120 days,
-ASSUMPTION) OURS 19,459,524 Rs. Local solves answered by verified QAOA: 66.0 %.
-ADMM full-agreement rate 48.7 %. Recovery after a zone crash (networked): 3.16 s.
+See `docs/results.md` (all tables generated from CSV). Key numbers (scenario A): 30-day mean cost B0 163,975,
+B3 163,803, OURS 164,782, B4 163,807 Rs/day; per semester (120 days,
+ASSUMPTION) OURS 19,773,804 Rs. Local solves answered by verified QAOA: 65.7 %.
+ADMM full-agreement rate 53.3 %. Recovery after a zone crash (networked): 3.17 s.
 
 ## 9 Limitations and future work
 PENDING data (prices, CO2, calendar, RVCE meters); perfect forecasts; ideal simulated QAOA; no AC power flow; ADMM with binaries

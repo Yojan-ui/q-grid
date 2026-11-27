@@ -1,46 +1,46 @@
 # Pitch — 3 minutes (spoken script, follows the explainer steps)
 
-_Rendered by `scripts/write_results_md.py` from `docs/templates/pitch_3min.md`; every number comes from `results/`. Re-render
-after any re-run; never edit numbers by hand. Timings are targets; total ≈ 3:00. Press **P** for presenter mode before you start._
+_Rendered by `scripts/write_results_md.py` from `docs/templates/pitch_3min.md`. Every number comes from `results/`; the
+headline sentence is the locked one in `results/headline.json` ([docs/headline.md](headline.md)). Re-render after any re-run;
+never edit numbers by hand. Timings are targets at about 150 words a minute; total 3:00. Press **P** for presenter mode first._
 
-> Say once, early: "QAOA on a local simulator: verified against exact solutions, no quantum advantage claimed. Tariffs are
-> labelled stand-ins until the official BESCOM/KERC order arrives."
+**Step 1 · The problem (0:00–0:30)** · screen: Step 1, the problem cards
+"Today each building acts on its own: when BESCOM supply fails, critical loads go dark for 2.6 h per outage while the diesel sets burn 373 L; the electricity bill averages Rs 177,694 a day.
+That's the average of 30 modelled RVCE days, 3 of them with a BESCOM outage. Each building
+decides on its own, and when the grid fails, only diesel stands between the labs and a blackout.
+Everything you'll see is modelled on RVCE with real solar, map and tariff data. The outages are simulated, the batteries and
+cables are proposals, and the quantum part runs on a simulator: verified against exact solutions, no quantum advantage claimed."
 
-**Step 1 · The problem (0:00–0:25).**
-"Today each building runs on its own: critical loads lose power 16 min a day and the bill is Rs 177,985 a day.
-That's thirty modelled days at RVCE. Every building decides on its own — sells noon solar cheaply, buys back at the evening
-peak, starts diesel when BESCOM fails."
+**Step 2 · The campus (0:30–0:45)** · Step 2, the 3D campus
+"This is RVCE from OpenStreetMap: nine building groups, about 500 kWp of rooftop solar on 21 roofs, two 490 kVA diesel sets,
+and, proposed, batteries and cables between buildings. Every fifteen minutes, each of them needs a decision."
 
-**Step 2 · The campus (0:25–0:40).**
-"This is RVCE from OpenStreetMap: nine buildings, rooftop solar, batteries, two diesel sets, a pump house — joined by ten
-cables. Every fifteen minutes, each of them needs a decision."
+**Step 3 · The decisions (0:45–1:00)** · Step 3
+"Diesel on or off, battery charge or discharge, pump hours, when the laundry runs, for the next 24 hours. For the whole campus
+that's too many combinations for one computer to check, so each building solves only its own."
 
-**Step 3 · The decisions (0:40–0:55).**
-"Diesel on or off, battery may charge, pump hours, when the laundry runs — for the next 24 hours. For the whole campus that's
-too many combinations for any one computer to check, so each building solves only its own."
+**Step 4 · The quantum test (1:00–1:35)** · Step 4, then 4f
+"We asked an honest question: does a quantum circuit help with these on/off choices? Branch and bound leaves a few undecided,
+here 10. We turn them into a QUBO and run QAOA on a simulator. *[Click **Measure the block**: live moment 1.]*
+It matches exact search. But across 1,080 building problems the exact solver already finished at its first node
+99.9 % of the time, so the quantum start saved no work. Q-Grid doesn't use it in the loop. We tested
+it, verified it, and we're telling you it didn't help."
 
-**Step 4 · The quantum test (0:55–1:30).**
-"We asked an honest question: does a quantum circuit help with these on/off choices? Branch and bound leaves a few undecided
-— here 5 — we turn them into a QUBO and run QAOA on a simulator. *[Click **Measure the block** — live moment 1.]*
-It matches exact search. But across 1,080 building problems, the exact solver already finished at its first node
-99.9 % of the time, so the quantum start saved no work. Verdict: Q-Grid doesn't use it. We tested it,
-verified it, and we tell you it didn't help."
-
-**Step 5 · Buildings agree (1:30–2:00).**
+**Step 5 · Buildings agree (1:35–2:05)** · Step 5
 "Between buildings there is no central computer. Neighbours trade proposals for each cable's flow until they agree.
-*[Click **Take mechanical labs offline** — live moment 2.]* Its 3 cables go dark; the others re-agree in
-55 rounds and every critical load is still served."
+*[Click **Take mechanical labs offline**: live moment 2.]* Its 3 cables go dark; the others re-agree in
+46 rounds, and every critical load in the other buildings is still served."
 
-**Step 6 · Storage and rules (2:00–2:20).**
-"Batteries fill before the evening outage and carry the campus through it. And faculty can add rules in plain English.
-*[Type or click **no DG** — live moment 3.]* It's checked, then priced: diesel goes from
-6.0 hours to 0.0, and you see exactly what that costs in shed load.
-An impossible rule is refused with a reason."
+**Step 6 · Storage and rules (2:05–2:25)** · Step 6, then 6b
+"The proposed batteries fill before the evening outage and carry critical loads through it. Faculty can add rules in plain
+English. *[Click the chip **no DG**: live moment 3.]* It's checked, then priced: diesel goes from
+6.0 to 0.0 hours, and you see what that costs. An impossible rule is
+refused with a reason."
 
-**Step 7 · Results (2:20–3:00).**
-"Same days, same data, same forecasts for every method. Q-Grid cuts critical downtime from 16 min to 8 min a day (0 min counting only shortfalls above 1 %), saves 3.3% on the bill versus today, and lands 0.8% from the best possible plan.
-When the campus network fails for 3 hours, central control loses 3.5 points of gap and Q-Grid 2.1, because each building keeps optimising on its own.
-Is it worth it? About Rs 7.9 lakh of hardware for nine buildings; with battery wear counted it pays back
-in about 0.4 years on assumed costs, and the Monte Carlo range is on screen. Every number opens to its source file."
+**Step 7 · Results (2:25–3:00)** · 7a scorecard, then 7e
+"Same days, same data, same forecasts for every method. In a BESCOM outage Q-Grid cuts critical-load downtime from 2.6 h to 55 min per outage (41 L more diesel, 110 kg CO₂, to keep those loads up); on normal days the bill is 0.4% higher and the demand charge rises by Rs 16,685 a month at 1,300 kVA contract demand; with no central controller it averages 8.4% from the best possible plan against 9.2% for Per-building MPC, a lead made on the outage days (normal days: 7.4% against 0.3%).
+When the campus network fails for 3 hours, central control loses 2.7 points of gap and Q-Grid 0.7, because each building keeps optimising on its own.
+About Rs 7.9 lakh of node hardware for 9 buildings. On the electricity bill alone it does not pay back on our assumed costs. The case today is reliability: fewer dark hours for critical loads when BESCOM fails. Every number on screen opens to the file it came from."
 
-**Close (one line).** "Decentralised, verified, honest about quantum — ready for RVCE's real meter data."
+**Close (one line).** "Decentralised, verified against exact solutions, honest about quantum, and ready for RVCE's own bill
+and meter data."

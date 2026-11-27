@@ -228,7 +228,7 @@ def comms_series(ds: str, day: str) -> dict:
             "totals": {k: v[-1] for k, v in series.items()}}
 
 
-def headline(s, w, labels) -> dict:
+def headline(s, w, labels, r: pd.DataFrame | None = None) -> dict:
     nocoord = ["status_quo", "rule_based", "ga", "pso", "per_building_mpc", "qgrid"]
     best_on, details = [], []
     for ds in labels:
@@ -248,10 +248,19 @@ def headline(s, w, labels) -> dict:
     rv = next((d for d in details if d[0] == "rvce"), details[0] if details else None)
     if rv is None:
         return {"text": "Benchmark results are not available yet.", "detail": ""}
-    _, q, alt, av, p = rv
-    sig = "" if p is None else (f" (paired Wilcoxon p = {p:.3f})" if p >= 0.001 else " (paired Wilcoxon p < 0.001)")
-    first = (f"Q-Grid lands {q:.1f}% from the best possible plan; the closest alternative without a central controller, "
-             f"{NAMES[alt][0]}, lands {av:.1f}%{sig}.")
+    ds0, q, alt, av, p = rv
+    ptxt = "" if p is None else (f"paired Wilcoxon p = {p:.3f}" if p >= 0.001 else "paired Wilcoxon p < 0.001")
+    sig = f" ({ptxt})" if ptxt else ""
+    k_days = n_days = None
+    if r is not None:                       # say who wins day by day, so a p-value is never read in the wrong direction
+        pv = r[r.dataset == ds0].pivot_table(index="day", columns="method", values="gap_pct")
+        if {"qgrid", alt} <= set(pv.columns):
+            k_days, n_days = int((pv["qgrid"] < pv[alt] - 1e-9).sum()), int(len(pv))
+            sig = (f"; day by day, Q-Grid is closer on {k_days} of {n_days} days" if 2 * k_days >= n_days else
+                   f"; day by day, {NAMES[alt][0]} is closer on {n_days - k_days} of {n_days} days, and Q-Grid's lower "
+                   f"mean comes from a few days with large differences") + (f" ({ptxt})" if ptxt else "")
+    first = (f"Q-Grid lands {q:.1f}% from the best possible plan on average; the closest alternative without a central "
+             f"controller, {NAMES[alt][0]}, lands {av:.1f}%{sig}.")
     if len(best_on) == n:
         second = f"Among methods that work without a central controller, Q-Grid is closest to the best possible plan on all {n} campuses."
     elif best_on:
@@ -260,7 +269,8 @@ def headline(s, w, labels) -> dict:
                   f"{len(best_on)} of {n} campuses; elsewhere ({'; '.join(miss)}) another method is closer.")
     else:
         second = "Q-Grid is not the closest to the best possible plan among methods without a central controller on any campus."
-    return {"text": first, "detail": second, "rvce": {"qgrid_gap": q, "alt": NAMES[alt][0], "alt_gap": av, "p": p},
+    return {"text": first, "detail": second, "rvce": {"qgrid_gap": q, "alt": NAMES[alt][0], "alt_gap": av, "p": p,
+                                                      "alt_key": alt, "qgrid_closer_days": k_days, "n_days": n_days},
             "best_on": best_on, "n": n}
 
 
@@ -269,7 +279,7 @@ def story_headlines(s, labels, cfg, ds: str = "rvce") -> dict:
     Wording follows the numbers (e.g. 'cuts' vs 'raises'); figures that depend on the stand-in tariff are flagged."""
     g = lambda m, k: (_stat(s, ds, m, k) or {}).get("mean")   # noqa: E731
     n = int(s[(s.dataset == ds) & (s.method == "qgrid")].n_days.iloc[0]) if len(s[(s.dataset == ds) & (s.method == "qgrid")]) else 0
-    pend = cfg["tariff_v2"]["status"] != "REAL"
+    pend = tariff_pending(cfg)
     sq_dt, sq_dt1, sq_bill = g("status_quo", "critical_downtime_h"), g("status_quo", "critical_downtime_1pct_h"), g("status_quo", "bill_rs")
     opt_sav = g("optimum", "saving_pct")
     q_dt, q_dt1, q_sav, q_gap = g("qgrid", "critical_downtime_h"), g("qgrid", "critical_downtime_1pct_h"), g("qgrid", "saving_pct"), g("qgrid", "gap_pct")
@@ -297,6 +307,150 @@ def story_headlines(s, labels, cfg, ds: str = "rvce") -> dict:
                         "optimum_saving_pct": opt_sav, "qgrid_downtime_h": q_dt, "qgrid_downtime_1pct_h": q_dt1,
                         "qgrid_saving_pct": q_sav, "qgrid_gap_pct": q_gap, "central_gap_pct": c_gap,
                         "central_comms_fail_gap_pct": cf_gap, "qgrid_comms_fail_gap_pct": qf_gap}}
+
+
+def tariff_pending(cfg: dict) -> bool:
+    """The headline tariff is the HT-2(c)(ii) block when present (KERC orders); otherwise the earlier tariff_v2."""
+    st = (cfg.get("tariff_ht2c") or cfg.get("tariff_v2") or {}).get("status", "PENDING")
+    return str(st).upper() not in ("REAL", "VERIFIED")
+
+
+def demand_by_contract(r: pd.DataFrame, cfg: dict, ds: str = "rvce") -> list[dict]:
+    """Monthly demand charge (Rs/month, mean over the sampled months) for status quo and Q-Grid at each contract demand
+    of tariff_ht2c.contract_demand_sweep, from the same rows and the same monthly settlement as the bill."""
+    from qgrid.ablation.demand import monthly_settlement, tariff_params
+    th = cfg.get("tariff_ht2c") or {}
+    sweep = th.get("contract_demand_sweep") or ([th["contract_demand_kva"]] if th.get("contract_demand_kva") else [])
+    g = r[(r.dataset == ds) & r.method.isin(["status_quo", "qgrid"])].copy()
+    out = []
+    for cd in sweep:
+        cache: dict = {}
+
+        def pf(d, day, cd=cd):
+            k = str(day)[:7]
+            if k not in cache:
+                cache[k] = tariff_params(cfg, day, contract_kva=cd)
+            return cache[k]
+        m = monthly_settlement(g.drop(columns=[c for c in ("md_month_kva", "billing_kva_month", "demand_charge_month_rs",
+                                                          "demand_share_rs", "bill_rs") if c in g]),
+                               pf, peak_col="peak_kva_bill", energy_col="cost_rs")
+        m["month"] = m.day.astype(str).str[:7]
+        mo = m.groupby(["method", "month"]).demand_charge_month_rs.first().groupby("method").mean()
+        ex = m.groupby(["method", "month"]).md_month_kva.first().groupby("method").max()
+        out.append({"contract_kva": float(cd), "status_quo_rs_month": float(mo.get("status_quo", np.nan)),
+                    "qgrid_rs_month": float(mo.get("qgrid", np.nan)),
+                    "change_rs_month": float(mo.get("qgrid", np.nan) - mo.get("status_quo", np.nan)),
+                    "status_quo_max_md_kva": float(ex.get("status_quo", np.nan)), "qgrid_max_md_kva": float(ex.get("qgrid", np.nan))})
+    return out
+
+
+def locked_headline(r: pd.DataFrame, hl: dict, cfg: dict, ds: str = "rvce") -> dict:
+    """The one headline sentence and the Step 1 problem sentence, generated only from the scorecard rows of the case
+    study. Priority: critical-load downtime in outages, diesel and CO2, monthly demand charge by contract demand, gap
+    to the best plan without a central controller, the everyday bill. Every verb follows the sign of the number."""
+    g = r[r.dataset == ds]
+    if not len(g):
+        return {}
+    has_out = g.outage.fillna("").astype(str).str.len() > 0
+    o, n = g[has_out], g[~has_out]
+    mean = lambda d, m, k: float(d[d.method == m][k].mean()) if len(d[d.method == m]) else np.nan   # noqa: E731
+    co2_l = float(cfg.get("diesel", {}).get("co2_kg_per_l", 2.68))
+    hm = lambda h: f"{h * 60:.0f} min" if h < 1 else f"{h:.1f} h"   # noqa: E731
+    nums = {"dataset": ds, "n_days": int(g.day.nunique()), "n_outage_days": int(o.day.nunique()),
+            "outage_downtime_h": {m: mean(o, m, "critical_downtime_h") for m in ("status_quo", "qgrid", "optimum")},
+            "outage_diesel_l": {m: mean(o, m, "dg_litres") for m in ("status_quo", "qgrid", "optimum")},
+            "normal_day_saving_pct": mean(n, "qgrid", "saving_pct"),
+            "all_day_saving_pct": mean(g, "qgrid", "saving_pct"),
+            "status_quo_bill_rs": mean(g, "status_quo", "bill_rs"),
+            "gap_pct": (hl.get("rvce") or {}).get("qgrid_gap"), "alt": (hl.get("rvce") or {}).get("alt"),
+            "alt_gap_pct": (hl.get("rvce") or {}).get("alt_gap"),
+            "demand_by_contract": demand_by_contract(r, cfg, ds),
+            "contract_kva_base": float((cfg.get("tariff_ht2c") or {}).get("contract_demand_kva") or np.nan),
+            "diesel_co2_kg_per_l": co2_l}
+    if "export_kwh" in g:
+        nums["status_quo_export_kwh_day"] = mean(g, "status_quo", "export_kwh")
+    # gap on normal (no-outage) days, for Q-Grid and the methods that also need no central controller
+    nocoord = ["status_quo", "rule_based", "ga", "pso", "per_building_mpc"]
+    nums["normal_day_gap_pct"] = {m: mean(n, m, "gap_pct") for m in nocoord + ["qgrid", "central_mpc", "optimum"]}
+    best_n = min(nocoord, key=lambda m: nums["normal_day_gap_pct"][m])
+    nums["normal_day_best_nocoord"] = {"method": best_n, "name": NAMES[best_n][0], "gap_pct": nums["normal_day_gap_pct"][best_n]}
+    dsq, dq = nums["outage_downtime_h"]["status_quo"], nums["outage_downtime_h"]["qgrid"]
+    lsq, lq = nums["outage_diesel_l"]["status_quo"], nums["outage_diesel_l"]["qgrid"]
+    parts = []
+    if nums["n_outage_days"] and not np.isnan(dsq):
+        verb = "cuts" if dq < dsq - 1e-9 else ("raises" if dq > dsq + 1e-9 else "keeps")
+        parts.append(f"in a BESCOM outage Q-Grid {verb} critical-load downtime from {hm(dsq)} to {hm(dq)} per outage"
+                     if verb != "keeps" else f"in a BESCOM outage Q-Grid keeps critical-load downtime at {hm(dq)} per outage")
+        dl = lsq - lq
+        if abs(dl) >= 0.5:
+            parts[-1] += (f" and saves {dl:,.0f} L of diesel ({dl * co2_l:,.0f} kg CO₂)" if dl > 0
+                          else f" ({-dl:,.0f} L more diesel, {-dl * co2_l:,.0f} kg CO₂, to keep those loads up)")
+    # everyday cost next, then the gap (priority order of the brief: outages, diesel, demand charge, gap, everyday bill)
+    base = next((x for x in nums["demand_by_contract"] if x["contract_kva"] == nums["contract_kva_base"]), None)
+    sav = nums["normal_day_saving_pct"]
+    if not np.isnan(sav):
+        every = f"on normal days the bill is {abs(sav):.1f}% {'lower' if sav >= 0 else 'higher'}"
+        if base and not np.isnan(base["change_rs_month"]):
+            c = base["change_rs_month"]
+            every += (f" and the demand charge {'falls' if c < 0 else 'rises'} by Rs {abs(c):,.0f} a month"
+                      f" at {base['contract_kva']:,.0f} kVA contract demand")
+        parts.append(every)
+    if nums["gap_pct"] is not None:
+        import re as _re
+        short = lambda nm: ("today's practice" if nm.lower().startswith("status quo")   # noqa: E731
+                            else _re.sub(r" \(.*\)$", "", nm))
+        alt = nums.get("alt") or ""
+        ahead = nums["alt_gap_pct"] is not None and nums["gap_pct"] <= nums["alt_gap_pct"]
+        g0 = f"with no central controller it averages {nums['gap_pct']:.1f}% from the best possible plan"
+        gap_txt = (g0 if not alt else f"{g0} against {nums['alt_gap_pct']:.1f}% for {short(alt)}" if ahead
+                   else f"{g0}, behind {short(alt)} ({nums['alt_gap_pct']:.1f}%)")
+        qn, bn = nums["normal_day_gap_pct"]["qgrid"], nums["normal_day_best_nocoord"]
+        if nums["n_outage_days"] and not np.isnan(qn) and qn > bn["gap_pct"] + 1e-9:   # the lead is made on outage days
+            same = short(bn["name"]) == short(alt)
+            gap_txt += (f", a lead made on the outage days (normal days: {qn:.1f}% against {bn['gap_pct']:.1f}%"
+                        f"{'' if same else ' for ' + short(bn['name'])})")
+        parts.append(gap_txt)
+    sentence = (parts[0][0].upper() + parts[0][1:] + ("; " + "; ".join(parts[1:]) if len(parts) > 1 else "") + ".") if parts else ""
+    step1 = (f"Today each building acts on its own: when BESCOM supply fails, critical loads go dark for {hm(dsq)} per "
+             f"outage while the diesel sets burn {lsq:,.0f} L; the electricity bill averages Rs {nums['status_quo_bill_rs']:,.0f} a day."
+             if nums["n_outage_days"] else
+             f"Today each building acts on its own; the campus pays Rs {nums['status_quo_bill_rs']:,.0f} a day.")
+    if nums.get("status_quo_export_kwh_day", 0) and nums["status_quo_export_kwh_day"] > 1:
+        step1 += f" It exports {nums['status_quo_export_kwh_day']:,.0f} kWh of solar a day at the export rate."
+    return {"sentence": sentence, "step1": step1, "numbers": nums, "tariff_pending": tariff_pending(cfg),
+            "source": "results/bench_v3/daily.csv (rows dataset=rvce), monthly bill per scripts/write_bench_v3.monthly_bill",
+            "generated_by": "scripts/write_bench_v3.py locked_headline()"}
+
+
+def write_headline(lh: dict) -> None:
+    """results/headline.json (locked sentence + numbers; the earlier v1 card kept under legacy_v1) and docs/headline.md."""
+    if not lh:
+        return
+    hj = ROOT / "results" / "headline.json"
+    old = json.loads(hj.read_text(encoding="utf-8")) if hj.exists() else {}
+    legacy = old.get("legacy_v1", old if "before" in old else None)
+    out = {"locked": True, **lh, **({"legacy_v1": {**legacy, "note": "v1 pipeline card (old campus and stand-in tariff); superseded"}}
+                                    if legacy else {})}
+    hj.write_text(json.dumps(out, indent=2, default=float), encoding="utf-8")
+    nb = lh["numbers"]
+    rows = [f"| Critical-load downtime per outage | {nb['outage_downtime_h']['status_quo']:.2f} h | {nb['outage_downtime_h']['qgrid']:.2f} h | {nb['outage_downtime_h']['optimum']:.2f} h |",
+            f"| Diesel per outage day | {nb['outage_diesel_l']['status_quo']:,.0f} L | {nb['outage_diesel_l']['qgrid']:,.0f} L | {nb['outage_diesel_l']['optimum']:,.0f} L |"]
+    dc = "\n".join(f"| {x['contract_kva']:,.0f} kVA | Rs {x['status_quo_rs_month']:,.0f} | Rs {x['qgrid_rs_month']:,.0f} | "
+                   f"{'+' if x['change_rs_month'] >= 0 else '−'}Rs {abs(x['change_rs_month']):,.0f} | {x['status_quo_max_md_kva']:,.0f} / {x['qgrid_max_md_kva']:,.0f} kVA |"
+                   for x in nb["demand_by_contract"])
+    md = ["# Headline (locked)\n", f"**{lh['sentence']}**\n", f"Step 1 (the problem): {lh['step1']}\n",
+          f"Generated by `{lh['generated_by']}` from `{lh['source']}`: {nb['n_days']} RVCE days, {nb['n_outage_days']} with a "
+          "synthetic BESCOM outage. Re-run `python scripts/write_bench_v3.py` to regenerate; never edit by hand.\n",
+          "| On outage days (mean) | Status quo | Q-Grid | Best possible plan |", "|---|---:|---:|---:|", *rows, "",
+          f"- Gap to the best possible plan, no central controller: Q-Grid {nb['gap_pct']:.1f}%"
+          + (f"; {nb['alt']} {nb['alt_gap_pct']:.1f}%" if nb.get("alt") else ""),
+          f"- Bill versus status quo: normal days {nb['normal_day_saving_pct']:+.1f}% saving, all days {nb['all_day_saving_pct']:+.1f}% "
+          f"(status-quo bill Rs {nb['status_quo_bill_rs']:,.0f}/day; energy + monthly demand charge)\n",
+          "Monthly demand charge by contract demand (RVCE's contract demand is unknown until its BESCOM bill arrives):\n",
+          "| Contract demand | Status quo | Q-Grid | Change | Highest monthly MD (SQ / Q-Grid) |", "|---|---:|---:|---:|---:|", dc, "",
+          "_Tariff: BESCOM HT-2(c)(ii), KERC Tariff Order 2023 (verified). Outages are synthetic; loads are floor area × energy "
+          "intensity on BDG2 shapes; batteries and cables are PROPOSED._\n"]
+    (ROOT / "docs" / "headline.md").write_text("\n".join(md), encoding="utf-8")
 
 
 def main():
@@ -332,8 +486,14 @@ def main():
         if st["gap_pct"]:
             design.append({"key": m, "name": nm, "what_changed": what, **{k: (v or {}).get("mean") for k, v in st.items()},
                            "source": "results/bench_v3/summary.csv"})
-    hl = headline(s, w, labels)
+    hl = headline(s, w, labels, r)
     hl["story"] = story_headlines(s, labels, cfg)
+    lh = locked_headline(r, hl, cfg)
+    if lh and hl["story"]:                      # Step 1 / Step 7 / README hero use the locked sentence
+        hl["story"]["step1"]["text"] = lh["step1"]
+        hl["story"]["step7"]["text"] = lh["sentence"]
+        hl["story"]["locked"] = lh["numbers"]
+    write_headline(lh)
     # shadow mode (Deploy -> Phase 0): per RVCE day, what staff did (status quo) vs what Q-Grid recommended, same data
     shadow = []
     rv = r[r.dataset == "rvce"]
@@ -344,7 +504,7 @@ def main():
             pick = lambda x: {"bill_rs": float(x.bill_rs), "critical_downtime_h": float(x.critical_downtime_h), "dg_litres": float(x.dg_litres),   # noqa: E731
                               "co2_kg": float(x.co2_kg), "import_kwh": float(x.import_kwh), "unserved_kwh": float(x.unserved_kwh)}
             shadow.append({"day": day, "outage": bool(isinstance(a.outage, str) and a.outage), "status_quo": pick(a), "qgrid": pick(q)})
-    out = {"tariff_status": cfg["tariff_v2"]["status"],
+    out = {"tariff_status": (cfg.get("tariff_ht2c") or cfg["tariff_v2"])["status"],
            "methods": [{"key": k, "name": v[0], "group": v[1], "without_coordinator": k not in ("central_mpc", "central_mpc_comms_fail")} for k, v in NAMES.items()],
            "reference": {"key": REF[0], "name": REF[1], "group": "Reference", "without_coordinator": False},
            "metrics": [{"key": k, "label": l, "group": g, "better": b, "unit": u, "digits": d} for k, l, g, b, u, d in METRICS],

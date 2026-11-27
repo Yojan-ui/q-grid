@@ -2,6 +2,8 @@
 // No extra packages: Node >= 22 (global WebSocket/fetch) and an installed Chrome.
 //   node scripts/capture.mjs --url http://localhost:5173 --out ../docs/media/shots [--sizes 1440x900,1920x1080] [--only 1,4c]
 //   node scripts/capture.mjs --url http://localhost:5173 --out ../docs/media --video 1-4g --seconds 60
+//   node scripts/capture.mjs --url http://localhost:5173 --out ../docs/media --demo --sizes 1920x1080 --present
+//        (90 s backup demo: the story plus the three live moments, written to <out>/demo_backup.webm; --name to rename)
 //   --theme light|dark (default: light)   --present (presenter mode: projector sizing, dev controls hidden)
 // Also reports console errors and overlapping on-screen labels for each stop.
 import { spawn } from 'node:child_process'
@@ -17,6 +19,7 @@ const OUT = resolve(arg('out', 'shots'))
 const SIZES = arg('sizes', '1440x900,1920x1080').split(',').map(s => s.split('x').map(Number))
 const ONLY = arg('only', '')
 const VIDEO = arg('video', '')
+const DEMO = process.argv.includes('--demo')
 const SECONDS = Number(arg('seconds', '60'))
 const CHROME = arg('chrome', [
   'C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe',
@@ -26,6 +29,27 @@ const STOPS = ['1', '2', '3', '4a', '4b', '4c', '4d', '4e', '4f', '4g', '5', '5b
 // how long to let each stop's motion play before the screenshot (ms)
 const WAIT = { '1': 9000, '3': 4200, '4c': 4200, '4d': 2600, '4e': 2200, '5': 9000, '6': 12000, '7a': 6000, '7b': 3000 }
 const sleep = ms => new Promise(r => setTimeout(r, ms))
+const ev = (cdp, expression) => cdp.send('Runtime.evaluate', { expression, returnByValue: true })
+// scripted interactions for the recordings (each includes its own lead-in pause)
+const ACTIONS = {
+  hostels: async cdp => { await sleep(1800); await ev(cdp, `[...document.querySelectorAll('.chip')].find(b => b.textContent === 'Hostels')?.click()`) },
+  measure: async cdp => { await sleep(2500); await ev(cdp, `[...document.querySelectorAll('.card.live .btn')].find(b => /^Measure/.test(b.textContent))?.click()`) },
+  remove: async cdp => { await sleep(3000); await ev(cdp, `[...document.querySelectorAll('.card .btn')].find(b => /offline/.test(b.textContent))?.click()`) },
+  rule: async cdp => {
+    await sleep(1500)
+    const t = (await ev(cdp, `(() => { const c = [...document.querySelectorAll('.card.live .chips.sm .chip')].map(b => b.textContent); return c[1] ?? c[0] ?? '' })()`)).result.value
+    await ev(cdp, `(() => { const i = document.querySelector('input[aria-label="faculty rule"]'); i.focus(); i.select() })()`)
+    for (const ch of t) { await cdp.send('Input.insertText', { text: ch }); await sleep(45) }
+    await sleep(400)
+    await ev(cdp, `document.querySelector('.card.live form button[type="submit"]')?.click()`)
+  },
+}
+// the 90 s backup demo: story, solve a slot (4f), remove a building (5), type a rule (6b), results (7a-7e); ms per stop
+const DEMO_PLAN = [
+  { stop: '1', ms: 12000 }, { stop: '2', ms: 6000, act: 'hostels' }, { stop: '3', ms: 6000 }, { stop: '4c', ms: 6000 },
+  { stop: '4f', ms: 8000, act: 'measure' }, { stop: '5', ms: 12000, act: 'remove' }, { stop: '6b', ms: 10000, act: 'rule' },
+  { stop: '7a', ms: 8000 }, { stop: '7c', ms: 6000 }, { stop: '7d', ms: 6000 }, { stop: '7e', ms: 8000 },
+]
 
 const OVERLAP_JS = `(() => {
   const sel = ['.zlabel', '.linelabel', '.devlabel', '.tile', '.qlabel', '.rulechip', '.barlab', '.colhead', '.verifytag', '.duotag', '.blockhead', '.clock', '.stage-foot'];
@@ -61,7 +85,7 @@ async function main() {
     await cdp.send('Page.enable'); await cdp.send('Runtime.enable')
     mkdirSync(OUT, { recursive: true })
     const report = {}
-    if (VIDEO) await record(cdp)
+    if (VIDEO || DEMO) await record(cdp)
     else for (const [w, h] of SIZES) {
       await cdp.send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 1, mobile: false })
       const errs = []
@@ -100,7 +124,7 @@ async function main() {
       const fps = (await cdp.send('Runtime.evaluate', { expression: `new Promise(r => { let n = 0; const t0 = performance.now(); const f = () => { n++; performance.now() - t0 < 2000 ? requestAnimationFrame(f) : r(n / 2) }; requestAnimationFrame(f) })`, awaitPromise: true, returnByValue: true })).result.value
       report[`${w}x${h} fps (headless, last stop)`] = fps
     }
-    writeFileSync(join(OUT, VIDEO ? 'record_report.json' : `shots_report_${TAG}.json`), JSON.stringify(report, null, 1))
+    if (!VIDEO && !DEMO) writeFileSync(join(OUT, `shots_report_${TAG}.json`), JSON.stringify(report, null, 1))
     for (const [k, v] of Object.entries(report)) {
       if (Array.isArray(v)) { if (v.length) console.log(k, v.slice(0, 5)) ; continue }
       if (typeof v !== 'object') { console.log(k, v); continue }
@@ -118,23 +142,41 @@ async function main() {
 async function record(cdp) {
   const [w, h] = SIZES[0]
   await cdp.send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 1, mobile: false })
-  const [a, b] = VIDEO.split('-')
-  const list = STOPS.slice(STOPS.indexOf(a), STOPS.indexOf(b) + 1)
-  await cdp.send('Page.navigate', { url: `${URL0}/?stop=${a}${QS}` })
+  let plan, name
+  if (DEMO) { plan = DEMO_PLAN; name = arg('name', 'demo_backup.webm') }
+  else {
+    const [a, b] = VIDEO.split('-')
+    const list = STOPS.slice(STOPS.indexOf(a), STOPS.indexOf(b) + 1)
+    // time budget per stop, weighted: the day-long and circuit stops get more
+    const weight = { '1': 2.2, '2': 1.2, '3': 1.5, '4c': 1.5, '4d': 1.2, '4e': 1.6 }
+    const tot = list.reduce((s, x) => s + (weight[x] ?? 1), 0)
+    plan = list.map(s => ({ stop: s, ms: (SECONDS * 1000 * (weight[s] ?? 1)) / tot, act: s === '2' ? 'hostels' : undefined }))
+    name = `qgrid-steps-${a}-${b}.webm`
+  }
+  await cdp.send('Page.navigate', { url: `${URL0}/?stop=${plan[0].stop}${QS}` })
   await waitFor(cdp, `!!document.querySelector('.panel .answer')`, 30000)
   await sleep(1500)
+  const errs = []
+  cdp.on('Runtime.exceptionThrown', p => errs.push(p.exceptionDetails?.exception?.description ?? p.exceptionDetails?.text))
+  cdp.on('Runtime.consoleAPICalled', p => { if (p.type === 'error') errs.push(p.args.map(a => a.value ?? a.description).join(' ').slice(0, 200)) })
   const frames = []
   cdp.on('Page.screencastFrame', p => { frames.push({ t: p.metadata.timestamp, data: p.data }); cdp.send('Page.screencastFrameAck', { sessionId: p.sessionId }) })
   await cdp.send('Page.startScreencast', { format: 'jpeg', quality: 82, maxWidth: w, maxHeight: h, everyNthFrame: 1 })
-  // time budget per stop, weighted: the day-long and circuit stops get more
-  const weight = { '1': 2.2, '2': 1.2, '3': 1.5, '4c': 1.5, '4d': 1.2, '4e': 1.6 }
-  const tot = list.reduce((s, x) => s + (weight[x] ?? 1), 0)
-  for (let i = 0; i < list.length; i++) {
-    if (i > 0) await key(cdp, 'ArrowRight')
-    if (list[i] === '2') { await sleep(1800); await cdp.send('Runtime.evaluate', { expression: `[...document.querySelectorAll('.chip')].find(b => b.textContent === 'Hostels')?.click()` }) }
-    await sleep((SECONDS * 1000 * (weight[list[i]] ?? 1)) / tot - (list[i] === '2' ? 1800 : 0))
+  let cur = STOPS.indexOf(plan[0].stop)
+  for (const p of plan) {
+    const target = STOPS.indexOf(p.stop)
+    while (cur < target) { await key(cdp, 'ArrowRight'); cur++; if (cur < target) await sleep(300) }
+    const t0 = Date.now()
+    if (p.act) await ACTIONS[p.act](cdp)
+    await sleep(Math.max(0, p.ms - (Date.now() - t0)))
   }
   await cdp.send('Page.stopScreencast')
+  // keep at most 30 frames per second (the screencast can deliver far more; the in-page encoder only needs 30)
+  const all = frames.splice(0)
+  for (const f of all) if (!frames.length || f.t - frames[frames.length - 1].t >= 1 / 30 - 1e-6) frames.push(f)
+  writeFileSync(join(OUT, `${name.replace(/\.webm$/, '')}_report.json`), JSON.stringify({ console_errors: [...new Set(errs)], frames: frames.length,
+    seconds: frames.length ? frames[frames.length - 1].t - frames[0].t : 0, plan }, null, 1))
+  if (errs.length) console.log('console errors during recording:', [...new Set(errs)].slice(0, 5))
   console.log(`captured ${frames.length} frames`)
   const dir = join(OUT, 'frames')
   mkdirSync(dir, { recursive: true })
@@ -164,11 +206,11 @@ async function record(cdp) {
   await cdp.send('Runtime.evaluate', { expression: 'window.__frames = []' })
   for (let i = 0; i < frames.length; i += 40) {
     const batch = frames.slice(i, i + 40).map(f => `data:image/jpeg;base64,${f.data}`)
-    await cdp.send('Runtime.evaluate', { expression: `window.__frames.push(...${JSON.stringify(batch)})` })
+    await cdp.send('Runtime.evaluate', { expression: `window.__frames.push(...${JSON.stringify(batch)})` }, 300000)
   }
   const res = await cdp.send('Runtime.evaluate', { expression: enc, awaitPromise: true, returnByValue: true }, 600000)
   if (res.exceptionDetails) throw new Error(JSON.stringify(res.exceptionDetails).slice(0, 400))
-  const file = join(OUT, `qgrid-steps-${a}-${b}.webm`)
+  const file = join(OUT, name)
   writeFileSync(file, Buffer.from(res.result.value, 'base64'))
   rmSync(dir, { recursive: true, force: true })
   console.log('wrote', file)

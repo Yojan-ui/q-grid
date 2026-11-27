@@ -318,7 +318,12 @@ def product_fields(cfg: dict, lay: dict, out: dict) -> None:
                 "text": f"{len(dgs.get('sets', []))} generator sets ({dgs.get('total_kva', 0):,} kVA) run only in outages (status-quo simulation)." if dgs
                         else "Generators run only in outages."})
     if tp:
-        pts.append({"key": "demand_charges", "title": f"Every kVA of peak costs Rs {tp['orders'][0]['demand_rs_kva_month']:g} a month",
+        from qgrid.v2.tariff import order_for
+        try:
+            o_day = order_for(cfg, day)                  # the KERC order in force on the headline day
+        except ValueError:
+            o_day = tp["orders"][-1]
+        pts.append({"key": "demand_charges", "title": f"Every kVA of peak costs Rs {o_day['demand_rs_kva_month']:g} a month",
                     "text": f"Billed on the month's peak, at least {100 * tp['billing_demand_floor_frac']:.0f} % of the {tp['contract_demand_kva']:,.0f} kVA contract. Peak today: {m['peak_import_kw'] / tp.get('power_factor', 0.95):,.0f} kVA."})
     if pe:
         rk = sum(float(lay["zones"][z].get("pv_kwp_osm_roof", 0.0)) for z in lay["zones"])

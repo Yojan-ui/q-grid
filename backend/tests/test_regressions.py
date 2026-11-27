@@ -80,3 +80,27 @@ def test_planners_never_run_dg_with_grid_up_2023_06_20():
     s, _ = run_day(c["campus"], c["yd"], day, out, ACfg(True, True, True, False, share=False, demand=dem))
     up = make_day(c["campus"], c["proc"], day, "A", "eval", out).grid.astype(bool)
     assert np.all(s.dg_kw[:, up] == 0)
+
+
+# ---------------------------------------------------------------- audit vs backup-only diesel (full scorecard, 28 Nov 2026)
+# Cause: the planners cut a DG run's minimum on-time short when the grid returns (baselines/milp.py, ablation/local.py),
+# but check_feasibility still demanded the full minimum, so 37 outage-day rows (status quo and the best possible plan
+# among them) were marked infeasible. The audit now applies the same rule; a run that stops mid-outage is still flagged.
+def test_feasibility_audit_allows_dg_run_cut_by_grid_return():
+    import copy
+
+    from baselines import b1_rule_based
+    from qgrid.model import check_feasibility, make_day
+    rb, c = _rvce()
+    campus = c["campus"]
+    dd = make_day(campus, c["proc"], "2023-06-20", "A", "eval", ["18:00", "18:15"])     # one-slot outage
+    s = b1_rule_based.solve(campus, dd)
+    assert s.dg_kw[:, ~dd.grid.astype(bool)].sum() > 0                                  # the DG covers the outage
+    assert not [v for v in check_feasibility(campus, s, dd)["violations"] if "min on-time" in v]
+    # a run that stops while the grid is still down keeps failing the minimum on-time
+    dd2 = make_day(campus, c["proc"], "2023-06-20", "A", "eval", ["18:00", "19:00"])    # four-slot outage
+    i = next(k for k, b in enumerate(campus.buildings) if b.dg)
+    s2 = copy.deepcopy(s)
+    s2.dg_kw[:] = 0.0
+    s2.dg_kw[i, 72] = campus.buildings[i].dg.p_min                                       # one slot of a 4-slot outage
+    assert [v for v in check_feasibility(campus, s2, dd2)["violations"] if "min on-time" in v]

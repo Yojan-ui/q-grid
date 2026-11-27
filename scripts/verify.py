@@ -34,9 +34,19 @@ def main(ci: bool = False) -> int:
             good = abs(float(r[c["metric"]]) - c["value"]) <= max(c["abs_tol"], c["rel_tol"] * abs(c["value"]))
             ok &= good
             print(f"{'PASS' if good else 'FAIL'}  csv {c['method']} {c['metric']} = {r[c['metric']]}")
-        good = abs(h["after"]["cost_rs"] - float(b[(b.method == "OURS") & (b.scenario == h["scenario"]) & (b.price_scenario == "A")].cost_rs.iloc[0])) < 1e-6
+        hv1 = h.get("legacy_v1", h)
+        good = abs(hv1["after"]["cost_rs"] - float(b[(b.method == "OURS") & (b.scenario == hv1["scenario"]) & (b.price_scenario == "A")].cost_rs.iloc[0])) < 1e-6
         ok &= good
-        print(f"{'PASS' if good else 'FAIL'}  headline.json matches benchmark.csv")
+        print(f"{'PASS' if good else 'FAIL'}  headline.json v1 card matches benchmark.csv")
+        if h.get("locked"):                      # the locked sentence's numbers recompute from the scorecard rows
+            d = pd.read_csv(ROOT / "results" / "bench_v3" / "daily.csv")
+            d = d[d.dataset == h["numbers"]["dataset"]]
+            o = d[d.outage.fillna("").astype(str).str.len() > 0]
+            for m in ("status_quo", "qgrid"):
+                for k, col in (("outage_downtime_h", "critical_downtime_h"), ("outage_diesel_l", "dg_litres")):
+                    good = abs(float(o[o.method == m][col].mean()) - h["numbers"][k][m]) <= 1e-6 * max(1.0, abs(h["numbers"][k][m]))
+                    ok &= good
+                    print(f"{'PASS' if good else 'FAIL'}  headline {k}.{m} = {h['numbers'][k][m]:.4f} (daily.csv)")
         return 0 if ok else 1
 
     from baselines import b0_status_quo, b4_central_milp

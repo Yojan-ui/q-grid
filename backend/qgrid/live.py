@@ -144,6 +144,13 @@ def qaoa_block(key: str, seed: int = 1234, shots: int = 256, backend: str = "aer
     sc = _replay(key)
     blk = (sc.get("qgrid_story") or {}).get("block") or ((sc.get("v2") or {}).get("example") or {}).get("block")
     if not blk:
+        # the current design's decision needed no block that day: use the worked example the explainer shows instead
+        # (frontend/src/lib/story.ts pickExample: server room at slot 76, else the first QAOA = exact record)
+        live = sc.get("live_solve") or []
+        blk = (next((x for x in live if x.get("zone") == "server_room" and x.get("slot") == 76), None)
+               or next((x for x in live if (x.get("qaoa") or {}).get("best_bits") == (x.get("exact") or {}).get("bits")), None)
+               or (live[0] if live else None))
+    if not blk:
         raise ValueError(f"scenario_{key}.json has no worked-example block")
     M = np.array(blk["qubo_matrix"], float)
     q = QUBO(0.0, M)

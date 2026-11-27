@@ -1,5 +1,8 @@
 # Pitch (3 minutes, follows the six story chapters) — numbers from results/*.csv
 
+> **Superseded.** This is the earlier v1 pitch (one headline day, v1 pipeline). Use [pitch_3min.md](pitch_3min.md) and the
+> locked headline in [headline.md](headline.md): {{headline.sentence}}
+
 **1 · Problem (30 s).** "This is RVCE from OpenStreetMap — nine zones, rooftop PV from NASA data. Watch a fest evening: at
 18:00 BESCOM goes down. Today the campus runs diesel zone by zone and the server room loses power: {{headline.before.critical_downtime_h|2}}
 hours of critical-load downtime."

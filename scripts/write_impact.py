@@ -124,7 +124,9 @@ def main():
                        "extra_throughput_kwh_per_day_mean": float(dthr.mean()), "source": "results/bench_v3/daily.csv (RVCE, Q-Grid vs status quo, same days)"},
            "central": central,
            "monte_carlo": {"samples": N, "seed": mc["seed"], "npv_gross_rs": pct(npv_g), "npv_net_rs": pct(npv_n),
-                           "payback_gross_years": {"p5": float(np.percentile(payg, 5)), "p50": float(np.percentile(payg, 50)), "p95": float(np.percentile(payg, 95))}},
+                           # payback percentiles; null where the sample never pays back (strict JSON for the replay)
+                           "payback_gross_years": {k: (float(v) if np.isfinite(v) else None) for k, v in
+                                                   (("p5", np.percentile(payg, 5)), ("p50", np.percentile(payg, 50)), ("p95", np.percentile(payg, 95)))}},
            "per_building": per_b,
            "assumptions": [
                {"name": "Edge controller per building", "value": pb["edge_controller_rs"], "unit": "Rs", "source": "ASSUMPTION — quote PENDING"},

@@ -380,13 +380,20 @@ def check_feasibility(campus: Campus, sched: Schedule, day: DayData | None = Non
             ok[i] &= ~badg
             if badg.any():
                 viol.append(f"{b.name}: DG output outside [min load, rated]")
+            # backup-only DG: a run that starts in an outage has its minimum on-time cut short when the grid returns
+            # (the planners' rule: baselines/milp.py, qgrid/ablation/local.py). Needs `day`; runs that start with the
+            # grid up, or without `day`, keep the full minimum.
+            down = None if day is None else ~np.asarray(day.grid, bool)
             t = 0
             while t < T:
                 if on[t]:
                     u = t
                     while u < T and on[u]:
                         u += 1
-                    if u - t < b.dg.min_on_slots and u < T:
+                    need = b.dg.min_on_slots
+                    if down is not None and down[t]:
+                        need = min(need, int(np.argmin(np.append(down[t:], False))))   # outage slots left from t
+                    if u - t < need and u < T:
                         viol.append(f"{b.name}: DG run {t}-{u} shorter than min on-time")
                         ok[i, t:u] = False
                     t = u

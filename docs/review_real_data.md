@@ -13,8 +13,11 @@ agents A, B and C by the lead, plus the regenerated scenario replays). Page numb
 | Integration: backup-only diesel in status quo / Operate / v2, rescaled layout, official prices; processed data rebuilt | done (0d6dd7b) |
 | Scenario replays on the rescaled campus and new tariff; Plan, badges, provenance, problem cards | done (0290cfa) |
 | Investment planner | done (eb3a989), stand-in costs |
-| **Quick RVCE run** | **not done on the branch**; run here under both FY2023-24 tariff options, see "Quick RVCE run" |
-| **Full benchmark (5 campuses) and everything derived from it** (scorecard, Step 7, impact, README numbers, headline.json) | **not done**: `results/bench_v3/` and `results/headline.json` still hold the old stand-in protocol |
+| Quick RVCE run | done 27 Nov under both FY2023-24 tariff options (see "Quick RVCE run"); TO-2023 approved by the lead |
+| FY2023-24 tariff | TO-2023 (Rs 8.50/kWh, Rs 350/kVA) VERIFIED and in `config.yaml` (e4e144b) |
+| **Full benchmark (5 campuses)** | **done 28 Nov**, 8 workers, 6,955 s; see "Full benchmark: what it shows" below |
+| Feasibility audit vs backup-only diesel | fixed (`check_feasibility`), regression test added, 37 rows re-run |
+| Scorecard, locked headline, replays, docs | regenerated from the full run on 28 Nov |
 
 ## a) Every changed figure
 
@@ -121,13 +124,70 @@ What this says (both tariffs agree; the tariff choice moves bills by under Rs 70
     a check that the high-peak days match their single-run values. Making the solves independent of machine load
     (a node limit instead of a wall-clock limit, or one HiGHS thread per solve) is the proper fix, after the event.
 
+## Full benchmark: what it shows (28 Nov 2026)
+
+`python scripts/run_bench_v3.py --workers=8`: 5 datasets × 30 days × 10 methods, the RVCE design rows and the
+certified bounds; 1,650 runs + 150 bounds, no failures, 6,955 s. Files: `results/bench_v3/` (runs, bounds, daily,
+summary, wilcoxon, `run_info.json`).
+
+**Two checks before trusting it**
+
+- **Feasibility audit.** 37 outage-day rows (0 in the committed run) were marked infeasible, among them the status quo
+  and the best possible plan. Every one was a diesel run cut short because the grid came back: the planners already do
+  this (backup-only diesel, `baselines/milp.py`, `qgrid/ablation/local.py`), but `check_feasibility` still demanded the
+  full 1 h minimum. The audit now applies the planners' rule (`backend/qgrid/model.py`; test
+  `test_feasibility_audit_allows_dg_run_cut_by_grid_return`). The 37 rows were re-run with `scripts/rerun_rows_v3.py`
+  (215 s): all feasible; 35 have identical objectives, 2 Q-Grid rows differ (time-limited solves): BDG2 Fox 2017-11-30
+  Rs 3,954,129 → 4,193,494 and BDG2 Bull 2017-10-28 (network failure) Rs 3,182,841 → 3,177,180. Both are logged under
+  `reruns` in `run_info.json`.
+- **CPU load.** The quick run's 1,452 kVA peak on 2023-01-19 is gone (Q-Grid 1,055 kVA, status quo 1,162). Q-Grid
+  re-run alone on its three worst normal days reproduced the full-run numbers exactly (2023-02-24 gap 56.90 %, peak
+  1,371 kVA; 2023-08-14 17.97 %; 2023-06-16 16.17 %), so the results below are not a machine-load artefact.
+
+**RVCE, mean of 30 days** (3 with a synthetic outage; tariff TO-2022 / TO-2023; contract demand 1,300 kVA assumed)
+
+| | Status quo | Per-building MPC | Central MPC | **Q-Grid** | Best possible plan |
+|---|---:|---:|---:|---:|---:|
+| Gap to best plan (incl. lost load) | 16.75 % | 9.17 % | 1.37 % | **8.37 %** | 0.00 % |
+| Gap on the 27 normal days | 2.41 % | 0.34 % | 1.33 % | **7.43 %** | – |
+| Gap, money only (no lost-load value) | 3.04 % | 0.30 % | 2.88 % | **9.62 %** | 1.54 % |
+| Bill change vs status quo (all days) | – | −1.27 % | +0.92 % | **+0.86 %** | +0.20 % |
+| Critical downtime per outage | 2.58 h | 2.58 h | 0.00 h | **0.92 h** | 0.00 h |
+| Diesel per outage day | 373 L | 68 L | 396 L | **414 L** | 389 L |
+| Highest monthly peak | 1,194 kVA | 1,136 kVA | 1,140 kVA | **1,371 kVA** | 1,105 kVA |
+
+(Bill change: + = more expensive than the status quo.)
+
+- **Reliability is the win.** In an outage Q-Grid cuts critical-load downtime from 2.58 h to 0.92 h (55 min), using
+  41 L more diesel than the status quo to keep those loads up. Per-building MPC saves money but leaves critical loads
+  dark as long as today.
+- **Its average lead comes from the 3 outage days.** Per-building MPC is closer to the best plan on 27 of 30 days;
+  the paired Wilcoxon p = 0.002 is in *its* favour day by day. The scorecard sentence now says so.
+- **Normal days cost more.** Bill +0.43 % on normal days; monthly demand charge +Rs 41,261 at 1,000 kVA, +Rs 16,685 at
+  1,300 kVA, +Rs 238 at 1,600 kVA. Main cause, a **defect**: on 2023-02-24 Q-Grid charges the (proposed) batteries at
+  about 369 kW between 18:00 and 18:45, the dearest slot (Rs 9.65/kWh with ToD), pushing campus import to 1,302 kW
+  (1,371 kVA, above the 1,300 kVA contract, billed at 2×); per-building MPC peaks at 941 kW and the status quo at 987 kW
+  that day. Cause not yet found; candidates in `qgrid/ablation/engine.py` (~l.330–349): the per-building peak budgets
+  from the ADMM import shares, or the 24 h window's terminal value (`DayData.term_value` = mean import price).
+  Reproduce: `run_bench_v3.run_one("rvce", "2023-02-24", "qgrid", return_sched=True)` and look at `sched.p_bat[:, 72:76]`.
+- **Network failure.** Central MPC loses 2.7 points of gap (1.37 → 4.06 %), Q-Grid 0.7 (8.37 → 9.08 %).
+- **Other campuses.** Among methods without a central controller Q-Grid is closest on 1 of 5 (RVCE). Per-building MPC
+  is closer on BDG2 Fox (8.69 vs 9.90 %), Bull (9.61 vs 9.79 %) and Cockatoo (10.28 vs 11.82 %); PSO on CU-BEMS
+  (27.48 vs 27.66 %).
+- **What no longer holds** from the pitch plan (old stand-in protocol): "0.76 % from the best plan", "best other
+  method 21.7 %", "downtime halves 16 → 8 min a day", "closest on four of five", "3.5 vs 2.1 points", "within 1 % of a
+  perfect central optimiser", "sells noon solar cheaply".
+
 ## d) Decisions needed
 
-1. **FY2023-24 tariff.** Replace the carried-over TO-2022 values (Rs 8.65 marginal, Rs 265/kVA) with the TO-2023
-   values verified above (Rs 8.50 single slab, Rs 350/kVA, ToD threshold 500 kVA)? This is a working-tree edit in
-   `config.yaml`, not committed. It needs ~15 wording changes ("FY2023-24 carried over") in scripts, frontend and
-   templates, and one test (`test_tariff_ht2c` expects `PENDING_CARRIED_OVER`). The full benchmark should start
-   only after this is settled, so it runs once.
+0. **Which build goes on the presenting laptop (28 Nov)?** The old portal (`harden`) matches Shoumik's pitch plan
+   number for number but rests on a stand-in tariff and 3,974 kWp of solar. `real-data` has the verified tariff and
+   RVCE's 500 kWp; its story is reliability in outages, with higher normal-day cost and the defect above. Every
+   spoken number must match the build on screen.
+10. **The evening-peak charging defect.** Fix it before claiming any cost result for Q-Grid; afterwards re-run the
+   Q-Grid rows (about 300 rows, roughly 1–2 h on 8 workers) and regenerate. Not attempted overnight: it is an engine
+   change the team should review.
+1. ~~FY2023-24 tariff~~: **resolved 27 Nov** (lead: "Approve, TO-2023 rates"), committed in e4e144b.
 2. **Export rate**: mark Rs 3.74 VERIFIED (KERC solar order 01.06.2023 p30) and commit the source PDFs? The branch
    git-ignores PDFs (SHA-256 only); Shoumik's copy commits them (≈ 25 MB in total).
 3. **Campus labels**: upgrade solar, floor areas and diesel from "TEAM BRIEF" to the NAAC SSR / NAAC Cr 7.1.2
@@ -137,9 +197,8 @@ What this says (both tariffs agree; the tariff choice moves bills by under Rs 70
 5. **Diesel**: "two generators of capacity 980 KVA": 980 kVA in total (2 × 490, current) or each?
 6. **Contract demand**: keep 1,300 kVA as the base case and report 1,000 / 1,300 / 1,600 kVA, until RVCE's bill
    arrives?
-7. **Full benchmark**: run tonight on this machine (24 cores; the last full run took 2.8 h on 9 workers; the RVCE
-   quick run took 14 min), then regenerate scorecard, impact, replays and README, before Part 2? Recommended order:
-   fix the two Q-Grid defects above first (or accept them and report them), then run once.
+7. ~~Full benchmark~~: **done 28 Nov** (8 workers); the oversubscription defects did not recur, the evening-peak
+   charging defect (decision 10) did.
 9. **Story**: the honest pitch on real data is reliability (critical downtime during outages, gap to the best plan
    without a central controller), not bill savings. Accept this framing for Part 2?
 8. **My earlier branch `fix/real-data-prep`** (Shoumik's commits cherry-picked onto `product-modes`) is superseded by

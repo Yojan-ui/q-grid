@@ -4,12 +4,15 @@ EUREKA Track 3 · Smart Decentralised Energy Systems · RVCE, Bengaluru
 
 ![Q-Grid explainer: the campus, the decisions, the neighbour agreement, the scorecard](docs/media/hero.gif)
 
-**{{q3.story.step7}}** {{q3.story.comms}}
+**{{headline.sentence}}**
+
+{{q3.story.comms}} (Mean of {{hl.n_days|0}} modelled RVCE days, {{hl.n_outage_days|0}} with a synthetic BESCOM outage;
+locked headline and its table: [docs/headline.md](docs/headline.md).)
 
 > QAOA on a local simulator: verified against exact solutions, no quantum advantage claimed.
-> Tariff: BESCOM HT-2(c)(ii) at the official KERC Tariff Order 2023 rates (FY2022-23 days: Tariff Order 2022; the 2023 schedule is
-> obtained). CO₂: CEA baseline 0.727 t/MWh (verified). RVCE loads, battery, EV chargers and cables are stand-ins or
-> proposals and are labelled; see [docs/data_verification.md](docs/data_verification.md).
+> Tariff: BESCOM HT-2(c)(ii) from the KERC Tariff Order 2022 (days before 1 April 2023) and the KERC Tariff Order 2023
+> (from 1 April 2023), both verified against the official PDFs. CO₂: CEA baseline 0.727 t/MWh (verified). RVCE loads,
+> battery, EV chargers and cables are stand-ins or proposals and are labelled; see [docs/data_verification.md](docs/data_verification.md).
 > Every number in this README is rendered from `results/` by `scripts/write_results_md.py`.
 
 ## Open the demo
@@ -20,8 +23,10 @@ EUREKA Track 3 · Smart Decentralised Energy Systems · RVCE, Bengaluru
 - **With the live backend** (the three live moments compute on the spot): `make backend` in a second terminal; the top bar
   turns to **Live backend**.
 - **Deploy your own:** import the repo in Vercel with root directory `frontend` (`frontend/vercel.json` sets
-  `npm run build:static`, output `dist`). Or `cd frontend && npm run build:static` and serve `dist/` from any static host.
-- **Backup video (90 s):** [docs/media/backup_demo.webm](docs/media/backup_demo.webm) · **one-page summary:** the
+  `npm run build:static`, output `dist`). Or `cd frontend && npm run build:static` and serve `dist/` from any static host
+  (Windows PowerShell: `$env:VITE_QGRID_OFFLINE=1; npm run build`). Check it with `npx vite preview` → <http://localhost:4173>.
+  The replay files the build ships are `frontend/public/replay/*.json`, copied there by the result scripts.
+- **Backup video (90 s):** [docs/media/demo_backup.webm](docs/media/demo_backup.webm) · **one-page summary:** the
   "Download summary (PDF)" button in the demo.
 
 ## The problem
@@ -42,22 +47,19 @@ EUREKA Track 3 · Smart Decentralised Energy Systems · RVCE, Bengaluru
 | Q-Grid, 3 h network failure | {{q3.b.rvce.qgrid_comms_fail.gap_pct|2}} | {{q3.b.rvce.qgrid_comms_fail.certified_gap_pct|2}} | {{q3.b.rvce.qgrid_comms_fail.saving_pct|1}} | {{q3.b.rvce.qgrid_comms_fail.critical_downtime_h|2}} | {{q3.b.rvce.qgrid_comms_fail.critical_downtime_1pct_h|2}} | ✓ |
 | _Best possible plan (central MILP, perfect information; reference)_ | _{{q3.b.rvce.optimum.gap_pct|2}}_ | _{{q3.b.rvce.optimum.certified_gap_pct|2}}_ | _{{q3.b.rvce.optimum.saving_pct|1}}_ | _{{q3.b.rvce.optimum.critical_downtime_h|2}}_ | _{{q3.b.rvce.optimum.critical_downtime_1pct_h|2}}_ | — |
 
-\* BESCOM HT-2(c)(ii), KERC Tariff Order 2023 rates, monthly demand charge. Across {{q3.n_campuses|0}} campuses (RVCE + four public meter datasets), Q-Grid is the closest
+\* BESCOM HT-2(c)(ii) (KERC Tariff Orders 2022 and 2023), energy charge plus the day's share of the monthly demand charge at
+{{hl.contract_kva|0}} kVA contract demand (assumed). Across {{q3.n_campuses|0}} campuses (RVCE + four public meter datasets), Q-Grid is the closest
 method without a central controller on {{q3.best_on_n|0}}. Full tables with ± and 95 % intervals, Wilcoxon verdicts:
 [docs/benchmark_v3.md](docs/benchmark_v3.md) · consistency checks: [docs/consistency.md](docs/consistency.md).
 
-**Is it worth it?** Node hardware ≈ Rs {{imp.hardware_rs_lakh|1}} lakh for {{imp.n_buildings|0}} buildings (assumed costs); bill
-saving ≈ Rs {{imp.bill_saving_rs_per_year_lakh|1}} lakh/year; extra battery wear ≈ Rs {{imp.battery_wear_rs_per_year_lakh|1}} lakh/year
-(every optimiser prices wear in its objective). Payback ≈ {{imp.payback_net_years|1}} years; 10-year NPV Rs {{imp.npv_net_rs_lakh|1}}
-lakh (Monte Carlo P5–P95: Rs {{imp.mc.npv_net_rs.p5|1}} to {{imp.mc.npv_net_rs.p95|1}} lakh). Assumptions and sources:
-[docs/impact.md](docs/impact.md).
+**Is it worth it?** {{imp.sentence}} Assumptions and sources: [docs/impact.md](docs/impact.md).
 
 **What should RVCE build next?** The investment planner (Plan tab, `scripts/plan_investment.py`) sizes extra rooftop
 solar per roof group, a battery and the contract demand with one linear programme over the 30 RVCE days at the real
 tariff. Today: {{plan.existing_kwp|0}} kWp, contract {{plan.base_contract_kva|0}} kVA, energy + demand + diesel ≈ Rs
 {{plan.base_cost_lakh|1}} lakh/year. The cost-minimising plan adds {{plan.extra_kwp|0}} kWp and a {{plan.battery_kwh|0}} kWh
 battery at {{plan.contract_kva|0}} kVA contract: investment ≈ Rs {{plan.capex_lakh|1}} lakh, saving ≈ Rs
-{{plan.saving_lakh|1}} lakh/year, payback ≈ {{plan.payback_years|1}} years. PV and battery costs are ASSUMPTIONS (quotes
+{{plan.saving_lakh|1}} lakh/year, {{plan.payback_text}}. PV and battery costs are ASSUMPTIONS (quotes
 pending) and operation is planned with perfect information, so this is an upper bound on savings.
 
 ## Architecture
@@ -90,7 +92,7 @@ validated and priced before they can touch a schedule.
 conda activate qgrid && make install
 make test                                  # pytest (backend) ; cd frontend && npm run test:contrast  (WCAG AA, both themes)
 make demo                                  # frontend + live backend on :8000 (the frontend alone works offline)
-python scripts/run_bench_v3.py             # scorecard benchmark (5 datasets x 30 days x 10 methods; ~10 h on 8 workers)
+python scripts/run_bench_v3.py --workers=8 # scorecard benchmark (5 datasets x 30 days x 10 methods + design rows; ~3 h on a 24-thread laptop)
 python scripts/write_bench_v3.py && python scripts/write_consistency.py && python scripts/write_impact.py
 make replay && python scripts/make_live.py # replay JSON + precomputed live moments for the offline demo
 python scripts/write_results_md.py         # re-render README and docs from results/
@@ -117,8 +119,19 @@ Licences, URLs and fetch dates: `data/SOURCES.md` · what we asked RVCE for: `do
 
 ## Pitch materials
 
-[3-minute script](docs/pitch_3min.md) · [1-minute script](docs/pitch_1min.md) · [Q&A prep: 20 hardest questions](docs/qa_prep.md) ·
-[demo runbook](docs/demo_runbook.md) · [impact](docs/impact.md) · [why quantum](docs/why_quantum.md)
+[locked headline](docs/headline.md) · [judge brief: the project in plain words](docs/judge_brief.md) · [3-minute script](docs/pitch_3min.md) · [1-minute script](docs/pitch_1min.md) ·
+[Q&A prep: 20 hardest questions](docs/qa_prep.md) · [deck outline](docs/deck_outline.md) · [demo runbook](docs/demo_runbook.md) ·
+[impact](docs/impact.md) · [why quantum](docs/why_quantum.md) · [real-data review](docs/review_real_data.md) ·
+[RVCE data request email](docs/rvce_data_request_email.md)
+
+## Status
+
+- **Real-data pass (branch `real-data`):** campus rescaled to the team brief (500.48 kWp on 21 roofs, 2 × 490 kVA diesel);
+  BESCOM HT-2(c)(ii) tariff verified against the KERC Tariff Orders 2022 and 2023 and the KERC solar order; CEA CO₂ factor
+  verified; five-campus scorecard, replays and docs regenerated from it.
+- **Waiting on RVCE:** one BESCOM HT bill (contract demand, recorded maximum demand), which buildings the two diesel sets
+  back, diesel logs, meter data. See [docs/rvce_data_request_email.md](docs/rvce_data_request_email.md).
+- **Proposed, not on campus today:** batteries, EV chargers, inter-building cables.
 
 ## Team and faculty guide
 
@@ -132,6 +145,10 @@ Licences, URLs and fetch dates: `data/SOURCES.md` · what we asked RVCE for: `do
 - No quantum advantage: QAOA is simulated (ideal, noiseless) and is not in the control loop; it was tested and verified.
 - RVCE loads and calendar are stand-ins until meter data arrives; solar, diesel and floor areas are from the team brief.
 - Battery, EV chargers and inter-building cables do not exist on campus today: they are PROPOSED, and labelled so.
+  Q-Grid's outage gain comes from sharing the two diesel sets' power with buildings that have none, so on campus it
+  depends on which buildings those sets can actually feed (asked of the estate office).
+- On normal days Q-Grid costs more than today's practice; part of that is a defect found in the full run (batteries
+  charged at the evening peak on some days, e.g. 24 Feb 2023), described in docs/review_real_data.md.
 - Tariff: RVCE's billing category (HT-2(c)(ii)) and its contract demand (1,300 kVA assumed) need one RVCE BESCOM bill to confirm.
 - Outages and network failures in the benchmark are synthetic (seeded). Cables are modelled as lossless, without AC power flow.
 - Battery wear is priced with an assumed battery cost and cycle life; real warranty data will change the rate.

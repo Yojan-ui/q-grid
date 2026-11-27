@@ -117,6 +117,17 @@ export type V2Data = { rows: V2Row[]; summary: (V2Row & { day_set: string; n_day
 export type BenchStat = { mean: number; std: number; ci_lo: number; ci_hi: number; n: number }
 export type BenchMethod = { key: string; name: string; group: string; without_coordinator: boolean }
 export type BenchMetric = { key: string; label: string; group: string; better: 'lower' | 'higher'; unit: string; digits: number }
+// ---- the locked headline numbers (scripts/write_bench_v3.py locked_headline(); also results/headline.json)
+export type Locked = {
+  dataset: string; n_days: number; n_outage_days: number
+  outage_downtime_h: Record<string, number>; outage_diesel_l: Record<string, number>
+  normal_day_saving_pct: number; all_day_saving_pct: number; status_quo_bill_rs: number
+  gap_pct: number | null; alt: string | null; alt_gap_pct: number | null
+  demand_by_contract: { contract_kva: number; status_quo_rs_month: number; qgrid_rs_month: number; change_rs_month: number
+    status_quo_max_md_kva: number; qgrid_max_md_kva: number }[]
+  contract_kva_base: number; diesel_co2_kg_per_l?: number; status_quo_export_kwh_day?: number
+}
+
 export type Bench = {
   tariff_status: string
   methods: BenchMethod[]
@@ -127,7 +138,8 @@ export type Bench = {
   wilcoxon: Record<string, Record<string, Record<string, number | null>>>   // dataset -> method -> metric -> p vs Q-Grid
   comms_day: { dataset: string; day: string; window: [number, number]; t: string[]; series: Record<string, number[]>; totals: Record<string, number> } | null
   headline: { text: string; detail: string; story?: { dataset: string; n_days: number; tariff_pending: boolean
-    step1: { text: string; tariff_dependent: boolean }; step7: { text: string; comms: string; tariff_dependent: boolean }; numbers: Record<string, number | null> } }
+    step1: { text: string; tariff_dependent: boolean }; step7: { text: string; comms: string; tariff_dependent: boolean }; numbers: Record<string, number | null>
+    locked?: Locked } }
   shadow?: { day: string; outage: boolean; status_quo: ShadowSide; qgrid: ShadowSide }[]
   design_choices: { key: string; name: string; what_changed: string; gap_pct: number | null; certified_gap_pct: number | null; critical_downtime_h: number | null; runtime_per_decision_s: number | null; source: string }[]
 }
@@ -164,7 +176,7 @@ export type Impact = {
   central: { hardware_rs: number; om_rs_per_year: number; bill_saving_rs_per_year: number; battery_wear_rs_per_year: number; net_rs_per_year: number
     discount_rate: number; npv_gross_rs: number; npv_net_rs: number; payback_gross_years: number | null; payback_net_years: number | null
     wear_rs_per_kwh_throughput: number; breakeven_wear_rs_per_kwh: number | null }
-  monte_carlo: { samples: number; seed: number; npv_gross_rs: Pct; npv_net_rs: Pct; payback_gross_years: { p5: number; p50: number; p95: number } }
+  monte_carlo: { samples: number; seed: number; npv_gross_rs: Pct; npv_net_rs: Pct; payback_gross_years: { p5: number | null; p50: number | null; p95: number | null } }
   per_building: { zone: string; battery_kwh: number; hardware_rs: [number, number]; battery_value_rs: [number, number] }[]
   assumptions: { name: string; value: [number, number] | null; unit: string; source: string }[]
   scale: { stage: string; what: string; evidence: string; datasets?: { dataset: string; label: string; gap_pct: number; saving_pct: number; runtime_per_decision_s: number; messages_per_decision: number }[] }[]
