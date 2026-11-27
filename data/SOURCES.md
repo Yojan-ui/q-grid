@@ -222,3 +222,12 @@ Diesel price 90 Rs/L, fuel curve 0.08 L/h per kW rated + 0.25 L/kWh, 2.68 kg CO2
 - **SYNTHETIC (seeded) events**: unplanned grid outages (20 % of evaluation days, 1–3 h, start 08:00–20:00) and one 3-hour
   campus network outage per day (06:00–21:00) for the communication-failure methods. Official BESCOM planned-cut schedules are
   **PENDING**.
+
+## KERC Tariff Order 2023 (BESCOM) and KERC solar tariff order 2023: VERIFIED (added 27 Nov 2026)
+
+Obtained by Shoumik (his copy of the repo with official sources); git-ignored like the other raw PDFs. Verify by SHA-256.
+
+- `data/raw/tariff/KERC_tariff_order_BESCOM_FY2023-24.pdf`: KERC Tariff Order 2023 of BESCOM, dated 12.05.2023, FY2023-24 retail tariff (385 pages): HT-2(c)(ii) p.215 (printed 206), rate schedule p.382 (373), ToD threshold p.208 (199), HT billing conditions p.374-375 (365-366). SHA-256 `018d3be54cca27e46803b584e0f676fc2c025a78c4ebc14eac422eeb40987b5b`.
+- `data/raw/tariff/KERC_tariff_order_BESCOM_FY2022-23.pdf`: KERC Tariff Order 2022 of BESCOM, dated 04.04.2022, full order (HT-2(c)(ii) printed p.412). SHA-256 `6869d16a62ddb40a69dd2117241e6c9f038641c5100bcda2f5c69ad51905a55e`.
+- `data/raw/tariff/KERC_solar_export_tariff.pdf`: KERC generic tariff order for solar projects, dated 01.06.2023: rooftop PV 1-2000 kW (excl. 1-10 kW) Rs 3.74 per unit, p.30. SHA-256 `5e5d1c2edbbc3456341b0c9e410ccc6cfee41e0ecab2d9d8532fb3bb005930ad`.
+- `data/raw/rvce/Final-submitted-SSR_28-June-2024_latest.pdf`: RVCE NAAC Self Study Report 2024 (self-financing p.2 and p.11; built-up area 67,721 m2 p.12; "two generators of capacity 980 KVA" p.69; three boys' hostels 38,659.11 m2, 1,450 capacity p.78). SHA-256 `01a3125406d4360b0881c61f2fb4eb20ac539b9f2c88fae990cbee7240f3f787`.

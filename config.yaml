@@ -313,18 +313,20 @@ tariff_v2:                    # demand charge on the campus peak (one HT connect
 #   TO-2022 = KERC Tariff Order 2022 (BESCOM), dated 04.04.2022, Annexure-5 "Electricity Tariff-2023", effective from
 #             the first meter-reading date on or after 01.04.2022 (data/raw/tariff/bescom_tariff_2023.pdf, p.375 [1]).
 #   TO-2023 = KERC Tariff Order 2023 (BESCOM), dated 12.05.2023, effective from the first meter-reading date on or after
-#             01.04.2023 (BESCOM public notice, data/raw/tariff/bescom_tariff_order_2023_highlights.pdf). Its rate
-#             schedule PDF ("Electricity Tariff-2024") is NOT in the repo: FY2023-24 values are TEAM BRIEF / PENDING.
+#             01.04.2023, data/raw/tariff/KERC_tariff_order_BESCOM_FY2023-24.pdf (385 pages, obtained by Shoumik; SHA-256
+#             018d3be5...0987b5b). FY2023-24 values are VERIFIED from it: HT-2(c)(ii) p.215 [206] and rate schedule
+#             p.382 [373]; ToD p.215 [206]; ToD threshold p.208 [199]; billing conditions Annexure V p.374-375 [365-366].
 #
 # ENERGY CHARGE FLAG FOR THE LEAD: the team brief says Rs 8.50/kWh; secondary sources say ~Rs 7.5-7.9/kWh.
 #   TO-2022 (FY2022-23) HT-2(c)(ii), p.412 [38]: 825 paise/unit for the first one lakh units, 865 paise for the balance
 #   (two slabs) -> neither 8.50 nor 7.5-7.9. The ~7.25/7.65 slabs belong to HT-2(c)(i) (government/aided institutions,
 #   hostels of all educational institutions, p.411 [37]), which may be where the "7.5-7.9" figure comes from.
-#   RESOLVED (lead decision): the brief's 8.50 / Rs 350 are dropped; both orders use the TO-2022 slabs and Rs 265.
-#   The FY2023-24 order carries the TO-2022 values over (status PENDING_CARRIED_OVER) until TO-2023 is obtained.
-# DEMAND CHARGE: TO-2022 HT-2(c)(ii) is Rs 265/kVA/month (p.412 [38]).
+#   RESOLVED with TO-2023: Rs 8.50 is the FY2023-24 HT-2(c)(ii) rate ("For entire consumption 850 paise", single slab,
+#   p.215 [206]); the ~7.5 figure is HT-2(c)(i) (750 paise in FY2023-24, same page). FY2022-23 keeps the TO-2022 slabs.
+# DEMAND CHARGE: Rs 265/kVA/month in FY2022-23 (TO-2022 p.412 [38]); Rs 350 in FY2023-24 (TO-2023 p.215 [206]).
 tariff_ht2c:
-  status: PENDING            # REAL only if every value below is checked against the PDF with a page number
+  status: VERIFIED           # every rate and billing rule checked against the KERC PDFs (pages below); contract demand,
+                             # power factor and RVCE's billing category stay ASSUMPTION / PENDING RVCE bill
   category: "HT-2(c)(ii) educational institutions"
   category_note: >-
     HT-2(c)(ii) = hospitals and educational institutions other than HT-2(c)(i) (TO-2022 p.412 [38]). HT-2(c)(i) covers
@@ -346,30 +348,29 @@ tariff_ht2c:
       status: VERIFIED
     - valid_from: "2023-04-01"
       valid_to: "2024-03-31"
-      # LEAD DECISION: TO-2022 values carried over until the TO-2023 rate schedule is obtained (NOT verified for FY2023-24)
-      energy_rs_kwh: 8.65          # carried over from TO-2022 p.412 (balance-units slab)
-      energy_slabs:                # carried over from TO-2022 p.412 [38]
-        - {upto_kwh: 100000, rs_kwh: 8.25}
-        - {upto_kwh: null, rs_kwh: 8.65}
-      demand_rs_kva_month: 265     # carried over from TO-2022 p.412 [38]
-      tod_min_contract_kva: null   # null -> tod.min_contract_kva (500 kVA, TEAM BRIEF)
-      source: "KERC Tariff Order 2023 (BESCOM), dated 12.05.2023, HT-2(c)(ii) (rate schedule PDF missing)"
-      values_from: "KERC Tariff Order 2022 (BESCOM), dated 04.04.2022, HT-2(c)(ii), p.412"
-      note: "TO-2022 values carried over until the TO-2023 rate schedule is obtained"
-      file: null
-      page: null
-      status: PENDING_CARRIED_OVER
+      # VERIFIED from the TO-2023 PDF (obtained by Shoumik; replaces the TO-2022 carry-over, which was meant to last only
+      # until this rate schedule was obtained). TO-2023 removes the two slabs: one rate "for entire consumption".
+      energy_rs_kwh: 8.50          # "Energy Charges per kWh: For entire consumption 850 paise": p.215 (printed 206), p.382 (printed 373)
+      energy_slabs:
+        - {upto_kwh: null, rs_kwh: 8.50}
+      demand_rs_kva_month: 350     # "Fixed Charges / month / KVA of Billing Demand: Per KVA Rs.350/-": p.215 (printed 206), p.382 (printed 373)
+      tod_min_contract_kva: 500    # ToD mandatory for HT2(c) "with a contract demand of 500 KVA and above": p.208 (printed 199)
+      source: "KERC Tariff Order 2023 (BESCOM), dated 12.05.2023, Chapter 6 (FY24 retail tariff) and Annexure rate schedule, HT-2(c)(ii)"
+      file: data/raw/tariff/KERC_tariff_order_BESCOM_FY2023-24.pdf   # SHA-256 018d3be54cca27e46803b584e0f676fc2c025a78c4ebc14eac422eeb40987b5b
+      page: 215
+      status: VERIFIED
   tod:                       # hours are [start, end) local time; offpeak wraps midnight
     months: [12, 1, 2, 3, 4, 5, 6]   # VERIFIED TO-2022 p.412 [38]: Dec-Jun; Jul-Nov (monsoon) 0
     peak_hours: [18, 22]
     peak_adder_rs_kwh: 1.00          # VERIFIED TO-2022 p.412 [38]: (+) 100 paise
     offpeak_hours: [22, 6]
     offpeak_adder_rs_kwh: -1.00      # VERIFIED TO-2022 p.412 [38]: (-) 100 paise (not for Special Incentive Scheme, p.408)
-    min_contract_kva: 500            # TEAM BRIEF (not found in TO-2022; check TO-2023)
-  export_rs_kwh: 3.74        # TEAM BRIEF, PENDING: KERC rooftop solar tariff order not in the repo
-  billing_demand_floor_frac: 0.85    # VERIFIED TO-2022 p.404 [30] cond. 1(A): max(recorded MD, 85 % of CD)
-  excess_demand_multiplier: 2.0      # VERIFIED TO-2022 p.404 [30] cond. 1(D): excess over CD at two times the rate
-  round_billing_demand: true         # VERIFIED TO-2022 p.405 [31] cond. 1(G): >= 0.5 kVA rounds up, < 0.5 ignored
+    min_contract_kva: 500            # VERIFIED TO-2023 p.208 (printed 199): mandatory ToD for HT2(c) at >= 500 kVA (TO-2022 states no threshold)
+  export_rs_kwh: 3.74        # VERIFIED KERC solar tariff order dated 01.06.2023, p.30: SRTPV 1-2000 kW (excl. 1-10 kW) "Rs.3.74 per unit"
+                             # file data/raw/tariff/KERC_solar_export_tariff.pdf, SHA-256 5e5d1c2edbbc3456341b0c9e410ccc6cfee41e0ecab2d9d8532fb3bb005930ad
+  billing_demand_floor_frac: 0.85    # VERIFIED TO-2022 p.404 [30] cond. 1(A); TO-2023 p.374 [365] cond. 1(A): max(recorded MD, 85 % of CD)
+  excess_demand_multiplier: 2.0      # VERIFIED TO-2022 p.404 [30] and TO-2023 p.374 [365] cond. 1(D): excess over CD at two times the rate
+  round_billing_demand: true         # VERIFIED TO-2022 p.405 [31] and TO-2023 p.375 [366] cond. 1(G): >= 0.5 kVA rounds up, < 0.5 ignored
   power_factor: 0.95         # ASSUMPTION (TO-2022 p.405 [31]: specified PF 0.90, 3 paise/unit surcharge per 0.01 below)
   contract_demand_kva: 1300  # TEAM BRIEF / ASSUMPTION, PENDING RVCE bill
   contract_demand_sweep: [1000, 1300, 1600]

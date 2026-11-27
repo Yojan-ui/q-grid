@@ -34,11 +34,11 @@ def test_config_interface(cfg):
 def test_order_switch_on_1_april_2023(cfg):
     assert order_for(cfg, "2023-03-31")["valid_from"] == "2022-04-01"      # FY2022-23 (TO-2022)
     assert order_for(cfg, "2023-04-01")["valid_from"] == "2023-04-01"      # FY2023-24 (TO-2023)
-    # identity of the order used, independent of the rates (FY2023-24 currently carries the TO-2022 values over)
+    # identity of the order used: FY2023-24 = KERC TO-2023 (Rs 8.50 single slab, Rs 350/kVA), verified from its PDF
     assert "Tariff Order 2022" in order_for(cfg, "2023-03-31")["source"]
     assert "Tariff Order 2023" in order_for(cfg, "2023-04-01")["source"]
     assert order_for(cfg, "2023-03-31")["status"] == "VERIFIED"
-    assert order_for(cfg, "2023-04-01")["status"] == "PENDING_CARRIED_OVER"
+    assert order_for(cfg, "2023-04-01")["status"] == "VERIFIED"
     assert order_for(cfg, "2024-03-31")["valid_from"] == "2023-04-01"
     a = energy_price_slots(cfg, "2023-03-31")
     b = energy_price_slots(cfg, "2023-04-01")
@@ -62,7 +62,7 @@ def test_tod_present_dec_to_jun_absent_jul_to_nov(cfg):
 
 
 def test_tod_absent_below_500_kva(cfg):
-    # FY2023-24 order: threshold tod.min_contract_kva = 500 (TEAM BRIEF)
+    # FY2023-24 order: ToD threshold 500 kVA (TO-2023 p.208)
     assert not tod_adder_slots(cfg, "2023-05-10", contract_kva=499).any()
     assert tod_adder_slots(cfg, "2023-05-10", contract_kva=500).any()
     p = energy_price_slots(cfg, "2023-05-10", contract_kva=400)

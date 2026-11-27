@@ -374,7 +374,7 @@ def build_prices(cfg: dict) -> tuple[pd.DataFrame, dict]:
         sts = sorted({str(order_for(cfg, str(d.date())).get("status", th.get("status"))) for d in days})
         status["A"] = {"status": "REAL" if sts == ["VERIFIED"] else "PARTLY VERIFIED",
                        "source": th.get("category", "HT-2(c)(ii)") + " — " + "; ".join(sorted({str(o.get("source")) for o in th["orders"]})),
-                       "note": "official KERC TO-2022 rates; FY2023-24 rates carried over until the TO-2023 schedule is obtained"
+                       "note": "official KERC rates (TO-2022 for FY2022-23, TO-2023 for FY2023-24); an order is not yet verified against its PDF"
                                if sts != ["VERIFIED"] else ""}
     else:
         imp = np.full(len(idx), float(a["import_base_rs_kwh"]))

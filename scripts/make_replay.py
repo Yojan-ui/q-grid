@@ -272,18 +272,21 @@ def product_fields(cfg: dict, lay: dict, out: dict) -> None:
     dgs = cfg.get("campus", {}).get("dg_sets", {})
     rows = []
     if tp:
-        rows += [{"item": "Energy charge, HT-2(c)(ii)", "value_label": "Rs 8.25 / 8.65 per kWh (first 1 lakh units / balance)",
-                  "source": "KERC Tariff Order 2022 (BESCOM)", "page": "p.412", "status": "VERIFIED (FY2023-24 carried over)"},
-                 {"item": "Demand charge", "value_label": f"Rs {tp['orders'][0]['demand_rs_kva_month']:g} per kVA per month",
-                  "source": "KERC Tariff Order 2022 (BESCOM)", "page": "p.412", "status": "VERIFIED (FY2023-24 carried over)"},
-                 {"item": "Time-of-day", "value_label": "+Rs 1.00 18-22 h, -Rs 1.00 22-06 h, Dec-Jun",
+        o23 = tp['orders'][-1]
+        rows += [{"item": "Energy charge, HT-2(c)(ii), from 1 Apr 2023", "value_label": f"Rs {o23['energy_rs_kwh']:.2f} per kWh, single slab",
+                  "source": "KERC Tariff Order 2023 (BESCOM)", "page": "p.206", "status": str(o23.get("status", "PENDING"))},
+                 {"item": "Energy charge, HT-2(c)(ii), Jan-Mar 2023", "value_label": "Rs 8.25 / 8.65 per kWh (first 1 lakh units / balance)",
                   "source": "KERC Tariff Order 2022 (BESCOM)", "page": "p.412", "status": "VERIFIED"},
-                 {"item": "Billing demand", "value_label": f"max(recorded maximum, {100 * tp['billing_demand_floor_frac']:.0f} % of contract demand)",
-                  "source": "KERC Tariff Order 2022, HT billing conditions", "page": "p.404", "status": "VERIFIED"},
+                 {"item": "Demand charge", "value_label": f"Rs {o23['demand_rs_kva_month']:g} per kVA per month (Rs {tp['orders'][0]['demand_rs_kva_month']:g} before Apr 2023)",
+                  "source": "KERC Tariff Orders 2023 / 2022 (BESCOM)", "page": "p.206 / p.412", "status": str(o23.get("status", "PENDING"))},
+                 {"item": "Time-of-day", "value_label": "+Rs 1.00 18-22 h, -Rs 1.00 22-06 h, Dec-Jun",
+                  "source": "KERC Tariff Order 2023 (BESCOM)", "page": "p.206", "status": "VERIFIED"},
+                 {"item": "Billing demand", "value_label": f"max(recorded maximum, {100 * tp['billing_demand_floor_frac']:.0f} % of contract demand); excess at 2x",
+                  "source": "KERC Tariff Order 2023, HT billing conditions", "page": "p.365", "status": "VERIFIED"},
                  {"item": "Contract demand", "value_label": f"{tp['contract_demand_kva']:,.0f} kVA", "source": "modelling choice (RVCE bill pending)",
                   "page": "", "status": "ASSUMPTION"},
-                 {"item": "Solar export rate", "value_label": f"Rs {tp['export_rs_kwh']:.2f} per kWh", "source": "team brief (KERC rooftop order pending)",
-                  "page": "", "status": "PENDING"}]
+                 {"item": "Solar export rate", "value_label": f"Rs {tp['export_rs_kwh']:.2f} per kWh", "source": "KERC solar tariff order, 01.06.2023 (rooftop PV 1-2000 kW)",
+                  "page": "p.30", "status": "VERIFIED"}]
     if co2:
         rows.append({"item": "Grid CO2 factor", "value_label": f"{float(co2.get('tco2_per_mwh', co2.get('standin_tco2_per_mwh', 0))):.3f} t per MWh",
                      "source": "CEA CO2 Baseline Database", "page": "", "status": str(co2.get("status", "PENDING"))})

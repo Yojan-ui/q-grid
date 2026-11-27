@@ -301,7 +301,7 @@ function ReportBody({ r }: { r: OpReport }) {
     ['Diesel', 'dg_litres', v => `${v.toFixed(0)} L`], ['CO₂', 'co2_kg', v => `${Math.round(v).toLocaleString('en-IN')} kg`], ['Grid import', 'import_kwh', v => `${Math.round(v).toLocaleString('en-IN')} kWh`], ['Battery wear', 'wear_rs', rs]]
   return (
     <>
-      <p className="small">Against the status quo on the same solar, loads and outages{r.final ? '' : ' (day so far)'}: bill <b>{r.saving_rs >= 0 ? `${rs(r.saving_rs)} lower` : `${rs(-r.saving_rs)} higher`}</b> <span className="pending">HT-2(c)(ii) tariff, FY2023-24 carried over</span>;
+      <p className="small">Against the status quo on the same solar, loads and outages{r.final ? '' : ' (day so far)'}: bill <b>{r.saving_rs >= 0 ? `${rs(r.saving_rs)} lower` : `${rs(-r.saving_rs)} higher`}</b> (HT-2(c)(ii), KERC 2023 tariff);
         critical downtime <b className="tn">{(r.status_quo.critical_downtime_h ?? 0).toFixed(2)} h → {(r.qgrid.critical_downtime_h ?? 0).toFixed(2)} h</b>;
         load left unserved <b className="tn">{Math.round(r.status_quo.unserved_kwh ?? 0).toLocaleString('en-IN')} → {Math.round(r.qgrid.unserved_kwh ?? 0).toLocaleString('en-IN')} kWh</b>.
         {r.saving_rs < 0 && (r.qgrid.dg_litres ?? 0) > (r.status_quo.dg_litres ?? 0) ? ' The higher bill is diesel burned to keep loads on.' : ''}</p>

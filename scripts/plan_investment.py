@@ -7,14 +7,14 @@ Model (one linear programme, HiGHS): the campus as one connection over the 30 RV
 their seeded outages included), every 15-minute slot. Per slot: solar = sum over roof groups of (existing + extra kWp) x
 the zone's measured solar per kWp (NASA POWER), a campus battery (PROPOSED) with charge / discharge, grid import /
 export, the two diesel sets during outages only (backup), load shedding at the value of lost load. Costs: BESCOM
-HT-2(c)(ii) energy per slot (official KERC TO-2022 rates, marginal slab; FY2023-24 carried over), export credit, the
+HT-2(c)(ii) energy per slot (official KERC rates: TO-2022 to Mar 2023, TO-2023 from Apr 2023), export credit, the
 monthly demand charge on billing demand = max(month's sampled maximum kVA, 85 % of contract demand) with kVA above the
 contract at 2x (qgrid/v2/tariff.py parameters), diesel fuel, battery wear, value of lost load. Days are weighted 365/30;
 each calendar month's demand charge comes from that month's sampled days.
   optimum : capacities are decision variables, priced at their annualised cost (capital recovery over the asset life)
   cases   : the grid of capacities in config planner.* evaluated with capacities fixed (what the Plan tab looks up)
 Operation is planned with perfect information on these days, so savings are an upper bound on what a controller gets.
-Every cost is an ASSUMPTION (config planner, labelled); tariff FY2023-24 rates are carried over (PENDING)."""
+Every cost is an ASSUMPTION (config planner, labelled); tariff: KERC TO-2023 HT-2(c)(ii) (verified)."""
 from __future__ import annotations
 
 import itertools
@@ -226,9 +226,9 @@ def main(workers: int):
                 "note": "Sizing LP: extra kWp per roof group and battery kWh chosen to minimise annualised capital + operating cost "
                         f"at contract demand {opt['contract_kva']:.0f} kVA (the cheapest of the sweep with today's assets)."})
     steps = sorted(set(pc["extra_kwp_fracs"]))
-    out = {"status": "ASSUMPTION costs; tariff HT-2(c)(ii) official TO-2022 rates (FY2023-24 carried over); not a headline result",
+    out = {"status": "ASSUMPTION costs; tariff BESCOM HT-2(c)(ii), KERC TO-2023 (verified); not a headline result",
            "generated_by": "scripts/plan_investment.py",
-           "labels": {"tariff": "BESCOM HT-2(c)(ii), KERC TO-2022 (FY2023-24 rates carried over, PENDING)",
+           "labels": {"tariff": "BESCOM HT-2(c)(ii), KERC Tariff Order 2023 (verified)",
                       "costs": "PV, battery and O&M costs are ASSUMPTIONS (config planner); quotes PENDING",
                       "operation": "perfect-information operation on the 30 RVCE evaluation days (an upper bound on savings)"},
            "roof_groups": [{"key": g["key"], "label": g["label"], "existing_kwp": round(g["existing_kwp"], 1),
@@ -245,8 +245,8 @@ def main(workers: int):
                            {"name": "Battery power", "value": pc["battery_kw_per_kwh"], "unit": "kW per kWh", "source": "ASSUMPTION"},
                            {"name": "Battery life", "value": pc["battery_life_years"], "unit": "years", "source": "ASSUMPTION"},
                            {"name": "Discount rate", "value": 100 * r, "unit": "%", "source": "ASSUMPTION (config economics)"},
-                           {"name": "Demand charge", "value": C["tp"].get("demand_rs_kva_month", 265), "unit": "Rs/kVA/month", "source": "KERC TO-2022 HT-2(c)(ii), p.412"},
-                           {"name": "Export rate", "value": C["tp"].get("export_rs_kwh", 3.74), "unit": "Rs/kWh", "source": "team brief (order PENDING)"}],
+                           {"name": "Demand charge", "value": C["tp"].get("demand_rs_kva_month", 265), "unit": "Rs/kVA/month", "source": "KERC TO-2023 HT-2(c)(ii), p.206"},
+                           {"name": "Export rate", "value": C["tp"].get("export_rs_kwh", 3.74), "unit": "Rs/kWh", "source": "KERC solar tariff order 01.06.2023, p.30"}],
            "runtime_s": time.time() - t0, "n_days": len(C["days"])}
     d = ROOT / "results" / "planner"; d.mkdir(parents=True, exist_ok=True)
     pd.json_normalize(cases).to_csv(d / "cases.csv", index=False)

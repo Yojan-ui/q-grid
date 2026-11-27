@@ -5,13 +5,18 @@
   "co2": {
     "status": "REAL",
     "tco2_per_mwh": 0.727,
-    "note": "CEA CO2 Baseline Database User Guide v20.0, Table S (PDF p.4); v21.0 Annexure-I (p.21)"
+    "weighted_average_tco2_per_mwh": 0.727,
+    "fy": "2023-24",
+    "source": "CEA CO2 Baseline Database for the Indian Power Sector, User Guide Version 20.0 (December 2024), Table S, PDF page 4",
+    "confirmed_in": "User Guide Version 21.0 (November 2025), Annexure-I, printed page 21 (PDF page 27): 2023-24 = 0.727; 2022-23 = 0.716",
+    "file": "data/raw/cea/CEA_CO2_Baseline_User_Guide_v20.0.pdf",
+    "sha256": "b881c258f58fd77c8faeb36479ccd1ed8bd111c45e708196df8a66ff7b29afc6"
   },
   "prices": {
     "A": {
-      "status": "PARTLY VERIFIED",
-      "source": "HT-2(c)(ii) educational institutions \u2014 KERC Tariff Order 2022 (BESCOM), dated 04.04.2022, Annexure-5 Electricity Tariff-2023, HT-2(c)(ii); KERC Tariff Order 2023 (BESCOM), dated 12.05.2023, HT-2(c)(ii) (rate schedule PDF missing)",
-      "note": "official KERC TO-2022 rates; FY2023-24 rates carried over until the TO-2023 schedule is obtained"
+      "status": "REAL",
+      "source": "HT-2(c)(ii) educational institutions \u2014 KERC Tariff Order 2022 (BESCOM), dated 04.04.2022, Annexure-5 Electricity Tariff-2023, HT-2(c)(ii); KERC Tariff Order 2023 (BESCOM), dated 12.05.2023, Chapter 6 (FY24 retail tariff) and Annexure rate schedule, HT-2(c)(ii)",
+      "note": ""
     },
     "B": {
       "status": "PENDING",
@@ -175,7 +180,7 @@
     "osm_layout": "REAL",
     "bdg2_load_shapes": "REAL",
     "iex": "PENDING",
-    "tariff_A": "PARTLY VERIFIED",
+    "tariff_A": "REAL",
     "cea": "REAL",
     "calendar": "PENDING",
     "campus_loads": "PENDING RVCE DATA",
