@@ -1,26 +1,26 @@
 # Q-Grid scorecard
 
-**Q-Grid lands 2.3% from the best possible plan; the closest alternative without a central controller, Particle swarm optimisation, lands 23.5% (paired Wilcoxon p < 0.001).** Among methods that work without a central controller, Q-Grid is closest to the best possible plan on 3 of 5 campuses; elsewhere (BDG2 university site 'Bull' (Texas); BDG2 university site 'Cockatoo' (New York)) another method is closer.
+**Q-Grid lands 0.8% from the best possible plan; the closest alternative without a central controller, Per-building MPC (MILP), lands 21.7% (paired Wilcoxon p < 0.001).** Among methods that work without a central controller, Q-Grid is closest to the best possible plan on 4 of 5 campuses; elsewhere (BDG2 university site 'Cockatoo' (New York)) another method is closer.
 
 _All figures: mean over evaluation days, from `results/bench_v3/summary.csv`. Stand-in tariff (PENDING), synthetic outages._
 
 | Method (RVCE) | Gap to best plan % | Certified gap % | Bill Rs/day | Saving vs today % | Critical downtime h | Peak kVA | Works without a central controller |
 |---|---:|---:|---:|---:|---:|---:|:---:|
-| Status quo (no coordination) | 34.27 | 34.17 | 177,985 | 0.0 | 0.26 | 1,623 | ✓ |
-| Rule-based battery controller | 35.61 | 35.52 | 173,613 | 2.6 | 0.26 | 1,557 | ✓ |
-| Genetic algorithm | 23.50 | 23.40 | 176,902 | 0.6 | 0.26 | 1,986 | ✓ |
-| Particle swarm optimisation | 23.48 | 23.38 | 175,963 | 1.2 | 0.26 | 1,906 | ✓ |
-| Per-building MPC (MILP) | 23.74 | 23.65 | 175,172 | 1.7 | 0.26 | 1,813 | ✓ |
-| Central MPC with forecasts | 2.72 | 2.62 | 174,698 | 2.1 | 0.10 | 2,032 | ✗ |
-| Central MPC when communication fails | 5.43 | 5.33 | 175,734 | 1.4 | 0.12 | 2,030 | ✗ |
-| **Q-Grid** | 2.28 | 2.18 | 173,510 | 2.7 | 0.15 | 1,997 | ✓ |
-| Q-Grid when communication fails | 4.22 | 4.13 | 175,163 | 1.7 | 0.14 | 2,030 | ✓ |
-| Best possible plan (central MILP, perfect information) | 0.01 | -0.08 | 171,919 | 3.6 | 0.00 | 2,143 | — |
+| Status quo (no coordination) | 28.73 | 28.73 | 177,985 | 0.0 | 0.26 | 1,623 | ✓ |
+| Rule-based battery controller | 35.75 | 35.76 | 173,613 | 2.6 | 0.26 | 1,557 | ✓ |
+| Genetic algorithm | 23.41 | 23.42 | 175,630 | 1.4 | 0.26 | 1,593 | ✓ |
+| Particle swarm optimisation | 23.55 | 23.55 | 175,757 | 1.3 | 0.26 | 1,620 | ✓ |
+| Per-building MPC (MILP) | 21.70 | 21.70 | 176,197 | 1.1 | 0.26 | 1,597 | ✓ |
+| Central MPC with forecasts | 1.86 | 1.86 | 173,797 | 2.5 | 0.09 | 1,601 | ✗ |
+| Central MPC when communication fails | 5.36 | 5.36 | 174,170 | 2.3 | 0.11 | 1,632 | ✗ |
+| **Q-Grid** | 0.76 | 0.76 | 172,293 | 3.3 | 0.14 | 1,609 | ✓ |
+| Q-Grid when communication fails | 2.87 | 2.87 | 173,692 | 2.5 | 0.16 | 1,606 | ✓ |
+| Best possible plan (central MILP, perfect information) | 0.02 | 0.02 | 169,219 | 5.1 | 0.00 | 1,595 | — |
 
 | Dataset | Q-Grid gap % | best alternative without a central controller | its gap % |
 |---|---:|---|---:|
-| RVCE, Bengaluru (case study) | 2.28 | Particle swarm optimisation | 23.48 |
-| BDG2 university site 'Fox' (Arizona) | 1.49 | Per-building MPC (MILP) | 1.75 |
-| BDG2 university site 'Bull' (Texas) | 2.75 | Per-building MPC (MILP) | 2.72 |
-| BDG2 university site 'Cockatoo' (New York) | 4.66 | Per-building MPC (MILP) | 4.34 |
-| CU-BEMS office building, Bangkok (7 floors) | 7.92 | Per-building MPC (MILP) | 11.50 |
+| RVCE, Bengaluru (case study) | 0.76 | Per-building MPC (MILP) | 21.70 |
+| BDG2 university site 'Fox' (Arizona) | 0.36 | Per-building MPC (MILP) | 0.59 |
+| BDG2 university site 'Bull' (Texas) | 0.87 | Per-building MPC (MILP) | 0.94 |
+| BDG2 university site 'Cockatoo' (New York) | 1.99 | Per-building MPC (MILP) | 1.94 |
+| CU-BEMS office building, Bangkok (7 floors) | 3.13 | Per-building MPC (MILP) | 5.91 |

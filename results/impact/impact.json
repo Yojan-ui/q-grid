@@ -1,0 +1,315 @@
+{
+ "status": "ASSUMPTION + stand-in tariff (PENDING): not a headline result",
+ "n_buildings": 9,
+ "n_days": 30,
+ "variant": null,
+ "battery_kwh_total": 1460.0,
+ "benefit": {
+  "bill_saving_rs_per_day_mean": 5692.317335196199,
+  "bill_saving_rs_per_day_ci95": [
+   3842.7626806673616,
+   7185.115601864346
+  ],
+  "extra_throughput_kwh_per_day_mean": 127.900549331709,
+  "source": "results/bench_v3/daily.csv (RVCE, Q-Grid vs status quo, same days)"
+ },
+ "central": {
+  "hardware_rs": 792000.0,
+  "om_rs_per_year": 79200.0,
+  "bill_saving_rs_per_year": 2077695.8273466125,
+  "battery_wear_rs_per_year": 194515.41877530745,
+  "net_rs_per_year": 1803980.408571305,
+  "discount_rate": 0.08,
+  "npv_gross_rs": 12618069.676940592,
+  "npv_net_rs": 11312855.383609097,
+  "payback_gross_years": 0.39629805034495985,
+  "payback_net_years": 0.4390291580978081,
+  "wear_rs_per_kwh_throughput": 4.166666666666667,
+  "breakeven_wear_rs_per_kwh": 40.280964274755185
+ },
+ "monte_carlo": {
+  "samples": 10000,
+  "seed": 2026,
+  "npv_gross_rs": {
+   "p5": 8781837.848626474,
+   "p50": 12766798.310371574,
+   "p95": 16223852.163038827,
+   "prob_positive": 1.0
+  },
+  "npv_net_rs": {
+   "p5": 7098414.908867332,
+   "p50": 11879856.91911307,
+   "p95": 15812494.338331167,
+   "prob_positive": 1.0
+  },
+  "payback_gross_years": {
+   "p5": 0.26801122756372225,
+   "p50": 0.3937816781539212,
+   "p95": 0.5932642885260478
+  }
+ },
+ "per_building": [
+  {
+   "zone": "academic",
+   "battery_kwh": 400.0,
+   "hardware_rs": [
+    46000,
+    130000
+   ],
+   "battery_value_rs": [
+    6000000.0,
+    10000000.0
+   ]
+  },
+  {
+   "zone": "heavy_labs",
+   "battery_kwh": 200.0,
+   "hardware_rs": [
+    46000,
+    130000
+   ],
+   "battery_value_rs": [
+    3000000.0,
+    5000000.0
+   ]
+  },
+  {
+   "zone": "hostels",
+   "battery_kwh": 300.0,
+   "hardware_rs": [
+    46000,
+    130000
+   ],
+   "battery_value_rs": [
+    4500000.0,
+    7500000.0
+   ]
+  },
+  {
+   "zone": "library",
+   "battery_kwh": 150.0,
+   "hardware_rs": [
+    46000,
+    130000
+   ],
+   "battery_value_rs": [
+    2250000.0,
+    3750000.0
+   ]
+  },
+  {
+   "zone": "canteen",
+   "battery_kwh": 100.0,
+   "hardware_rs": [
+    46000,
+    130000
+   ],
+   "battery_value_rs": [
+    1500000.0,
+    2500000.0
+   ]
+  },
+  {
+   "zone": "admin",
+   "battery_kwh": 150.0,
+   "hardware_rs": [
+    46000,
+    130000
+   ],
+   "battery_value_rs": [
+    2250000.0,
+    3750000.0
+   ]
+  },
+  {
+   "zone": "server_room",
+   "battery_kwh": 120.0,
+   "hardware_rs": [
+    46000,
+    130000
+   ],
+   "battery_value_rs": [
+    1800000.0,
+    3000000.0
+   ]
+  },
+  {
+   "zone": "health_centre",
+   "battery_kwh": 40.0,
+   "hardware_rs": [
+    46000,
+    130000
+   ],
+   "battery_value_rs": [
+    600000.0,
+    1000000.0
+   ]
+  },
+  {
+   "zone": "pumping_station",
+   "battery_kwh": 0.0,
+   "hardware_rs": [
+    46000,
+    130000
+   ],
+   "battery_value_rs": [
+    0.0,
+    0.0
+   ]
+  }
+ ],
+ "assumptions": [
+  {
+   "name": "Edge controller per building",
+   "value": [
+    15000,
+    40000
+   ],
+   "unit": "Rs",
+   "source": "ASSUMPTION \u2014 quote PENDING"
+  },
+  {
+   "name": "Energy meter per building",
+   "value": [
+    8000,
+    20000
+   ],
+   "unit": "Rs",
+   "source": "ASSUMPTION \u2014 quote PENDING"
+  },
+  {
+   "name": "Network per building",
+   "value": [
+    3000,
+    10000
+   ],
+   "unit": "Rs",
+   "source": "ASSUMPTION \u2014 quote PENDING"
+  },
+  {
+   "name": "Integration per building",
+   "value": [
+    20000,
+    60000
+   ],
+   "unit": "Rs",
+   "source": "ASSUMPTION \u2014 quote PENDING"
+  },
+  {
+   "name": "Maintenance per year",
+   "value": [
+    5.0,
+    15.0
+   ],
+   "unit": "% of hardware",
+   "source": "ASSUMPTION"
+  },
+  {
+   "name": "Discount rate",
+   "value": [
+    6.0,
+    10.0
+   ],
+   "unit": "%",
+   "source": "ASSUMPTION"
+  },
+  {
+   "name": "Battery cost",
+   "value": [
+    15000,
+    25000
+   ],
+   "unit": "Rs/kWh",
+   "source": "ASSUMPTION (config.yaml economics / impact)"
+  },
+  {
+   "name": "Battery cycle life",
+   "value": [
+    3000,
+    6000
+   ],
+   "unit": "full cycles",
+   "source": "ASSUMPTION (LFP datasheet class)"
+  },
+  {
+   "name": "Depth of discharge per cycle",
+   "value": [
+    75.0,
+    75.0
+   ],
+   "unit": "%",
+   "source": "ASSUMPTION"
+  },
+  {
+   "name": "Tariff (energy + demand charge)",
+   "value": null,
+   "unit": "",
+   "source": "STAND-IN (PENDING BESCOM/KERC tariff order)"
+  },
+  {
+   "name": "Batteries, solar, diesel sets",
+   "value": null,
+   "unit": "",
+   "source": "already in the campus model (sizes ASSUMPTION until RVCE asset data)"
+  }
+ ],
+ "scale": [
+  {
+   "stage": "RVCE pilot",
+   "what": "9 buildings, one node each",
+   "evidence": "this page"
+  },
+  {
+   "stage": "Bengaluru campuses",
+   "what": "the same node per building; no campus-wide server",
+   "evidence": "the benchmark's four other campuses",
+   "datasets": [
+    {
+     "dataset": "rvce",
+     "label": "RVCE, Bengaluru (case study)",
+     "gap_pct": 0.758205497674614,
+     "saving_pct": 3.3476378659260337,
+     "runtime_per_decision_s": 4.560544354027903,
+     "messages_per_decision": 398.5555555555555
+    },
+    {
+     "dataset": "bdg2_fox",
+     "label": "BDG2 university site 'Fox' (Arizona)",
+     "gap_pct": 0.3575703142119273,
+     "saving_pct": -0.43646007980997,
+     "runtime_per_decision_s": 4.289762039576191,
+     "messages_per_decision": 200.70555555555558
+    },
+    {
+     "dataset": "bdg2_bull",
+     "label": "BDG2 university site 'Bull' (Texas)",
+     "gap_pct": 0.8663718795838591,
+     "saving_pct": 0.43975869125755523,
+     "runtime_per_decision_s": 4.807534047685639,
+     "messages_per_decision": 450.4888888888889
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "label": "BDG2 university site 'Cockatoo' (New York)",
+     "gap_pct": 1.9853199595494995,
+     "saving_pct": 0.07778319466178149,
+     "runtime_per_decision_s": 4.9810433736005715,
+     "messages_per_decision": 560.5055555555555
+    },
+    {
+     "dataset": "cubems",
+     "label": "CU-BEMS office building, Bangkok (7 floors)",
+     "gap_pct": 3.131123224468012,
+     "saving_pct": 4.226984377750319,
+     "runtime_per_decision_s": 4.251766483141567,
+     "messages_per_decision": 227.15555555555557
+    }
+   ]
+  },
+  {
+   "stage": "Feeders",
+   "what": "campuses and buildings on one distribution feeder agree the same way, with neighbours only",
+   "evidence": "per-decision work and messages depend on a building's neighbours, not on the size of the network (consensus ADMM); not yet tested on a feeder model"
+  }
+ ]
+}
