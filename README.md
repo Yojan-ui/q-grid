@@ -11,7 +11,8 @@ EUREKA Track 3 · Smart Decentralised Energy Systems · RVCE, Bengaluru
 > Every number in this README is rendered from `results/` by `scripts/write_results_md.py`.
 
 **Data status:** real NASA POWER irradiance, Ausgrid household shapes (hostels), OpenStreetMap layout (© OpenStreetMap
-contributors), KERC Tariff Order 2023 (BESCOM HT-2(c)(ii) with ToD, Rs 350/kVA demand charge, 3.74 Rs/kWh export) and
+contributors), KERC Tariff Orders 2022/2023 by date (BESCOM HT-2(c)(ii) with ToD; FY2023-24: 8.50 Rs/kWh, Rs 350/kVA;
+FY2022-23: 825/865 paise two-slab, Rs 265/kVA; export 3.74 Rs/kWh) and
 CEA CO2 factor v20.0 (0.727 tCO2/MWh, FY2023-24). **PENDING:** IEX prices, RVCE calendar and meter data — labelled
 stand-ins, never headline results. **The Rs figures below were computed with the earlier stand-in tariff and will change
 when results are regenerated with the KERC 2023 tariff.** See `data/SOURCES.md`, `docs/BLOCKERS.md`, `docs/data_request.md`.
@@ -124,7 +125,7 @@ Licences, URLs and fetch dates: `data/SOURCES.md` · what we asked RVCE for: `do
 ## Honest limits
 
 - No quantum advantage: QAOA is simulated (ideal, noiseless) and is not in the control loop; it was tested and verified.
-- Tariff and CO₂ factor are now official (KERC 2023, CEA v20.0), but the Rs figures above were computed with the earlier stand-in tariff and change when results are regenerated. RVCE loads, calendar and asset sizes are stand-ins until the documents arrive.
+- Tariff and CO₂ factor are now official (KERC 2023, CEA v20.0), but the Rs figures above were computed with the earlier stand-in tariff and change when results are regenerated. RVCE's tariff category, a single HT connection (hostels included) and ≥ 500 kVA ToD applicability are ASSUMPTIONS pending its BESCOM bill; days before 1 April 2023 use the FY2022-23 order. RVCE loads, calendar and asset sizes are stand-ins until the documents arrive.
 - Outages and network failures in the benchmark are synthetic (seeded). Cables are modelled as lossless, without AC power flow.
 - Battery wear is priced with an assumed battery cost and cycle life; real warranty data will change the rate.
 - Value of lost load (Rs 40 / 1,000 per kWh) is an assumption; every gap is also reported without it.
