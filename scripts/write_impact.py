@@ -24,7 +24,7 @@ sys.path[:0] = [str(ROOT / "backend"), str(ROOT)]
 
 
 def main():
-    cfg = yaml.safe_load((ROOT / "config.yaml").read_text())
+    cfg = yaml.safe_load((ROOT / "config.yaml").read_text(encoding="utf-8"))
     im = cfg["impact"]
     from qgrid.model import load_campus
     campus = load_campus()
@@ -146,7 +146,7 @@ def main():
                 "evidence": "per-decision work and messages depend on a building's neighbours, not on the size of the network (consensus ADMM); not yet tested on a feeder model"},
            ]}
     rd = ROOT / "results" / "impact"; rd.mkdir(parents=True, exist_ok=True)
-    (rd / "impact.json").write_text(json.dumps(out, indent=1))
+    (rd / "impact.json").write_text(json.dumps(out, indent=1), encoding="utf-8")
     rp = ROOT / "results" / "replay" / "impact.json"
     shutil.copy(rd / "impact.json", rp); shutil.copy(rp, ROOT / "frontend" / "public" / "replay" / "impact.json")
     c = central
@@ -194,7 +194,7 @@ def main():
         for r_ in st.get("datasets", []):
             L.append(f"  - {r_['label']}: gap to the best plan {r_['gap_pct']:.1f} %, bill change {r_['saving_pct']:+.1f} % (stand-in tariff), "
                      f"{r_['runtime_per_decision_s']:.1f} s per decision")
-    (ROOT / "docs" / "impact.md").write_text("\n".join(x for x in L if x is not None) + "\n")
+    (ROOT / "docs" / "impact.md").write_text("\n".join(x for x in L if x is not None) + "\n", encoding="utf-8")
     print(json.dumps(central, indent=1))
     print("MC net", mcn, "gross", mcg)
 

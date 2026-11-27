@@ -140,11 +140,11 @@ Step 7 (result): Q-Grid cuts critical downtime from 16 min to 8 min a day (0 min
 | CU-BEMS office building, Bangkok (7 floors) | Status quo (no coordination) | -2.86 | 1.68e-06 | Q-Grid better |
 | RVCE, Bengaluru (case study) | Central MPC with forecasts | -0.88 | 1.86e-09 | Q-Grid better |
 | RVCE, Bengaluru (case study) | Central MPC when communication fails | -2.81 | 1.86e-09 | Q-Grid better |
-| RVCE, Bengaluru (case study) | Best possible plan (central MILP, perfect information) | -8.72 | 1.86e-09 | Q-Grid better |
-| RVCE, Bengaluru (case study) | Best possible plan (central MILP, perfect information) | -8.72 | 1.86e-09 | Q-Grid better |
-| RVCE, Bengaluru (case study) | Best possible plan (central MILP, perfect information) | -8.72 | 1.86e-09 | Q-Grid better |
-| RVCE, Bengaluru (case study) | Best possible plan (central MILP, perfect information) | -14.84 | 1.86e-09 | Q-Grid better |
-| RVCE, Bengaluru (case study) | Best possible plan (central MILP, perfect information) | -5.78 | 1.86e-09 | Q-Grid better |
+| RVCE, Bengaluru (case study) | 24 h hybrid Benders, exact master | -8.72 | 1.86e-09 | Q-Grid better |
+| RVCE, Bengaluru (case study) | 24 h hybrid Benders, QAOA master (verified, simulator) | -8.72 | 1.86e-09 | Q-Grid better |
+| RVCE, Bengaluru (case study) | 24 h hybrid Benders, QIEA master (quantum-inspired, classical) | -8.72 | 1.86e-09 | Q-Grid better |
+| RVCE, Bengaluru (case study) | Earlier prototype: 3-slot QUBO per building, binary coordination with QAOA/annealing tiers | -14.84 | 1.86e-09 | Q-Grid better |
+| RVCE, Bengaluru (case study) | 1-hour horizon, discrete kW, binary coordination | -5.78 | 1.86e-09 | Q-Grid better |
 | RVCE, Bengaluru (case study) | Genetic algorithm | -6.12 | 1.86e-09 | Q-Grid better |
 | RVCE, Bengaluru (case study) | Best possible plan (central MILP, perfect information) | +0.58 | 1.86e-09 | Q-Grid worse |
 | RVCE, Bengaluru (case study) | Per-building MPC (MILP) | -4.89 | 1.86e-09 | Q-Grid better |

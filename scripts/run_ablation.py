@@ -224,7 +224,7 @@ def _write_md(g, sv, fe, bd, stress=None):
               "- 30 days, not 365 (the full year will be run when RVCE data is available); one price scenario (stand-in).",
               "- Loads are BDG2 shapes scaled by floor area × EPI (PENDING RVCE meters); see data/SOURCES.md.",
               "- Discrete-dispatch combinations hit the branch-and-bound time limit more often; their gap includes that."]
-    (ROOT / "docs" / "ablation.md").write_text("\n".join(lines) + "\n")
+    (ROOT / "docs" / "ablation.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     print("wrote docs/ablation.md")
 
 
@@ -301,7 +301,7 @@ city-feeder setting with many more buildings than cable-slot constraints.)
   plans; binary ADMM (without C) agreed within its 6 rounds in {100 * c0.admm_converged_rate.mean():.0f} % (it then rounds and fixes
   the consensus).
 """
-    (ROOT / "docs" / "math.md").write_text(txt)
+    (ROOT / "docs" / "math.md").write_text(txt, encoding="utf-8")
     print("wrote docs/math.md")
 
 

@@ -38,6 +38,17 @@ DESIGN = {
     "design_benders_qaoa": ("24 h hybrid Benders, QAOA master (verified, simulator)", "same with a QAOA block master; realistic forecasts; battery wear not priced"),
     "design_benders_qiea": ("24 h hybrid Benders, QIEA master (quantum-inspired, classical)", "same with a QIEA master; realistic forecasts; battery wear not priced"),
 }
+
+
+def method_name(m: str) -> str:
+    """Display name for any method key in the results (main methods, design variants, the reference optimum)."""
+    if m in NAMES:
+        return NAMES[m][0]
+    if m in DESIGN:
+        return DESIGN[m][0]
+    return REF[1] if m == REF[0] else m
+
+
 METRICS = [  # key, label, group, better, unit, digits
     ("bill_rs", "Bill", "Cost", "lower", "Rs/day", 0), ("saving_pct", "Saving vs today", "Cost", "higher", "%", 1),
     ("npv10_rs_lakh", "10-yr NPV of saving", "Cost", "higher", "Rs lakh", 1),
@@ -253,7 +264,7 @@ def story_headlines(s, labels, cfg, ds: str = "rvce") -> dict:
 
 
 def main():
-    cfg = yaml.safe_load((ROOT / "config.yaml").read_text())
+    cfg = yaml.safe_load((ROOT / "config.yaml").read_text(encoding="utf-8"))
     from qgrid.datasets import SPECS
     r = daily()
     s = summary(r, float(cfg["economics"].get("discount_rate", 0.08)))
@@ -304,7 +315,7 @@ def main():
            "datasets": [{"key": k, "label": labels[k], "n_days": int(r[r.dataset == k].day.nunique())} for k in order],
            "table": table, "wilcoxon": wil, "comms_day": comms, "headline": hl, "design_choices": design, "shadow": shadow}
     rp = ROOT / "results" / "replay"
-    (rp / "bench_v3.json").write_text(json.dumps(out, allow_nan=False, default=lambda o: None).replace("NaN", "null"))
+    (rp / "bench_v3.json").write_text(json.dumps(out, allow_nan=False, default=lambda o: None).replace("NaN", "null"), encoding="utf-8")
     shutil.copy(rp / "bench_v3.json", ROOT / "frontend" / "public" / "replay" / "bench_v3.json")
     write_docs(r, s, w, labels, order, hl, cfg)
     print("wrote results/bench_v3/*.csv, docs/benchmark_v3.md, docs/scorecard.md, replay bench_v3.json")
@@ -369,14 +380,14 @@ def write_docs(r, s, w, labels, order, hl, cfg):
     L.append("|---|---|---:|---:|---|")
     for _, x in w[w.metric == "gap_pct"].iterrows():
         v = "tie (not significant)" if pd.isna(x.p) or x.p >= 0.05 else ("Q-Grid better" if x.median_diff_qgrid_minus_method < 0 else "Q-Grid worse")
-        L.append(f"| {labels.get(x.dataset, x.dataset)} | {NAMES.get(x.method, (REF[1],))[0]} | {x.median_diff_qgrid_minus_method:+.2f} | "
+        L.append(f"| {labels.get(x.dataset, x.dataset)} | {method_name(x.method)} | {x.median_diff_qgrid_minus_method:+.2f} | "
                  f"{'–' if pd.isna(x.p) else f'{x.p:.3g}'} | {v} |")
     L += ["", "## Honest interpretation\n",
           "- Read the verdict column: it is the test, not the means, that says whether a difference is real on these days.",
           "- The central MPC with working communication is a strong benchmark; the point of Q-Grid is to stay close to it without a "
           "single point of failure, which the communication-failure rows quantify.",
           "- Asset sizes on the BDG2 and CU-BEMS sites follow one rule, not real installations; tariffs and outages are stand-ins."]
-    (ROOT / "docs" / "benchmark_v3.md").write_text("\n".join(L) + "\n")
+    (ROOT / "docs" / "benchmark_v3.md").write_text("\n".join(L) + "\n", encoding="utf-8")
     # one-page scorecard (RVCE + per-dataset gap)
     S = ["# Q-Grid scorecard\n", f"**{hl['text']}** {hl['detail']}\n",
          "_All figures: mean over evaluation days, from `results/bench_v3/summary.csv`. Stand-in tariff (PENDING), synthetic outages._\n",
@@ -396,7 +407,7 @@ def write_docs(r, s, w, labels, order, hl, cfg):
         if alts and q is not None:
             a = min(alts, key=alts.get)
             S.append(f"| {labels[ds]} | {q:.2f} | {NAMES[a][0]} | {alts[a]:.2f} |")
-    (ROOT / "docs" / "scorecard.md").write_text("\n".join(S) + "\n")
+    (ROOT / "docs" / "scorecard.md").write_text("\n".join(S) + "\n", encoding="utf-8")
 
 
 if __name__ == "__main__":
