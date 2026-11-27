@@ -123,7 +123,7 @@ P(optimum)); tiered fallback QAOA → simulated annealing → exact (`qgrid/solv
 
 ---
 
-## v2 (RVCE campus model) — additions
+## RVCE campus model — additions
 
 **Horizon** H = 3 slots (45 min). **Variables** per zone: 2H battery bits (if a battery), `g` diesel generator on for the
 horizon (if a DG and not forced on by its minimum on-time), `w` borewell pump on for the horizon (if a tank and not forced by

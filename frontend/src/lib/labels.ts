@@ -10,7 +10,7 @@ export const zn = (z: string) => ZONE_NAME[z] ?? z.replace(/_/g, ' ')
 export const METHOD: Record<string, string> = {
   B0: 'Status quo (today)', B1: 'Rule-based controller', 'B2-GA': 'Genetic algorithm', 'B2-PSO': 'Particle swarm',
   B3: 'Per-zone MPC (MILP)', B4: 'Central optimum (MILP)', B5: 'ADMM + exact local solver', 'B5-nobattery': 'ADMM, no batteries',
-  'C-QIEA': 'Central QUBO + QIEA', OURS: 'Q-Grid (QAOA tiers)', 'OURS-QIEA': 'Q-Grid with QIEA tier',
+  'C-QIEA': 'Central QUBO + QIEA', OURS: 'Earlier prototype (QAOA tiers)', 'OURS-QIEA': 'Earlier prototype (QIEA tier)',
 }
 
 export const SCENARIO_NAME: Record<string, string> = {
@@ -47,6 +47,8 @@ const hhmm = (sc: Scenario, slot: number) => sc.slots.t[Math.min(95, slot)]
 
 /** One QUBO variable as a yes/no question a person understands. */
 export function varLabel(v: string, zone: string, slot: number, sc: Scenario): { short: string; device: string; yes: string; no: string } {
+  if (v.includes('#')) return slotLabel(v, sc)
+  if (v.includes('@')) return v2Label(v, sc)
   const step = sc.campus.line_step_kw
   const k = Number(v.slice(1))
   if (/^c\d$/.test(v)) return { short: k === 0 ? 'Charge battery now' : `Charge at ${hhmm(sc, slot + k)}`, device: 'battery', yes: 'charge', no: 'no charge' }
@@ -66,8 +68,45 @@ export function varLabel(v: string, zone: string, slot: number, sc: Scenario): {
   return { short: v, device: 'other', yes: '1', no: '0' }
 }
 
+/** Clock hour h of the operated day (>= 24: the next morning) as "18:00" / "tomorrow 02:00". */
+export const hourLabel = (h: number) => `${h >= 24 ? 'tomorrow ' : ''}${String(h % 24).padStart(2, '0')}:00`
+
+/** Per-slot commitment binaries of the current design (qgrid/ablation/local.py): kind#slot or flex#job#slot. */
+function slotLabel(v: string, sc: Scenario): { short: string; device: string; yes: string; no: string } {
+  const parts = v.split('#')
+  const t = (k: string) => `${Number(k) >= 96 ? 'tomorrow ' : ''}${sc.slots.t[Number(k) % 96] ?? k}`
+  const [kind, a, b] = parts
+  if (kind === 'mode') return { short: `Battery may charge at ${t(a)}`, device: 'battery', yes: 'charge allowed', no: 'discharge allowed' }
+  if (kind === 'charge') return { short: `Charge at full power at ${t(a)}`, device: 'battery', yes: 'charge', no: 'no charge' }
+  if (kind === 'discharge') return { short: `Discharge at full power at ${t(a)}`, device: 'battery', yes: 'discharge', no: 'no discharge' }
+  if (kind === 'dg') return { short: `Diesel on at ${t(a)}`, device: 'dg', yes: 'diesel on', no: 'diesel off' }
+  if (kind === 'st') return { short: `Diesel starts at ${t(a)}`, device: 'dg', yes: 'start', no: 'no start' }
+  if (kind === 'pump') return { short: `Pump on at ${t(a)}`, device: 'tank', yes: 'pump on', no: 'pump off' }
+  if (kind === 'flex') return { short: `Start ${a.replace(/_/g, ' ')} at ${t(b)}`, device: 'flex', yes: 'start here', no: 'not here' }
+  return { short: v, device: 'other', yes: '1', no: '0' }
+}
+
+/** Hourly master binaries of the Benders design: one decision per device per clock hour (qgrid/v2/building.py). */
+function v2Label(v: string, sc: Scenario): { short: string; device: string; yes: string; no: string } {
+  const [kind, a, b] = v.split('@')
+  const h = Number(a)
+  if (kind === 'pump') return { short: `Pump on ${hourLabel(h)}`, device: 'tank', yes: 'pump on', no: 'pump off' }
+  if (kind === 'dg') return { short: `Diesel on ${hourLabel(h)}`, device: 'dg', yes: 'diesel on', no: 'diesel off' }
+  if (kind === 'mode') return { short: `Battery may charge ${hourLabel(h)}`, device: 'battery', yes: 'charge allowed', no: 'discharge allowed' }
+  if (kind === 'flex') return { short: `Start ${a.replace(/_/g, ' ')} at ${sc.slots.t[Math.min(95, Number(b))] ?? b}`, device: 'flex', yes: 'start here', no: 'not here' }
+  return { short: v, device: 'other', yes: '1', no: '0' }
+}
+
 /** Structural rule that couples two variables (from qgrid/qubo.py penalty construction). */
 export function pairRule(a: string, b: string): string | null {
+  if (a.includes('#') && b.includes('#')) {
+    const [ka, , ] = a.split('#'), [kb] = b.split('#')
+    if (ka === 'flex' && kb === 'flex' && a.split('#')[1] === b.split('#')[1]) return 'a job starts exactly once'
+    if ((ka === 'dg' || ka === 'st') && (kb === 'dg' || kb === 'st')) return 'diesel minimum run time'
+    return null
+  }
+  if (a.startsWith('pump@') && b.startsWith('pump@')) return 'the tank level links every pumping hour'
+  if (a.startsWith('flex@') && b.startsWith('flex@') && a.split('@')[1] === b.split('@')[1]) return 'a job starts exactly once'
   const s = [a, b].sort().join(' ')
   if (/^c(\d) d\1$/.test(s)) return 'battery can’t charge and discharge in the same slot'
   const m = s.match(/^n(\d+) p(\d+)$/)

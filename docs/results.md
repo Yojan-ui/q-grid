@@ -16,7 +16,7 @@ Real: NASA POWER (PV), Ausgrid (hostel load shape), OpenStreetMap (layout). **PE
 
 ### 30-day evaluation set (mean per day)
 
-| Method | Rs/day | Rs incl. VOLL | gap to B4 % | crit. downtime h | DG h | DG L | CO2 kg | self-cons. % | peak kW | re-plan s/slot | feasible % | QAOA P(opt) | ADMM conv. % |
+| Design | Rs/day | Rs incl. VOLL | gap to B4 % | crit. downtime h | DG h | DG L | CO2 kg | self-cons. % | peak kW | re-plan s/slot | feasible % | QAOA P(opt) | ADMM conv. % |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | B0 status quo | 166,645 | 166,645 | 14.41 | 0.00 | 0.0 | 0 | 15,871 | 82.5 | 2,094 | – | 100.0 | – | – |
 | B1 rule-based | 164,613 | 164,613 | 11.17 | 0.00 | 0.0 | 0 | 15,197 | 85.9 | 2,057 | – | 100.0 | – | – |
@@ -30,7 +30,7 @@ Real: NASA POWER (PV), Ausgrid (hostel load shape), OpenStreetMap (layout). **PE
 
 ### teaching — 2023-09-13 (PLACEHOLDER teaching Wednesday (PENDING calendar))
 
-| Method | Rs/day | Rs incl. VOLL | gap to B4 % | crit. downtime h | DG h | DG L | CO2 kg | self-cons. % | peak kW | re-plan s/slot | feasible % | QAOA P(opt) | ADMM conv. % |
+| Design | Rs/day | Rs incl. VOLL | gap to B4 % | crit. downtime h | DG h | DG L | CO2 kg | self-cons. % | peak kW | re-plan s/slot | feasible % | QAOA P(opt) | ADMM conv. % |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | B0 status quo | 235,102 | 235,102 | 2.40 | 0.00 | 0.0 | 0 | 21,325 | 96.1 | 2,920 | – | 100.0 | – | – |
 | B1 rule-based | 234,300 | 234,300 | 2.05 | 0.00 | 0.0 | 0 | 20,833 | 97.8 | 2,903 | – | 100.0 | – | – |
@@ -45,7 +45,7 @@ Real: NASA POWER (PV), Ausgrid (hostel load shape), OpenStreetMap (layout). **PE
 
 ### exam week — 2023-07-12 (PLACEHOLDER exam-week Wednesday (PENDING calendar))
 
-| Method | Rs/day | Rs incl. VOLL | gap to B4 % | crit. downtime h | DG h | DG L | CO2 kg | self-cons. % | peak kW | re-plan s/slot | feasible % | QAOA P(opt) | ADMM conv. % |
+| Design | Rs/day | Rs incl. VOLL | gap to B4 % | crit. downtime h | DG h | DG L | CO2 kg | self-cons. % | peak kW | re-plan s/slot | feasible % | QAOA P(opt) | ADMM conv. % |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | B0 status quo | 140,284 | 140,284 | 7.08 | 0.00 | 0.0 | 0 | 13,052 | 91.8 | 1,470 | – | 100.0 | – | – |
 | B1 rule-based | 137,608 | 137,608 | 5.04 | 0.00 | 0.0 | 0 | 12,263 | 96.2 | 1,437 | – | 100.0 | – | – |
@@ -60,7 +60,7 @@ Real: NASA POWER (PV), Ausgrid (hostel load shape), OpenStreetMap (layout). **PE
 
 ### vacation — 2023-08-09 (PLACEHOLDER vacation Wednesday (PENDING calendar))
 
-| Method | Rs/day | Rs incl. VOLL | gap to B4 % | crit. downtime h | DG h | DG L | CO2 kg | self-cons. % | peak kW | re-plan s/slot | feasible % | QAOA P(opt) | ADMM conv. % |
+| Design | Rs/day | Rs incl. VOLL | gap to B4 % | crit. downtime h | DG h | DG L | CO2 kg | self-cons. % | peak kW | re-plan s/slot | feasible % | QAOA P(opt) | ADMM conv. % |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | B0 status quo | 73,004 | 73,004 | 31.86 | 0.00 | 0.0 | 0 | 8,607 | 62.0 | 776 | – | 100.0 | – | – |
 | B1 rule-based | 69,244 | 69,244 | 25.07 | 0.00 | 0.0 | 0 | 7,674 | 67.6 | 710 | – | 100.0 | – | – |
@@ -75,7 +75,7 @@ Real: NASA POWER (PV), Ausgrid (hostel load shape), OpenStreetMap (layout). **PE
 
 ### fest — 2023-06-14 (8th Mile fest day 2 (RVCE report))
 
-| Method | Rs/day | Rs incl. VOLL | gap to B4 % | crit. downtime h | DG h | DG L | CO2 kg | self-cons. % | peak kW | re-plan s/slot | feasible % | QAOA P(opt) | ADMM conv. % |
+| Design | Rs/day | Rs incl. VOLL | gap to B4 % | crit. downtime h | DG h | DG L | CO2 kg | self-cons. % | peak kW | re-plan s/slot | feasible % | QAOA P(opt) | ADMM conv. % |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | B0 status quo | 185,944 | 185,944 | 4.98 | 0.00 | 0.0 | 0 | 16,973 | 93.8 | 2,263 | – | 100.0 | – | – |
 | B1 rule-based | 182,440 | 182,440 | 3.00 | 0.00 | 0.0 | 0 | 16,084 | 98.3 | 2,160 | – | 100.0 | – | – |
@@ -90,7 +90,7 @@ Real: NASA POWER (PV), Ausgrid (hostel load shape), OpenStreetMap (layout). **PE
 
 ### monsoon — 2023-07-25 (lowest campus PV day Jun-Sep 2023 (NASA POWER))
 
-| Method | Rs/day | Rs incl. VOLL | gap to B4 % | crit. downtime h | DG h | DG L | CO2 kg | self-cons. % | peak kW | re-plan s/slot | feasible % | QAOA P(opt) | ADMM conv. % |
+| Design | Rs/day | Rs incl. VOLL | gap to B4 % | crit. downtime h | DG h | DG L | CO2 kg | self-cons. % | peak kW | re-plan s/slot | feasible % | QAOA P(opt) | ADMM conv. % |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | B0 status quo | 113,467 | 113,467 | 5.32 | 0.00 | 0.0 | 0 | 10,609 | 91.8 | 1,064 | – | 100.0 | – | – |
 | B1 rule-based | 111,120 | 111,120 | 3.14 | 0.00 | 0.0 | 0 | 9,878 | 99.4 | 1,057 | – | 100.0 | – | – |
@@ -105,7 +105,7 @@ Real: NASA POWER (PV), Ausgrid (hostel load shape), OpenStreetMap (layout). **PE
 
 ### outage fest — 2023-06-15 (HEADLINE stress test: BESCOM outage 18:00-21:00 during fest evening peak (ASSUMED outage window))
 
-| Method | Rs/day | Rs incl. VOLL | gap to B4 % | crit. downtime h | DG h | DG L | CO2 kg | self-cons. % | peak kW | re-plan s/slot | feasible % | QAOA P(opt) | ADMM conv. % |
+| Design | Rs/day | Rs incl. VOLL | gap to B4 % | crit. downtime h | DG h | DG L | CO2 kg | self-cons. % | peak kW | re-plan s/slot | feasible % | QAOA P(opt) | ADMM conv. % |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | B0 status quo | 153,499 | 1,048,184 | 235.83 | 3.00 | 6.0 | 192 | 13,214 | 93.8 | 2,229 | – | 100.0 | – | – |
 | B1 rule-based | 146,610 | 1,152,260 | 269.18 | 3.00 | 5.2 | 163 | 12,466 | 97.4 | 2,147 | – | 100.0 | – | – |
@@ -122,7 +122,7 @@ Real: NASA POWER (PV), Ausgrid (hostel load shape), OpenStreetMap (layout). **PE
 
 ### 30-day evaluation set (mean per day)
 
-| Method | Rs/day | Rs incl. VOLL | gap to B4 % | crit. downtime h | DG h | DG L | CO2 kg | self-cons. % | peak kW | re-plan s/slot | feasible % | QAOA P(opt) | ADMM conv. % |
+| Design | Rs/day | Rs incl. VOLL | gap to B4 % | crit. downtime h | DG h | DG L | CO2 kg | self-cons. % | peak kW | re-plan s/slot | feasible % | QAOA P(opt) | ADMM conv. % |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | B0 status quo | 111,218 | 111,218 | 13.04 | 0.00 | 0.0 | 0 | 15,871 | 82.5 | 2,094 | – | 100.0 | – | – |
 | B1 rule-based | 110,626 | 110,626 | 11.53 | 0.00 | 0.0 | 0 | 15,197 | 85.9 | 2,057 | – | 100.0 | – | – |
@@ -136,7 +136,7 @@ Real: NASA POWER (PV), Ausgrid (hostel load shape), OpenStreetMap (layout). **PE
 
 ### teaching — 2023-09-13 (PLACEHOLDER teaching Wednesday (PENDING calendar))
 
-| Method | Rs/day | Rs incl. VOLL | gap to B4 % | crit. downtime h | DG h | DG L | CO2 kg | self-cons. % | peak kW | re-plan s/slot | feasible % | QAOA P(opt) | ADMM conv. % |
+| Design | Rs/day | Rs incl. VOLL | gap to B4 % | crit. downtime h | DG h | DG L | CO2 kg | self-cons. % | peak kW | re-plan s/slot | feasible % | QAOA P(opt) | ADMM conv. % |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | B0 status quo | 150,791 | 150,791 | 5.77 | 0.00 | 0.0 | 0 | 21,325 | 96.1 | 2,920 | – | 100.0 | – | – |
 | B1 rule-based | 150,244 | 150,244 | 5.39 | 0.00 | 0.0 | 0 | 20,833 | 97.8 | 2,903 | – | 100.0 | – | – |
@@ -151,7 +151,7 @@ Real: NASA POWER (PV), Ausgrid (hostel load shape), OpenStreetMap (layout). **PE
 
 ### exam week — 2023-07-12 (PLACEHOLDER exam-week Wednesday (PENDING calendar))
 
-| Method | Rs/day | Rs incl. VOLL | gap to B4 % | crit. downtime h | DG h | DG L | CO2 kg | self-cons. % | peak kW | re-plan s/slot | feasible % | QAOA P(opt) | ADMM conv. % |
+| Design | Rs/day | Rs incl. VOLL | gap to B4 % | crit. downtime h | DG h | DG L | CO2 kg | self-cons. % | peak kW | re-plan s/slot | feasible % | QAOA P(opt) | ADMM conv. % |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | B0 status quo | 106,099 | 106,099 | 8.54 | 0.00 | 0.0 | 0 | 13,052 | 91.8 | 1,470 | – | 100.0 | – | – |
 | B1 rule-based | 105,318 | 105,318 | 7.74 | 0.00 | 0.0 | 0 | 12,263 | 96.2 | 1,437 | – | 100.0 | – | – |
@@ -166,7 +166,7 @@ Real: NASA POWER (PV), Ausgrid (hostel load shape), OpenStreetMap (layout). **PE
 
 ### vacation — 2023-08-09 (PLACEHOLDER vacation Wednesday (PENDING calendar))
 
-| Method | Rs/day | Rs incl. VOLL | gap to B4 % | crit. downtime h | DG h | DG L | CO2 kg | self-cons. % | peak kW | re-plan s/slot | feasible % | QAOA P(opt) | ADMM conv. % |
+| Design | Rs/day | Rs incl. VOLL | gap to B4 % | crit. downtime h | DG h | DG L | CO2 kg | self-cons. % | peak kW | re-plan s/slot | feasible % | QAOA P(opt) | ADMM conv. % |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | B0 status quo | 51,880 | 51,880 | 20.39 | 0.00 | 0.0 | 0 | 8,607 | 62.0 | 776 | – | 100.0 | – | – |
 | B1 rule-based | 51,050 | 51,050 | 18.47 | 0.00 | 0.0 | 0 | 7,674 | 67.6 | 710 | – | 100.0 | – | – |
@@ -181,7 +181,7 @@ Real: NASA POWER (PV), Ausgrid (hostel load shape), OpenStreetMap (layout). **PE
 
 ### fest — 2023-06-14 (8th Mile fest day 2 (RVCE report))
 
-| Method | Rs/day | Rs incl. VOLL | gap to B4 % | crit. downtime h | DG h | DG L | CO2 kg | self-cons. % | peak kW | re-plan s/slot | feasible % | QAOA P(opt) | ADMM conv. % |
+| Design | Rs/day | Rs incl. VOLL | gap to B4 % | crit. downtime h | DG h | DG L | CO2 kg | self-cons. % | peak kW | re-plan s/slot | feasible % | QAOA P(opt) | ADMM conv. % |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | B0 status quo | 149,213 | 149,213 | 5.98 | 0.00 | 0.0 | 0 | 16,973 | 93.8 | 2,263 | – | 100.0 | – | – |
 | B1 rule-based | 149,727 | 149,727 | 6.35 | 0.00 | 0.0 | 0 | 16,084 | 98.3 | 2,160 | – | 100.0 | – | – |
@@ -196,7 +196,7 @@ Real: NASA POWER (PV), Ausgrid (hostel load shape), OpenStreetMap (layout). **PE
 
 ### monsoon — 2023-07-25 (lowest campus PV day Jun-Sep 2023 (NASA POWER))
 
-| Method | Rs/day | Rs incl. VOLL | gap to B4 % | crit. downtime h | DG h | DG L | CO2 kg | self-cons. % | peak kW | re-plan s/slot | feasible % | QAOA P(opt) | ADMM conv. % |
+| Design | Rs/day | Rs incl. VOLL | gap to B4 % | crit. downtime h | DG h | DG L | CO2 kg | self-cons. % | peak kW | re-plan s/slot | feasible % | QAOA P(opt) | ADMM conv. % |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | B0 status quo | 84,134 | 84,134 | 11.66 | 0.00 | 0.0 | 0 | 10,609 | 91.8 | 1,064 | – | 100.0 | – | – |
 | B1 rule-based | 83,570 | 83,570 | 10.91 | 0.00 | 0.0 | 0 | 9,878 | 99.4 | 1,057 | – | 100.0 | – | – |
@@ -211,7 +211,7 @@ Real: NASA POWER (PV), Ausgrid (hostel load shape), OpenStreetMap (layout). **PE
 
 ### outage fest — 2023-06-15 (HEADLINE stress test: BESCOM outage 18:00-21:00 during fest evening peak (ASSUMED outage window))
 
-| Method | Rs/day | Rs incl. VOLL | gap to B4 % | crit. downtime h | DG h | DG L | CO2 kg | self-cons. % | peak kW | re-plan s/slot | feasible % | QAOA P(opt) | ADMM conv. % |
+| Design | Rs/day | Rs incl. VOLL | gap to B4 % | crit. downtime h | DG h | DG L | CO2 kg | self-cons. % | peak kW | re-plan s/slot | feasible % | QAOA P(opt) | ADMM conv. % |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | B0 status quo | 111,054 | 1,005,740 | 270.24 | 3.00 | 6.0 | 192 | 13,214 | 93.8 | 2,229 | – | 100.0 | – | – |
 | B1 rule-based | 107,629 | 1,113,279 | 309.82 | 3.00 | 5.2 | 163 | 12,466 | 97.4 | 2,147 | – | 100.0 | – | – |

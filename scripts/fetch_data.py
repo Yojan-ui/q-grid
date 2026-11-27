@@ -48,6 +48,80 @@ def fetch_nasa(year: int) -> Path:
     return out
 
 
+NASA_CS_URL = NASA_URL.replace("ALLSKY_SFC_SW_DWN,T2M", "CLRSKY_SFC_SW_DWN")
+
+
+def fetch_nasa_clearsky(year: int) -> Path:
+    """Clear-sky surface shortwave (NASA POWER CLRSKY_SFC_SW_DWN), used by the v2 solar forecast."""
+    out = RAW / "nasa_power" / f"bengaluru_{year}_hourly_clearsky.json"
+    if out.exists():
+        print(f"[nasa-cs] cached {out.relative_to(ROOT)}")
+        return out
+    url = NASA_CS_URL.format(lat=LAT, lon=LON, y=year)
+    print(f"[nasa-cs] GET {url}")
+    r = requests.get(url, timeout=120, headers={"User-Agent": "qgrid-data-fetch/0.1"})
+    r.raise_for_status()
+    data = r.json()
+    assert "CLRSKY_SFC_SW_DWN" in data["properties"]["parameter"]
+    data["_qgrid_fetch"] = {"url": url, "fetched_utc": dt.datetime.now(dt.UTC).isoformat()}
+    out.write_text(json.dumps(data))
+    print(f"[nasa-cs] saved {out.relative_to(ROOT)}")
+    return out
+
+
+NASA_SITE_URL = (
+    "https://power.larc.nasa.gov/api/temporal/hourly/point"
+    "?parameters=ALLSKY_SFC_SW_DWN,CLRSKY_SFC_SW_DWN,T2M&community=RE&longitude={lon}&latitude={lat}"
+    "&start={y}0101&end={y}1231&format=JSON&time-standard=LST"
+)
+
+
+def fetch_nasa_site(name: str, lat: float, lon: float, year: int) -> Path:
+    """NASA POWER hourly irradiance (all-sky, clear-sky) and temperature for another benchmark site."""
+    out = RAW / "nasa_power" / f"{name}_{year}_hourly.json"
+    if out.exists():
+        print(f"[nasa]    cached {out.relative_to(ROOT)}")
+        return out
+    url = NASA_SITE_URL.format(lat=round(lat, 3), lon=round(lon, 3), y=year)
+    print(f"[nasa]    GET {url}")
+    r = requests.get(url, timeout=180, headers={"User-Agent": "qgrid-data-fetch/0.1"})
+    r.raise_for_status()
+    data = r.json()
+    assert {"ALLSKY_SFC_SW_DWN", "CLRSKY_SFC_SW_DWN", "T2M"} <= set(data["properties"]["parameter"])
+    data["_qgrid_fetch"] = {"url": url, "fetched_utc": dt.datetime.now(dt.UTC).isoformat()}
+    out.write_text(json.dumps(data))
+    return out
+
+
+BENCH_SITES = {   # benchmark v3 datasets: BDG2 university sites (site coordinates from BDG2 metadata) and CU-BEMS (Bangkok)
+    "bdg2_fox": (33.424425, -111.928140, 2017), "bdg2_bull": (30.2672, -97.7431, 2017),
+    "bdg2_cockatoo": (42.459837, -76.485292, 2017), "cubems": (13.7367, 100.5332, 2019),
+}
+
+
+BDG2_FILES = {
+    "LICENSE": "https://raw.githubusercontent.com/buds-lab/building-data-genome-project-2/master/LICENSE",
+    "metadata.csv": "https://media.githubusercontent.com/media/buds-lab/building-data-genome-project-2/master/data/metadata/metadata.csv",
+    "electricity_cleaned.csv": "https://media.githubusercontent.com/media/buds-lab/building-data-genome-project-2/master/data/meters/cleaned/electricity_cleaned.csv",
+}
+
+
+def fetch_bdg2() -> Path:
+    """Building Data Genome Project 2 (CC BY-SA 4.0): education-campus hourly electricity meters, 2016-17."""
+    d = RAW / "bdg2"
+    d.mkdir(parents=True, exist_ok=True)
+    for name, url in BDG2_FILES.items():
+        out = d / name
+        if out.exists() and out.stat().st_size > 1000:
+            print(f"[bdg2]    cached {out.relative_to(ROOT)}")
+            continue
+        print(f"[bdg2]    GET {url}")
+        r = requests.get(url, timeout=1200, headers={"User-Agent": "qgrid-data-fetch/0.1"})
+        r.raise_for_status()
+        out.write_bytes(r.content)
+    return d
+
+
 MANUAL = {
     "ausgrid": dict(
         dir=RAW / "ausgrid",
@@ -124,6 +198,10 @@ def main() -> int:
     ap.add_argument("--year", type=int, default=2023)
     args = ap.parse_args()
     fetch_nasa(args.year)
+    fetch_nasa_clearsky(args.year)
+    fetch_bdg2()
+    for nm, (la, lo, yr) in BENCH_SITES.items():
+        fetch_nasa_site(nm, la, lo, yr)
     ok = all([check_manual(n, args.year) for n in MANUAL])
     if not ok:
         print("Some raw data is missing; complete the manual steps above, then re-run.")

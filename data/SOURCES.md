@@ -8,7 +8,9 @@ Status legend: **REAL** = official/primary data in `data/raw/` and used for resu
 | Dataset | Status | Used for | Raw file(s) |
 |---|---|---|---|
 | NASA POWER hourly (ALLSKY_SFC_SW_DWN, T2M), 12.92N 77.50E, 2023 | **REAL** | PV output, sun position | `data/raw/nasa_power/bengaluru_2023_hourly.json` |
-| Ausgrid Solar Home Electricity Data 2012-13 (half-hourly, 300 homes) | **REAL** | building load shapes | `data/raw/ausgrid/Solar home 2012-2013.csv` (+ archive zip, notes PDF) |
+| NASA POWER hourly clear-sky (CLRSKY_SFC_SW_DWN), same site, 2023 | **REAL** | v2 solar forecast (clear-sky envelope) | `data/raw/nasa_power/bengaluru_2023_hourly_clearsky.json` |
+| Building Data Genome Project 2 (BDG2): hourly electricity meters, 1,578 non-residential buildings, 2016-17 | **REAL** | zone load shapes (7 of 9 zones) | `data/raw/bdg2/electricity_cleaned.csv`, `metadata.csv`, `LICENSE` |
+| Ausgrid Solar Home Electricity Data 2012-13 (half-hourly, 300 homes) | REAL, **superseded by BDG2** (used only if `loads.source: templates`) | hostel load shape (v1) | `data/raw/ausgrid/Solar home 2012-2013.csv` (+ archive zip, notes PDF) |
 | BESCOM HT educational tariff with ToD + KERC solar export rate | **PENDING** | price scenario A (headline) | `data/raw/tariff/` |
 | IEX Day-Ahead Market 15-min MCP, 2023 | **PENDING** | price scenario B | `data/raw/iex/` |
 | CEA CO2 Baseline Database (grid weighted-average emission factor) | **PENDING** | CO2 accounting | `data/raw/cea/` |
@@ -26,7 +28,45 @@ Status legend: **REAL** = official/primary data in `data/raw/` and used for resu
   PV = kWp · G/1000 · (1 + γ(T_cell − 25)) · derate, T_cell = T_air + (NOCT − 20)/800 · G
   (γ = −0.4 %/°C, NOCT 45 °C, derate 0.86 — config.yaml).
 
-## Ausgrid Solar Home Electricity Data — REAL
+## NASA POWER clear-sky — REAL
+- URL: `https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=CLRSKY_SFC_SW_DWN&community=RE&longitude=77.5&latitude=12.92&start=20230101&end=20231231&format=JSON&time-standard=LST`
+- Fetched: 2026-11-22 by `scripts/fetch_data.py` (`fetch_nasa_clearsky`; timestamp inside the JSON under `_qgrid_fetch`).
+- Licence: as NASA POWER above.
+- Use: the v2 rolling-horizon optimiser forecasts PV as clear-sky PV x a clearness index (persistence of the
+  last observed hour, blended towards yesterday's daily clearness for longer lead times). The forecast only
+  uses data up to the decision time; its error against the actual (ALLSKY-based) PV is reported.
+
+## Building Data Genome Project 2 (BDG2) — REAL
+- Paper: Miller, C., Kathirgamanathan, A., Picchetti, B. et al. "The Building Data Genome Project 2, energy meter data
+  from the ASHRAE Great Energy Predictor III competition." *Scientific Data* 7, 368 (2020). Repository
+  `https://github.com/buds-lab/building-data-genome-project-2` (Zenodo record 3887306).
+- Files (Git LFS media URLs, fetched 2026-11-22 by `scripts/fetch_data.py`, `fetch_bdg2`):
+  `data/meters/cleaned/electricity_cleaned.csv` (174,977,911 bytes, SHA-256 b6ffc9b4dfcefe5c753594730a08ae822b0d50fec6815abb8f185591e6c630a3),
+  `data/metadata/metadata.csv` (272,024 bytes, SHA-256 992d0b29f24f96ad4332bc4dbb534b7bdd7dd2689aad093f94e93068ecddca02), `LICENSE`.
+- Licence: **Creative Commons Attribution-ShareAlike 4.0** (`data/raw/bdg2/LICENSE`). Derived zone load profiles in
+  `data/processed/load.parquet` are shared under the same licence; attribution as above.
+- Mapping (config.yaml `bdg2.zones`; buildings kept if >= 90 % of hours present, each normalised by its own mean,
+  median across buildings per hour):
+
+  | Zone | BDG2 primary use / sub use | buildings |
+  |---|---|---:|
+  | academic | Education / College Classroom, Academic, Classroom | 130 |
+  | heavy_labs | Education / College Laboratory, Research | 124 |
+  | hostels | Lodging/residential / Dormitory, Residence Hall | 86 |
+  | library | Public services / Library | 48 |
+  | canteen | Education / Student Union | 11 |
+  | admin | Office / Office | 235 |
+  | health_centre | Healthcare / Hospital, Patient Care | 11 |
+  | server_room | none (no data centre in BDG2): flat profile, ASSUMPTION | – |
+
+- Calendar mapping: each 2023 date takes one real 2016/17 source day — RVCE teaching/exam/fest weekdays -> source
+  term-time weekdays (same weekday), RVCE vacation -> source break weekdays (June-August and 20 Dec - 5 Jan,
+  ASSUMPTION), weekends -> source term-time weekends; seeded per zone and date (`qgrid/bdg2.py`).
+- Limitations: the buildings are in North America and Europe (BDG2 sites), so HVAC base load and climate differ from
+  Bengaluru, and the source "break" months are northern summer. Shapes are real; magnitudes are still floor area x EPI
+  (PENDING RVCE meter data / bills).
+
+## Ausgrid Solar Home Electricity Data — REAL (superseded by BDG2 for loads)
 - Original publisher: Ausgrid (dataset page `https://www.ausgrid.com.au/Industry/Our-Research/Data-to-share/Solar-home-electricity-data`,
   no longer online in 2026; metadata record: `https://data.gov.au/data/en/dataset/nsw-solar-home-electricty-data`).
 - Copy used: archive by Pierre Haessig, `https://pierreh.eu/downloads/Ausgrid_solar_home_data.zip`
@@ -100,3 +140,39 @@ Synthetic inputs appear only in unit tests (`backend/tests/`), labelled SYNTHETI
 Diesel price 90 Rs/L, fuel curve 0.08 L/h per kW rated + 0.25 L/kWh, 2.68 kg CO2/L; VOLL 40 / 1000 Rs/kWh
 (optimisation only); battery capex 25,000 Rs/kWh; semester = 120 days; battery/DG/tank sizes per zone. All in
 `config.yaml`, all labelled ASSUMPTION; none is presented as data.
+
+
+## Benchmark datasets (multi-dataset benchmark, `qgrid/datasets.py`)
+
+| Dataset | Status | Loads | Weather | Licence |
+|---|---|---|---|---|
+| RVCE (case study) | as above | BDG2 shapes x floor area x EPI | NASA POWER 2023 | as above |
+| BDG2 site "Fox" (Arizona), 2017 | **REAL** loads | the site's own metered buildings (>= 90 % complete), grouped into zones | NASA POWER at the BDG2 site coordinates | CC BY-SA 4.0 |
+| BDG2 site "Bull" (Texas), 2017 | **REAL** loads | same | same | CC BY-SA 4.0 |
+| BDG2 site "Cockatoo" (New York), 2017 | **REAL** loads | same | same | CC BY-SA 4.0 |
+| CU-BEMS, Chamchuri 5 office building, Bangkok, 2019 | **REAL** loads | the 7 floors' AC, lighting and plug meters (1-min, summed per floor, hourly means) | NASA POWER at 13.7367 N, 100.5332 E | CC BY 4.0 |
+
+- **BDG2 sites**: same files and licence as the BDG2 entry above; zone groups (academic, labs, dorms, library, offices, other)
+  from `metadata.csv` primary/sub use; site coordinates from `metadata.csv`. Meter spikes clipped at each building's 99.9th
+  percentile.
+- **CU-BEMS**: Pipattanasomporn, M., Chitalia, G., Songsiri, J. et al. "CU-BEMS, smart building electricity consumption and
+  indoor environmental sensor datasets." *Scientific Data* 7, 241 (2020). Files from
+  `https://github.com/SGRUdata/SGRUdata.github.io/tree/master/data` (fetched 2026-11-22):
+  - `2019Floor1.csv.zip` SHA-256 f88d0707a4571598bc1be307cf44b6e13d5bf356b9255ed7742f8a279e272e50
+  - `2019Floor2.csv.zip` SHA-256 f6a40fa250d095fe9cdb17a302b4f81a7e3f4c2bdf709460b06b242c57ab2516
+  - `2019Floor3.csv.zip` SHA-256 a3b10899e070d3a32f3a1e3e8bfc2874eee81d573ddb8031b59801b39064a0c1
+  - `2019Floor4.csv.zip` SHA-256 f8ce104a9f1ed938d90cc2a0b02a72dee895c2c672b66ca896461feab02b0e61
+  - `2019Floor5.csv.zip` SHA-256 310ca9ae005326975e5161b0672cace46fab73c15d828078552af50ffb7be51c
+  - `2019Floor6.csv.zip` SHA-256 ded70a7938030b9bc19a7038ae09cb31d3d8dc18801a054a6a216c483828520d
+  - `2019Floor7.csv.zip` SHA-256 f6fb56ee65bb07d0035f51148b86e0caf8030c96c46cf7c0aa2ec9e38196ce05
+  Licence: Creative Commons Attribution 4.0 (CC BY 4.0) per the dataset record. It is one office building, so its
+  "zones" are floors linked by assumed internal cables.
+- **NASA POWER** (sites): `data/raw/nasa_power/<dataset>_<year>_hourly.json`, parameters ALLSKY_SFC_SW_DWN, CLRSKY_SFC_SW_DWN,
+  T2M, fetched 2026-11-22 by `scripts/fetch_data.py` (`fetch_nasa_site`); licence as NASA POWER above.
+- **ASSUMPTIONS for sites without asset data** (one rule for all, `qgrid/datasets.py`): PV = 30 % of each zone's annual energy,
+  battery = 2 h of mean load (C-rate 0.5), one diesel set at the zone with the largest critical load (50 % of its 99th-percentile
+  load), critical share 10 % (dorms) / 5 % (others), cables in a chain plus two seeded cross-links rated at 25 % of the median
+  zone peak, the stand-in tariff (price scenario A, PENDING) on local clock time.
+- **SYNTHETIC (seeded) events**: unplanned grid outages (20 % of evaluation days, 1–3 h, start 08:00–20:00) and one 3-hour
+  campus network outage per day (06:00–21:00) for the communication-failure methods. Official BESCOM planned-cut schedules are
+  **PENDING**.

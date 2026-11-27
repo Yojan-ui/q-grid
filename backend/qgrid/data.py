@@ -203,7 +203,8 @@ def lab_schedule() -> pd.DataFrame:
 def build_zone_loads(cfg: dict, layout: dict) -> tuple[pd.DataFrame, pd.DataFrame, pd.Series, dict]:
     """Per-zone load and critical load (kW, 15-min, full year) and campus water demand (m3/slot).
     Annual kWh = floor area x EPI (ASSUMPTION, PENDING RVCE bills); shape = timetable template by day type
-    (hostels: real Ausgrid residential shape). If data/raw/rvce_bills.csv exists, totals are scaled to it."""
+    (loads.source = bdg2: real BDG2 education-campus meter shapes per zone, see qgrid/bdg2.py; otherwise templates and the
+    Ausgrid residential shape for hostels). If data/raw/rvce_bills.csv exists, totals are scaled to it."""
     year = cfg["site"]["year"]
     idx = year_index(year)
     prof = load_profiles()
@@ -215,9 +216,15 @@ def build_zone_loads(cfg: dict, layout: dict) -> tuple[pd.DataFrame, pd.DataFram
     loads, crits, info = {}, {}, {}
     sched = lab_schedule()
     dow = np.array(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"])[idx.weekday]
+    from . import bdg2
+    bmap = cfg.get("bdg2", {}).get("zones", {}) if cfg.get("loads", {}).get("source") == "bdg2" else {}
+    use_bdg2 = bool(bmap) and bdg2.available()
     for z, spec in zc.items():
         ptype = spec.get("profile", "flat")
-        if ptype == "hostel":
+        if use_bdg2 and z in bmap:
+            shape, binfo = bdg2.year_shape(z, bmap[z]["primary"], bmap[z]["subs"], idx, dt_slot)
+            ptype = f"bdg2:{bmap[z]['primary']}/{'|'.join(bmap[z]['subs'])} ({binfo['buildings']} buildings)"
+        elif ptype == "hostel":
             if hostel_shape is None:
                 hostel_shape = ausgrid_daily_shape(year).to_numpy()
             mult = np.array([prof["hostel"].get(d, 1.0) for d in dt_slot])
@@ -426,7 +433,10 @@ def build_all(cfg: dict | None = None) -> dict:
     days = pick_scenarios(cfg, pv.sum(axis=1), dtypes)
     meta = {"year": year, "campus": layout["campus"], "osm_sha256": layout["osm_sha256"], "co2": co2,
             "prices": price_status, "days": days, "loads": load_info,
-            "data_status": {"nasa_power": "REAL", "ausgrid_hostel_shape": "REAL", "osm_layout": "REAL",
+            "data_status": {"nasa_power": "REAL", "osm_layout": "REAL",
+                            **({"bdg2_load_shapes": "REAL"} if any(str(v.get("profile", "")).startswith("bdg2:")
+                                                                  for v in load_info["zones"].values() if isinstance(v, dict))
+                               else {"ausgrid_hostel_shape": "REAL"}),
                             "iex": price_status["B"]["status"], "tariff_A": price_status["A"]["status"],
                             "cea": co2["status"], "calendar": cfg["calendar"]["status"],
                             "campus_loads": "PENDING RVCE DATA" if not (RAW / "rvce_bills.csv").exists() else "SCALED TO BILLS",

@@ -17,6 +17,8 @@ dependencies = [
   "qiskit-optimization>=0.6",
   "pulp>=2.8",
   "highspy>=1.7",
+  "osqp>=1.0",
+  "scikit-learn>=1.3",
   "pymoo>=0.6.1",
   "fastapi>=0.110",
   "uvicorn>=0.29",
@@ -32,10 +34,11 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=8", "pytest-timeout>=2.3", "httpx>=0.27"]
 ibm = ["qiskit-ibm-runtime>=0.25"]
+dwave = ["dwave-system>=1.24"]
 
 [tool.setuptools]
 package-dir = { "qgrid" = "backend/qgrid", "baselines" = "baselines" }
-packages = ["qgrid", "qgrid.solvers", "baselines"]
+packages = ["qgrid", "qgrid.solvers", "qgrid.v2", "qgrid.ablation", "baselines"]
 
 [tool.pytest.ini_options]
 testpaths = ["backend/tests"]

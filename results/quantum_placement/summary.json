@@ -1,0 +1,29 @@
+{
+ "instances": 1080,
+ "lp_relaxation_integral_pct": 0.8333333333333334,
+ "cold_root_node_pct": 99.9074074074074,
+ "qaoa_used": 1071,
+ "qaoa_block_qubits_mean": 3.0541549953314657,
+ "qaoa_block_opt_pct": 100.0,
+ "incumbent_optimal_pct_qaoa_instances": 92.43697478991596,
+ "incumbent_optimal_pct_all": 92.5,
+ "nodes_cold_mean": 0.9944444444444445,
+ "nodes_warm_mean": 1.6712962962962963,
+ "time_cold_mean_s": 0.023455927671131103,
+ "time_warm_mean_s": 0.013602473070231672,
+ "time_incumbent_mean_s": 0.01068125663614073,
+ "time_warm_plus_incumbent_mean_s": 0.024283729706372402,
+ "timing_note": "cold and warm each on a fresh HiGHS model (includes model build); run alongside other jobs",
+ "nodes_cold_mean_qaoa_instances": 0.9943977591036415,
+ "nodes_warm_mean_qaoa_instances": 1.676937441643324,
+ "time_cold_mean_qaoa_instances_s": 0.023554838670250926,
+ "time_warm_mean_qaoa_instances_s": 0.013629402154883766,
+ "days": [
+  "2023-01-07",
+  "2023-04-02",
+  "2023-06-26",
+  "2023-09-19",
+  "2023-06-15"
+ ],
+ "label": "QAOA on a local simulator: verified against exact solutions, no quantum advantage claimed"
+}

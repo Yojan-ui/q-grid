@@ -8,7 +8,7 @@ import { RoundedBox } from '@react-three/drei'
 import { Label3D } from './Label3D'
 import gsap from 'gsap'
 import type { LiveSolve, Scenario } from '../lib/data'
-import { C, reducedMotion } from '../lib/theme'
+import { reducedMotion, useC } from '../lib/theme'
 import { pairRule, varLabel, zn } from '../lib/labels'
 import type { StopId } from '../lib/story'
 
@@ -18,12 +18,25 @@ const TW = 10, TH = 5.2, GAP = 1.0, BLOCK = 3
 /** Tile layout grouped by device: battery (charge row over discharge row), one column per cable, then others. */
 export function tileLayout(names: string[]) {
   const blocks: { title: string; cols: string[][] }[] = []
+  if (names.some(v => v.includes('@') || v.includes('#'))) {   // one row per device kind, one tile per hour / slot
+    const kindOf = (v: string) => v.split(/[@#]/)[0]
+    for (const kind of [...new Set(names.map(kindOf))]) {
+      const vs = names.filter(v => kindOf(v) === kind)
+      const h = Math.ceil(vs.length / 2)            // two rows (first half of the hours on top) so 12 hours fit on stage
+      blocks.push({ title: kind, cols: vs.slice(0, h).map((v, k) => [v, vs[k + h]].filter(Boolean) as string[]) })
+    }
+    return place(blocks)
+  }
   const c = names.filter(v => /^c\d$/.test(v)), d = names.filter(v => /^d\d$/.test(v))
   if (c.length) blocks.push({ title: 'battery', cols: c.map((v, k) => [v, d[k]].filter(Boolean) as string[]) })
   const lines = [...new Set(names.filter(v => /^[pn]\d+$/.test(v)).map(v => v.slice(1)))]
   for (const l of lines) blocks.push({ title: `cable ${l}`, cols: [[`p${l}`, `n${l}`].filter(v => names.includes(v))] })
   const rest = names.filter(v => !/^[cdpn]\d+$/.test(v))
   if (rest.length) blocks.push({ title: 'other', cols: rest.map(v => [v]) })
+  return place(blocks)
+}
+
+function place(blocks: { title: string; cols: string[][] }[]) {
   const ncol = blocks.reduce((a, b) => a + b.cols.length, 0)
   const width = ncol * TW + (ncol - blocks.length) * GAP + (blocks.length - 1) * BLOCK
   const pos: Record<string, V3> = {}
@@ -57,6 +70,7 @@ const modeOf = (s: StopId): Mode =>
 export function Lab({ stop, ex, sc, anchor, yaw, buildingH, pulseKey }: {
   stop: StopId; ex: LiveSolve; sc: Scenario; anchor: THREE.Vector3; yaw: number; buildingH: number; pulseKey: number
 }) {
+  const C = useC()
   const n = ex.n_qubits
   const names = ex.var_names
   const { pos: tpos, heads } = useMemo(() => tileLayout(names), [names])
@@ -125,12 +139,12 @@ export function Lab({ stop, ex, sc, anchor, yaw, buildingH, pulseKey }: {
   const mats = useMemo(() => ({
     edgeRule: new THREE.MeshBasicMaterial({ color: C.grid, transparent: true, opacity: 0, depthWrite: false }),
     edgeCost: new THREE.MeshBasicMaterial({ color: C.quantum, transparent: true, opacity: 0, depthWrite: false }),
-    wire: new THREE.MeshBasicMaterial({ color: '#BDBCB5', transparent: true, opacity: 0 }),
+    wire: new THREE.MeshBasicMaterial({ color: C.wire, transparent: true, opacity: 0 }),
     slab: new THREE.MeshStandardMaterial({ color: C.quantum, transparent: true, opacity: 0, roughness: 0.6, depthWrite: false }),
-    gate: new THREE.MeshStandardMaterial({ color: '#FFFFFF', transparent: true, opacity: 0, roughness: 0.6 }),
+    gate: new THREE.MeshStandardMaterial({ color: C.tile, transparent: true, opacity: 0, roughness: 0.6 }),
     meas: new THREE.MeshStandardMaterial({ color: C.text, transparent: true, opacity: 0, roughness: 0.6 }),
     pulse: new THREE.MeshBasicMaterial({ color: C.quantum, transparent: true, opacity: 0, depthWrite: false }),
-  }), [])
+  }), [C])
   const pulse = useRef<THREE.Mesh>(null!)
   const pulseT = useRef(1)
   useEffect(() => { pulseT.current = stop === '4c' ? 0 : 1 }, [stop, pulseKey])
@@ -194,14 +208,15 @@ export function Lab({ stop, ex, sc, anchor, yaw, buildingH, pulseKey }: {
       ))}
       {names.map((v, i) => {
         const on = best[i] === '1'
+        const tileCol = mode === 'decoded' && on ? C.tileOn : C.tile
         return (
           <group key={v} ref={g => { grp.current[i] = g }} position={home} scale={0.02}>
             <group ref={g => { tile.current[i] = g }}>
               <RoundedBox args={[TW, TH, 0.8]} radius={0.45} smoothness={3} castShadow>
-                <meshStandardMaterial color={mode === 'decoded' && on ? '#EEEAFF' : '#FFFFFF'} emissive={mode === 'decoded' && on ? '#EEEAFF' : '#FFFFFF'} emissiveIntensity={0.25} roughness={0.8} />
+                <meshStandardMaterial color={tileCol} emissive={tileCol} emissiveIntensity={0.25} roughness={0.8} />
               </RoundedBox>
               <Label3D show={mode === 'tiles' || (mode === 'decoded' && phase === 'a')} transform distanceFactor={18} position={[0, 0, 0.45]}>
-                <div className={`tile ${labels[i].device} ${mode === 'decoded' ? (on ? 'yes' : 'no') : ''}`}>
+                <div className={`tile ${labels[i].device} ${mode === 'decoded' ? (on ? 'yes' : 'no') : ''}`} data-bg={tileCol}>
                   <span className="q tn">q{i}</span>
                   <span className="t">{labels[i].short}</span>
                   {mode === 'decoded' && <span className="a">{on ? `YES · ${labels[i].yes}` : 'no'}</span>}
@@ -224,8 +239,8 @@ export function Lab({ stop, ex, sc, anchor, yaw, buildingH, pulseKey }: {
       {/* bits of the winning plan (4e) */}
       {names.map((v, i) => (
         <group key={`b${v}`} ref={g => { bit.current[i] = g }} scale={0.001}>
-          <mesh><boxGeometry args={[1.5, 1.5, 1.5]} /><meshStandardMaterial color={best[i] === '1' ? C.quantum : '#FFFFFF'} roughness={0.5} /></mesh>
-          <Label3D show={mode === 'decoded' && phase === 'a'} center zIndexRange={[31, 0]}><span className={`bitch tn ${best[i] === '1' ? 'one' : ''}`}>{best[i]}</span></Label3D>
+          <mesh><boxGeometry args={[1.5, 1.5, 1.5]} /><meshStandardMaterial color={best[i] === '1' ? C.quantum : C.tile} roughness={0.5} /></mesh>
+          <Label3D show={mode === 'decoded' && phase === 'a'} center zIndexRange={[31, 0]}><span className={`bitch tn ${best[i] === '1' ? 'one' : ''}`} data-bg={best[i] === '1' ? C.quantum : C.tile}>{best[i]}</span></Label3D>
         </group>
       ))}
       {/* 4b: interactions */}
@@ -274,7 +289,7 @@ export function Lab({ stop, ex, sc, anchor, yaw, buildingH, pulseKey }: {
               <group ref={g => { bars.current[k] = g }} scale={[1, 0.001, 1]}>
                 <mesh position-y={0.5} castShadow>
                   <boxGeometry args={[2.8, 1, 2.8]} />
-                  <meshStandardMaterial color={isBest ? C.quantum : s.feasible ? '#C9BFFB' : '#E2E1DB'} roughness={0.7} />
+                  <meshStandardMaterial color={isBest ? C.quantum : s.feasible ? C.quantumMid : C.barMuted} roughness={0.7} />
                 </mesh>
               </group>
               <Label3D show={stop === '4d'} position={[0, h + 1.4, 0]} center>
@@ -314,6 +329,13 @@ const ringLabelOffset = (i: number, n: number): V3 => {
   return [Math.cos(a) * 5.2, Math.sin(a) * 3.4, 0]
 }
 function blockTitle(t: string, zone: string, sc: Scenario) {
+  if (t === 'mode') return 'Battery charge/discharge mode'
+  if (t === 'charge' || t === 'discharge') return 'Battery level'
+  if (t === 'st') return 'Diesel start'
+  if (t === 'pump') return 'Borewell pump · hour by hour'
+  if (t === 'dg') return 'Diesel generator · hour by hour'
+  if (t === 'mode') return 'Battery mode · hour by hour'
+  if (t === 'flex') return 'Flexible job · start options'
   if (t === 'battery') return 'Battery · next 45 min'
   if (t.startsWith('cable')) {
     const l = Number(t.split(' ')[1]); const [a, b] = sc.campus.lines[l]

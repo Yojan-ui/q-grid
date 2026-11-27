@@ -2,6 +2,7 @@
 // No extra packages: Node >= 22 (global WebSocket/fetch) and an installed Chrome.
 //   node scripts/capture.mjs --url http://localhost:5173 --out ../docs/media/shots [--sizes 1440x900,1920x1080] [--only 1,4c]
 //   node scripts/capture.mjs --url http://localhost:5173 --out ../docs/media --video 1-4g --seconds 60
+//   --theme light|dark (default: light)   --present (presenter mode: projector sizing, dev controls hidden)
 // Also reports console errors and overlapping on-screen labels for each stop.
 import { spawn } from 'node:child_process'
 import { mkdirSync, writeFileSync, existsSync, rmSync } from 'node:fs'
@@ -10,7 +11,8 @@ import { tmpdir } from 'node:os'
 
 const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i > 0 ? process.argv[i + 1] : d }
 const URL0 = arg('url', 'http://localhost:5173')
-const QS = arg('scenario', '') ? `&scenario=${arg('scenario', '')}` : ''
+const QS = (arg('scenario', '') ? `&scenario=${arg('scenario', '')}` : '') + `&theme=${arg('theme', 'light')}` + (process.argv.includes('--present') ? '&present' : '')
+const TAG = `${arg('theme', 'light')}${process.argv.includes('--present') ? '-present' : ''}`
 const OUT = resolve(arg('out', 'shots'))
 const SIZES = arg('sizes', '1440x900,1920x1080').split(',').map(s => s.split('x').map(Number))
 const ONLY = arg('only', '')
@@ -20,9 +22,9 @@ const CHROME = arg('chrome', [
   'C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe',
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/google-chrome',
 ].find(p => existsSync(p)))
-const STOPS = ['1', '2', '3', '4a', '4b', '4c', '4d', '4e', '4f', '4g', '5', '6', '7a', '7b']
+const STOPS = ['1', '2', '3', '4a', '4b', '4c', '4d', '4e', '4f', '4g', '5', '5b', '6', '6b', '7a', '7b', '7c', '7d', '7e']
 // how long to let each stop's motion play before the screenshot (ms)
-const WAIT = { '1': 9000, '3': 3600, '4c': 4200, '4d': 2600, '4e': 2200, '5': 9000, '6': 12000, '7a': 6000, '7b': 3000 }
+const WAIT = { '1': 9000, '3': 4200, '4c': 4200, '4d': 2600, '4e': 2200, '5': 9000, '6': 12000, '7a': 6000, '7b': 3000 }
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 
 const OVERLAP_JS = `(() => {
@@ -36,9 +38,13 @@ const OVERLAP_JS = `(() => {
     if (ov > 0.15 * Math.min(a.width * a.height, b.width * b.height)) out.push(els[i].s + ' "' + els[i].t + '" x ' + els[j].s + ' "' + els[j].t + '"');
   }
   const panel = document.querySelector('.panel-scroll');
+  // anything in the top bar or pager clipped / overlapping (projector check)
+  const bar = [...document.querySelectorAll('.top > *, .top .right > *, .pager-row > *')].filter(vis).map(e => ({ s: e.className || e.tagName, r: e.getBoundingClientRect() }));
+  const clipped = bar.filter(b => b.r.right > innerWidth + 1 || b.r.left < -1).map(b => 'clipped: ' + b.s);
+  for (let i = 0; i < bar.length; i++) for (let j = i + 1; j < bar.length; j++) { const a = bar[i].r, b = bar[j].r; if (a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1 && !(a.left <= b.left && a.right >= b.right && a.top <= b.top && a.bottom >= b.bottom) && !(b.left <= a.left && b.right >= a.right && b.top <= a.top && b.bottom >= a.bottom)) clipped.push('overlap: ' + bar[i].s + ' x ' + bar[j].s) }
   const stage = document.querySelector('.stage')?.getBoundingClientRect();
   const offStage = stage ? els.filter(e => e.r.left < stage.left - 2 || e.r.right > stage.right + 2 || e.r.top < stage.top - 2).map(e => e.s + ' "' + e.t + '"') : [];
-  return { overlaps: out, panelScrolls: panel ? panel.scrollHeight > panel.clientHeight + 4 : false, offStage };
+  return { overlaps: out, panelScrolls: panel ? panel.scrollHeight > panel.clientHeight + 4 : false, offStage, chrome: clipped };
 })()`
 
 async function main() {
@@ -70,35 +76,35 @@ async function main() {
         while (cur < target) { await key(cdp, 'ArrowRight'); cur++; await sleep(cur === target ? 0 : 350) }
         await sleep(WAIT[s] ?? 2200)
         const shot = await cdp.send('Page.captureScreenshot', { format: 'png' })
-        const f = join(OUT, `${w}x${h}_step${s}.png`)
+        const f = join(OUT, `${TAG}_${w}x${h}_step${s}.png`)
         writeFileSync(f, Buffer.from(shot.data, 'base64'))
         const chk = (await cdp.send('Runtime.evaluate', { expression: OVERLAP_JS, returnByValue: true })).result.value
         report[`${w}x${h} ${s}`] = chk
         if (s === '4e') {   // second frame after the tiles drop back into the building
           await sleep(3200)
-          writeFileSync(join(OUT, `${w}x${h}_step4e-after.png`), Buffer.from((await cdp.send('Page.captureScreenshot', { format: 'png' })).data, 'base64'))
+          writeFileSync(join(OUT, `${TAG}_${w}x${h}_step4e-after.png`), Buffer.from((await cdp.send('Page.captureScreenshot', { format: 'png' })).data, 'base64'))
         }
         if (s === '2') {    // click a building via the chip list to show its devices
           await cdp.send('Runtime.evaluate', { expression: `[...document.querySelectorAll('.chip')].find(b => b.textContent === 'Hostels')?.click()` })
           await sleep(2400)
-          writeFileSync(join(OUT, `${w}x${h}_step2-zone.png`), Buffer.from((await cdp.send('Page.captureScreenshot', { format: 'png' })).data, 'base64'))
+          writeFileSync(join(OUT, `${TAG}_${w}x${h}_step2-zone.png`), Buffer.from((await cdp.send('Page.captureScreenshot', { format: 'png' })).data, 'base64'))
           report[`${w}x${h} 2-zone`] = (await cdp.send('Runtime.evaluate', { expression: OVERLAP_JS, returnByValue: true })).result.value
         }
         if (s === '5') {
           await cdp.send('Runtime.evaluate', { expression: `[...document.querySelectorAll('.card .btn')].find(b => /offline/.test(b.textContent))?.click()` })
           await sleep(2200)
-          writeFileSync(join(OUT, `${w}x${h}_step5-removed.png`), Buffer.from((await cdp.send('Page.captureScreenshot', { format: 'png' })).data, 'base64'))
+          writeFileSync(join(OUT, `${TAG}_${w}x${h}_step5-removed.png`), Buffer.from((await cdp.send('Page.captureScreenshot', { format: 'png' })).data, 'base64'))
         }
       }
       report[`${w}x${h} console errors`] = [...new Set(errs)]
       const fps = (await cdp.send('Runtime.evaluate', { expression: `new Promise(r => { let n = 0; const t0 = performance.now(); const f = () => { n++; performance.now() - t0 < 2000 ? requestAnimationFrame(f) : r(n / 2) }; requestAnimationFrame(f) })`, awaitPromise: true, returnByValue: true })).result.value
       report[`${w}x${h} fps (headless, last stop)`] = fps
     }
-    writeFileSync(join(OUT, VIDEO ? 'record_report.json' : 'shots_report.json'), JSON.stringify(report, null, 1))
+    writeFileSync(join(OUT, VIDEO ? 'record_report.json' : `shots_report_${TAG}.json`), JSON.stringify(report, null, 1))
     for (const [k, v] of Object.entries(report)) {
       if (Array.isArray(v)) { if (v.length) console.log(k, v.slice(0, 5)) ; continue }
       if (typeof v !== 'object') { console.log(k, v); continue }
-      if (v.overlaps?.length || v.panelScrolls || v.offStage?.length) console.log(k, JSON.stringify({ overlaps: v.overlaps.slice(0, 6), panelScrolls: v.panelScrolls, offStage: v.offStage.slice(0, 4) }))
+      if (v.overlaps?.length || v.panelScrolls || v.offStage?.length || v.chrome?.length) console.log(k, JSON.stringify({ overlaps: v.overlaps.slice(0, 6), panelScrolls: v.panelScrolls, offStage: v.offStage.slice(0, 4), chrome: v.chrome }))
     }
     cdp.close()
   } finally {

@@ -99,45 +99,45 @@
     "zones": {
       "academic": {
         "annual_kwh": 5758178,
-        "peak_kw": 1877.5,
+        "peak_kw": 1066.1,
         "floor_m2": 95871,
         "epi_kwh_m2_yr": 60,
-        "profile": "academic"
+        "profile": "bdg2:Education/College Classroom|Academic|Classroom (130 buildings)"
       },
       "heavy_labs": {
         "annual_kwh": 2419282,
-        "peak_kw": 1088.7,
+        "peak_kw": 375.2,
         "floor_m2": 26664,
         "epi_kwh_m2_yr": 90,
-        "profile": "labs"
+        "profile": "bdg2:Education/College Laboratory|Research (124 buildings)"
       },
       "hostels": {
         "annual_kwh": 451349,
-        "peak_kw": 195.8,
+        "peak_kw": 70.8,
         "floor_m2": 10030,
         "epi_kwh_m2_yr": 45,
-        "profile": "hostel"
+        "profile": "bdg2:Lodging/residential/Dormitory|Residence Hall (86 buildings)"
       },
       "library": {
         "annual_kwh": 780477,
-        "peak_kw": 196.4,
+        "peak_kw": 146.4,
         "floor_m2": 11150,
         "epi_kwh_m2_yr": 70,
-        "profile": "library"
+        "profile": "bdg2:Public services/Library (48 buildings)"
       },
       "canteen": {
         "annual_kwh": 773750,
-        "peak_kw": 232.2,
+        "peak_kw": 146.9,
         "floor_m2": 5158,
         "epi_kwh_m2_yr": 150,
-        "profile": "canteen"
+        "profile": "bdg2:Education/Student Union (11 buildings)"
       },
       "admin": {
         "annual_kwh": 452731,
-        "peak_kw": 145.5,
+        "peak_kw": 80.1,
         "floor_m2": 5659,
         "epi_kwh_m2_yr": 80,
-        "profile": "office"
+        "profile": "bdg2:Office/Office (235 buildings)"
       },
       "server_room": {
         "annual_kwh": 1547376,
@@ -148,10 +148,10 @@
       },
       "health_centre": {
         "annual_kwh": 105975,
-        "peak_kw": 15.5,
+        "peak_kw": 16.8,
         "floor_m2": 706,
         "epi_kwh_m2_yr": 150,
-        "profile": "health"
+        "profile": "bdg2:Healthcare/Hospital|Patient Care (11 buildings)"
       },
       "pumping_station": {
         "annual_kwh": 0,
@@ -172,8 +172,8 @@
   },
   "data_status": {
     "nasa_power": "REAL",
-    "ausgrid_hostel_shape": "REAL",
     "osm_layout": "REAL",
+    "bdg2_load_shapes": "REAL",
     "iex": "PENDING",
     "tariff_A": "PENDING",
     "cea": "PENDING",

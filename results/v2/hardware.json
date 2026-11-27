@@ -1,0 +1,491 @@
+{
+ "label": "Hardware results are noisy and experimental; QAOA verified against exact search; no quantum advantage claimed.",
+ "ibm": {
+  "platform": "IBM Quantum vs Qiskit Aer vs exact",
+  "status": "skipped: no token (QGRID_IBM_TOKEN not set)",
+  "rows": [
+   {
+    "instance": "academic@t0=72",
+    "block": [
+     [
+      "mode",
+      "18"
+     ],
+     [
+      "mode",
+      "19"
+     ],
+     [
+      "mode",
+      "20"
+     ],
+     [
+      "mode",
+      "21"
+     ],
+     [
+      "mode",
+      "22"
+     ],
+     [
+      "mode",
+      "23"
+     ],
+     [
+      "mode",
+      "24"
+     ],
+     [
+      "mode",
+      "25"
+     ],
+     [
+      "mode",
+      "26"
+     ],
+     [
+      "mode",
+      "27"
+     ],
+     [
+      "mode",
+      "28"
+     ],
+     [
+      "mode",
+      "29"
+     ]
+    ],
+    "n_qubits": 12,
+    "J_exact": 199033.1936,
+    "aer_best_J": 199033.1936,
+    "aer_found_opt": true,
+    "aer_p_opt": 0.43359375,
+    "ibm": "skipped: no token (QGRID_IBM_TOKEN not set)"
+   },
+   {
+    "instance": "academic@t0=72",
+    "block": [
+     [
+      "mode",
+      "30"
+     ],
+     [
+      "mode",
+      "31"
+     ],
+     [
+      "mode",
+      "32"
+     ],
+     [
+      "mode",
+      "33"
+     ],
+     [
+      "mode",
+      "34"
+     ],
+     [
+      "mode",
+      "35"
+     ],
+     [
+      "mode",
+      "36"
+     ],
+     [
+      "mode",
+      "37"
+     ],
+     [
+      "mode",
+      "38"
+     ],
+     [
+      "mode",
+      "39"
+     ],
+     [
+      "mode",
+      "40"
+     ],
+     [
+      "mode",
+      "41"
+     ]
+    ],
+    "n_qubits": 12,
+    "J_exact": 199032.2677,
+    "aer_best_J": 199032.2677,
+    "aer_found_opt": true,
+    "aer_p_opt": 0.765625,
+    "ibm": "skipped: no token (QGRID_IBM_TOKEN not set)"
+   },
+   {
+    "instance": "heavy_labs@t0=72",
+    "block": [
+     [
+      "mode",
+      "18"
+     ],
+     [
+      "mode",
+      "19"
+     ],
+     [
+      "mode",
+      "20"
+     ],
+     [
+      "mode",
+      "21"
+     ],
+     [
+      "mode",
+      "22"
+     ],
+     [
+      "mode",
+      "23"
+     ],
+     [
+      "mode",
+      "24"
+     ],
+     [
+      "mode",
+      "25"
+     ],
+     [
+      "mode",
+      "26"
+     ],
+     [
+      "mode",
+      "27"
+     ],
+     [
+      "mode",
+      "28"
+     ],
+     [
+      "mode",
+      "29"
+     ]
+    ],
+    "n_qubits": 12,
+    "J_exact": 61589.7775,
+    "aer_best_J": 61589.7775,
+    "aer_found_opt": true,
+    "aer_p_opt": 0.40625,
+    "ibm": "skipped: no token (QGRID_IBM_TOKEN not set)"
+   },
+   {
+    "instance": "heavy_labs@t0=72",
+    "block": [
+     [
+      "mode",
+      "30"
+     ],
+     [
+      "mode",
+      "31"
+     ],
+     [
+      "mode",
+      "32"
+     ],
+     [
+      "mode",
+      "33"
+     ],
+     [
+      "mode",
+      "34"
+     ],
+     [
+      "mode",
+      "35"
+     ],
+     [
+      "mode",
+      "36"
+     ],
+     [
+      "mode",
+      "37"
+     ],
+     [
+      "mode",
+      "38"
+     ],
+     [
+      "mode",
+      "39"
+     ],
+     [
+      "mode",
+      "40"
+     ],
+     [
+      "mode",
+      "41"
+     ]
+    ],
+    "n_qubits": 12,
+    "J_exact": 60461.7197,
+    "aer_best_J": 60461.7197,
+    "aer_found_opt": true,
+    "aer_p_opt": 0.46875,
+    "ibm": "skipped: no token (QGRID_IBM_TOKEN not set)"
+   },
+   {
+    "instance": "hostels@t0=72",
+    "block": [
+     [
+      "dg",
+      "18"
+     ],
+     [
+      "dg",
+      "19"
+     ],
+     [
+      "dg",
+      "20"
+     ],
+     [
+      "dg",
+      "21"
+     ],
+     [
+      "dg",
+      "22"
+     ],
+     [
+      "dg",
+      "23"
+     ],
+     [
+      "dg",
+      "24"
+     ],
+     [
+      "dg",
+      "25"
+     ],
+     [
+      "dg",
+      "26"
+     ],
+     [
+      "dg",
+      "27"
+     ],
+     [
+      "dg",
+      "28"
+     ],
+     [
+      "dg",
+      "29"
+     ]
+    ],
+    "n_qubits": 12,
+    "J_exact": -60.6496,
+    "aer_best_J": -60.6496,
+    "aer_found_opt": true,
+    "aer_p_opt": 0.2578125,
+    "ibm": "skipped: no token (QGRID_IBM_TOKEN not set)"
+   },
+   {
+    "instance": "hostels@t0=72",
+    "block": [
+     [
+      "dg",
+      "30"
+     ],
+     [
+      "dg",
+      "31"
+     ],
+     [
+      "dg",
+      "32"
+     ],
+     [
+      "dg",
+      "33"
+     ],
+     [
+      "dg",
+      "34"
+     ],
+     [
+      "dg",
+      "35"
+     ],
+     [
+      "dg",
+      "36"
+     ],
+     [
+      "dg",
+      "37"
+     ],
+     [
+      "dg",
+      "38"
+     ],
+     [
+      "dg",
+      "39"
+     ],
+     [
+      "dg",
+      "40"
+     ],
+     [
+      "dg",
+      "41"
+     ]
+    ],
+    "n_qubits": 12,
+    "J_exact": -60.6496,
+    "aer_best_J": -60.6496,
+    "aer_found_opt": true,
+    "aer_p_opt": 0.2734375,
+    "ibm": "skipped: no token (QGRID_IBM_TOKEN not set)"
+   },
+   {
+    "instance": "hostels@t0=72",
+    "block": [
+     [
+      "mode",
+      "18"
+     ],
+     [
+      "mode",
+      "19"
+     ],
+     [
+      "mode",
+      "20"
+     ],
+     [
+      "mode",
+      "21"
+     ],
+     [
+      "mode",
+      "22"
+     ],
+     [
+      "mode",
+      "23"
+     ],
+     [
+      "mode",
+      "24"
+     ],
+     [
+      "mode",
+      "25"
+     ],
+     [
+      "mode",
+      "26"
+     ],
+     [
+      "mode",
+      "27"
+     ],
+     [
+      "mode",
+      "28"
+     ],
+     [
+      "mode",
+      "29"
+     ]
+    ],
+    "n_qubits": 12,
+    "J_exact": -4419.7433,
+    "aer_best_J": -4419.7433,
+    "aer_found_opt": true,
+    "aer_p_opt": 0.14453125,
+    "ibm": "skipped: no token (QGRID_IBM_TOKEN not set)"
+   },
+   {
+    "instance": "hostels@t0=72",
+    "block": [
+     [
+      "mode",
+      "30"
+     ],
+     [
+      "mode",
+      "31"
+     ],
+     [
+      "mode",
+      "32"
+     ],
+     [
+      "mode",
+      "33"
+     ],
+     [
+      "mode",
+      "34"
+     ],
+     [
+      "mode",
+      "35"
+     ],
+     [
+      "mode",
+      "36"
+     ],
+     [
+      "mode",
+      "37"
+     ],
+     [
+      "mode",
+      "38"
+     ],
+     [
+      "mode",
+      "39"
+     ],
+     [
+      "mode",
+      "40"
+     ],
+     [
+      "mode",
+      "41"
+     ]
+    ],
+    "n_qubits": 12,
+    "J_exact": -4423.3847,
+    "aer_best_J": -4423.3847,
+    "aer_found_opt": true,
+    "aer_p_opt": 0.69921875,
+    "ibm": "skipped: no token (QGRID_IBM_TOKEN not set)"
+   }
+  ]
+ },
+ "dwave": {
+  "platform": "D-Wave Leap vs simulated annealing vs exact MILP masters",
+  "n_binaries": 324,
+  "J_exact_milp": 132360.994541362,
+  "sa_best_J": 132444.41768496126,
+  "sa_gap_pct": 0.06302698456470154,
+  "sa_time_s": 0.7449760437011719,
+  "note": "the master separates by building, so the campus QUBO is block-diagonal",
+  "dwave": "skipped: no token (DWAVE_API_TOKEN not set)"
+ }
+}

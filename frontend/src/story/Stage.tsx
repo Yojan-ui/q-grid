@@ -6,7 +6,7 @@ import { RoundedBox } from '@react-three/drei'
 import { Label3D } from './Label3D'
 import gsap from 'gsap'
 import type { Scenario } from '../lib/data'
-import { C, reducedMotion } from '../lib/theme'
+import { reducedMotion, useC } from '../lib/theme'
 import { devices } from '../lib/labels'
 import type { StopId, StoryData } from '../lib/story'
 import { Battery, Campus, Ground, Sun, Tank, useZoneGeo, type LineView, type ZoneGeo } from './Campus'
@@ -42,18 +42,20 @@ export type StageProps = {
   showMiss: boolean
 }
 
-export function Stage(p: StageProps) {
+export default function Stage(p: StageProps) {
+  const C = useC()
   return (
     <Canvas shadows="percentage" flat camera={{ position: [380, 360, 520], fov: 38, near: 2, far: 9000 }} dpr={[1, 1.75]}
       gl={{ antialias: true, preserveDrawingBuffer: true }} onPointerMissed={() => p.stop === '2' && p.onZone(null)}>
       <color attach="background" args={[C.bg]} />
-      <fog attach="fog" args={[C.bg, p.stop === '7b' ? 3200 : 1300, p.stop === '7b' ? 8000 : 3200]} />
+      <fog attach="fog" args={[C.bg, C.fogNear, C.fogFar]} />
       <Scene {...p} />
     </Canvas>
   )
 }
 
 function Scene({ stop, d, t, zone, onZone, killed, admmRound, pulseKey }: StageProps) {
+  const C = useC()
   const { sc, example } = d
   const zones = useZoneGeo(sc)
   const ex = example
@@ -73,31 +75,33 @@ function Scene({ stop, d, t, zone, onZone, killed, admmRound, pulseKey }: StageP
       case '4e': return { pos: add(A, rotY([0, 76, 116])), target: add(A, rotY([0, 40, 0])) }
       case '4f': return { pos: add(A, rotY([50, 90, 180])), target: add(A, [0, 8, 0]) }
       case '4g': return { pos: [380, 600, 820], target: [-60, 0, 0] }
-      case '5': return { pos: [-20, 1120, 170], target: [-20, 0, 0] }
-      case '6': return { pos: [150, 250, 400], target: [-40, 0, 0] }
-      case '7a': return { pos: [0, 760, 1060], target: [0, 0, 60] }
-      case '7b': return { pos: [0, 1450, 1750], target: [0, 0, 60], fov: 36 }
+      case '5': case '5b': return { pos: [-20, 1120, 170], target: [-20, 0, 0] }
+      case '6': case '6b': return { pos: [150, 250, 400], target: [-40, 0, 0] }
+      case '7a': case '7b': case '7c': case '7d': case '7e': return { pos: [300, 440, 620], target: [-20, 0, 0] }
     }
   }, [stop, zone, zones])
 
   // ADMM overlay (step 5): each cable shows both ends' proposals for the chosen round
   const lineViews = useMemo((): LineView[] | null => {
     if (stop !== '5') return null
-    const rounds = sc.admm.iterations[String(d.admmSlot)] ?? []
+    const rounds = d.admmRounds
     const r = rounds[Math.min(admmRound, rounds.length - 1)]
     if (!r) return null
+    // label only the three largest disagreements so the numbers stay readable; colour shows every cable
+    const gaps = sc.campus.lines.map((_, i) => { const [a, b] = r.proposals[String(i)] ?? [0, 0]; return Math.abs(a - b) })
+    const top = new Set(gaps.map((g, i) => [g, i]).filter(([g]) => g >= 1).sort((x, y) => y[0] - x[0]).slice(0, 3).map(([, i]) => i))
     return sc.campus.lines.map((_, i) => {
       const [a, b] = r.proposals[String(i)] ?? [0, 0]
       const ok = Math.abs(a - b) < 1
-      return { color: ok ? C.accent : C.grid, w: ok ? 3.2 : 1.6, label: ok ? undefined : `${Math.round(a)} ≠ ${Math.round(b)}` }
+      return { color: ok ? C.accent : C.grid, ink: ok ? C.accentInk : C.gridInk, w: ok ? 3.2 : 1.6, label: ok || !top.has(i) ? undefined : `${Math.round(a)} ≠ ${Math.round(b)}` }
     })
-  }, [stop, admmRound, d.admmSlot, sc])
+  }, [stop, admmRound, d.admmRounds, sc, C])
 
   // primary campus: splits right for the side-by-side result (7a/7b)
   const primary = useRef<THREE.Group>(null!)
   const secondary = useRef<THREE.Group>(null!)
   useEffect(() => {
-    const duo = stop === '7a'
+    const duo = false
     const D = reducedMotion() ? 0 : 1.0
     gsap.to(primary.current.position, { x: duo ? 235 : 0, duration: D, ease: 'power3.inOut' })
     gsap.to(primary.current.scale, { x: duo ? 0.6 : 1, y: duo ? 0.6 : 1, z: duo ? 0.6 : 1, duration: D, ease: 'power3.inOut' })
@@ -105,6 +109,11 @@ function Scene({ stop, d, t, zone, onZone, killed, admmRound, pulseKey }: StageP
     gsap.to(secondary.current.scale, { x: duo ? 0.6 : 0.001, y: duo ? 0.6 : 0.001, z: duo ? 0.6 : 0.001, duration: D, ease: 'power3.inOut' })
   }, [stop])
 
+  // mount the QAOA lab and the device icons the first time their steps come up, then keep them: unmounting drei
+  // <Html> roots during a React commit races (see Label3D), and they are idle (scaled to zero) off their steps
+  const seen = useRef({ lab: false, dev: false })
+  if (labStops.includes(stop) || stop === '4f') seen.current.lab = true
+  if (stop === '2') seen.current.dev = true
   const slot = Math.min(95, Math.floor(t))
   const run = stop === '1' ? 'status_quo' : 'qgrid'
   const inLab = labStops.includes(stop)
@@ -121,24 +130,25 @@ function Scene({ stop, d, t, zone, onZone, killed, admmRound, pulseKey }: StageP
       <Ground sc={sc} outline={stop !== '7a'} />
       <group ref={primary}>
         <Campus sc={sc} t={t} run={run} zones={zones} flows={flows} lift={lift} liftStagger={stop === '2' ? 0.07 : 0}
-          focus={focus} dimOthers={dim} killed={stop === '5' ? killed : null} labels={(stop === '2' && !zone) || stop === '5' ? 'names' : 'none'}
+          focus={focus} dimOthers={dim} killed={stop === '5' ? killed : null} labels={stop === '2' && !zone ? 'names' : 'none'}
           lineViews={lineViews} onZone={onZone} interactive={stop === '2'} storage={stop !== '5'}
           subLabel={stop !== '7a' && stop !== '7b' && stop !== '4g'} batteryScale={stop === '6' ? 1.7 : 1} socLabels={stop === '6'} />
-        {zones.map(z => <DeviceIcons key={z.name} sc={sc} z={z} slot={slot} show={stop === '2' && zone === z.name} />)}
-        <Label3D show={stop === '7a'} position={[0, 90, -300]} center><div className="duotag q">With Q-Grid</div></Label3D>
-        <Label3D show={stop === '7b'} position={[0, 70, 0]} center><div className="duotag q">RVCE · {sc.campus.zones.length} zones</div></Label3D>
+        {seen.current.dev && zones.map(z => <DeviceIcons key={z.name} sc={sc} z={z} slot={slot} show={stop === '2' && zone === z.name} />)}
+        
+        
       </group>
       <group ref={secondary} scale={0.001}>
         <Campus sc={sc} t={t} run="status_quo" zones={zones} flows={stop === '7a' ? 'both' : 'none'} subLabel={false} />
-        <Label3D show={stop === '7a'} position={[0, 90, -300]} center><div className="duotag">Status quo</div></Label3D>
+        
       </group>
-      <Lab stop={stop} ex={ex} sc={sc} anchor={new THREE.Vector3(...A)} yaw={YAW} buildingH={exZone.h} pulseKey={pulseKey} />
+      {/* the QAOA lab (tiles, circuit, histogram) is created when its steps first come up (lazy per step) */}
+      {seen.current.lab && <Lab stop={stop} ex={ex} sc={sc} anchor={new THREE.Vector3(...A)} yaw={YAW} buildingH={exZone.h} pulseKey={pulseKey} />}
       <Label3D show={stop === '4f'} position={[A[0], exZone.h + 22, A[2]]} center>
         <div className={`verifytag ${ex.qaoa.best_bits === ex.exact.bits ? 'ok' : 'gap'}`}>
           {ex.qaoa.best_bits === ex.exact.bits ? '✓ QAOA plan = exact optimum' : '≠ exact optimum → fallback tier'}
         </div>
       </Label3D>
-      <Cluster zones={zones} show={stop === '7b'} />
+      
     </>
   )
 }
@@ -146,6 +156,7 @@ function Scene({ stop, d, t, zone, onZone, killed, admmRound, pulseKey }: StageP
 /** Step 2: the selected zone's devices as small 3D icons above the building (from the campus model). */
 function DeviceIcons({ sc, z, slot, show }: { sc: Scenario; z: ZoneGeo; slot: number; show: boolean }) {
   const zi = sc.campus.zones.findIndex(q => q.name === z.name)
+  const C = useC()
   const zone = sc.campus.zones[zi]
   // one 3D icon per device type; the panel lists each flexible load with its power and run length
   const all = devices(zone, sc), flex = all.filter(x => x.key === 'flex')
@@ -172,8 +183,8 @@ function DeviceIcons({ sc, z, slot, show }: { sc: Scenario; z: ZoneGeo; slot: nu
           {dv.key === 'battery' && <group position-y={-3}><Battery soc={soc} scale={0.6} /></group>}
           {dv.key === 'dg' && <mesh><boxGeometry args={[7, 4.5, 4]} /><meshStandardMaterial color={C.diesel} roughness={0.9} /></mesh>}
           {dv.key === 'tank' && <group position-y={-4} scale={0.5}><Tank level={(tank ?? 0) / Math.max(zone.tank_m3, 1)} /></group>}
-          {dv.key === 'critical' && <RoundedBox args={[5, 5, 5]} radius={0.6}><meshStandardMaterial color="#FFFFFF" emissive={C.grid} emissiveIntensity={0.12} roughness={0.7} /></RoundedBox>}
-          {dv.key === 'flex' && <RoundedBox args={[6, 3.6, 4]} radius={0.5}><meshStandardMaterial color="#FFFFFF" roughness={0.7} /></RoundedBox>}
+          {dv.key === 'critical' && <RoundedBox args={[5, 5, 5]} radius={0.6}><meshStandardMaterial color={C.critical} emissive={C.grid} emissiveIntensity={0.12} roughness={0.7} /></RoundedBox>}
+          {dv.key === 'flex' && <RoundedBox args={[6, 3.6, 4]} radius={0.5}><meshStandardMaterial color={C.tile} roughness={0.7} /></RoundedBox>}
           <Label3D show={show} position={[0, 8, 0]} center>
             <div className="devlabel">{dv.label}</div>
           </Label3D>
@@ -183,35 +194,3 @@ function DeviceIcons({ sc, z, slot, show }: { sc: Scenario; z: ZoneGeo; slot: nu
   )
 }
 
-/** Step 7b (illustration only, not a result): the same per-zone pattern repeated across a cluster of campuses. */
-function Cluster({ zones, show }: { zones: ZoneGeo[]; show: boolean }) {
-  const spots: V3[] = [[-760, 0, -330], [760, 0, -330], [-760, 0, 420], [760, 0, 420], [0, 0, -760]]
-  const ref = useRef<THREE.Group>(null!)
-  useEffect(() => {
-    gsap.killTweensOf(ref.current.scale)
-    const s = show ? 1 : 0.001
-    gsap.to(ref.current.scale, { x: s, y: s, z: s, duration: reducedMotion() ? 0 : show ? 1.2 : 0.4, ease: 'power3.out', delay: reducedMotion() || !show ? 0 : 0.5 })
-  }, [show])
-  const mat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#E9E8E2', roughness: 1 }), [])
-  return (
-    <group ref={ref} scale={0.001}>
-      {spots.map((s, i) => (
-        <group key={i} position={s} scale={0.55} rotation-y={i * 1.1}>
-          {zones.map(z => z.geo && <mesh key={z.name} geometry={z.geo} material={mat} castShadow />)}
-        </group>
-      ))}
-      {spots.map((s, i) => {
-        const a = new THREE.Vector3(...s), b = new THREE.Vector3(-385, 0, 40)
-        const dd = new THREE.Vector3().subVectors(b, a)
-        return (
-          <mesh key={`f${i}`} position={a.clone().add(b).multiplyScalar(0.5).setY(1)} rotation={[-Math.PI / 2, 0, Math.atan2(-dd.z, dd.x)]} scale={[dd.length(), 9, 1]}>
-            <planeGeometry /><meshBasicMaterial color={C.faint} transparent opacity={0.55} />
-          </mesh>
-        )
-      })}
-      <Label3D show={show} position={[0, 160, -1050]} center><div className="duotag ill">Illustration — not a result</div></Label3D>
-      <Label3D show={show} position={[0, 110, -760]} center><div className="duotag">another campus</div></Label3D>
-      <Label3D show={show} position={[-560, 30, 230]} center><div className="duotag">city feeder</div></Label3D>
-    </group>
-  )
-}

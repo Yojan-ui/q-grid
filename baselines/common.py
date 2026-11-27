@@ -33,6 +33,7 @@ def simulate_building(b: Building, i: int, day: DayData, p_cmd: np.ndarray, star
         r = demand + p - day.pv[i, t] - dg_kw[t]
         cost += slot_cost(r, day.obj_imp[t], day.price_exp[t], bool(day.grid[t]),
                           np.maximum(demand - day.crit[i, t], 0), day.voll_nc, day.voll_c)
+        cost += getattr(day, "wear", 0.0) * np.abs(p) * DT          # battery wear (0 unless priced)
     if bat.present:
         cost += day.term_value * (bat.e0 - e)
     return cost, p_app

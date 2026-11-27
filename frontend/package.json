@@ -7,13 +7,16 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:contrast": "node scripts/check-contrast.mjs --sizes 1440x900,1280x720",
+    "capture": "node scripts/capture.mjs",
+    "build:static": "VITE_QGRID_OFFLINE=1 tsc -b && VITE_QGRID_OFFLINE=1 vite build",
+    "preview:static": "npm run build:static && vite preview --port 4173"
   },
   "dependencies": {
     "@fontsource/inter": "^5.3.0",
     "@react-three/drei": "^10.7.9",
     "@react-three/fiber": "^9.8.2",
-    "@types/katex": "^0.16.8",
     "framer-motion": "^14.14.0",
     "gsap": "^3.15.1",
     "katex": "^0.19.1",
@@ -23,6 +26,7 @@
     "three": "^0.187.0"
   },
   "devDependencies": {
+    "@types/katex": "^0.16.8",
     "@types/node": "^24.19.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",

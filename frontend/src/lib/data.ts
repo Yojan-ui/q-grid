@@ -17,10 +17,12 @@ export type Scenario = {
   campus: { name: string; credit: string; outline: [number, number][] | null; zones: Zone[]; lines: [string, string][]; line_step_kw: number }
   slots: { t: string[]; sun: { elevation_deg: number[]; azimuth_deg: number[] }; pv_kw: number[][]; load_kw: number[][];
     crit_kw: number[][]; price_import: number[]; price_export: number[]; grid_up: number[]; co2_kg_per_kwh: number }
-  runs: { qgrid: Run; status_quo?: Run }; replay_matches_benchmark: boolean
+  runs: { qgrid: Run; status_quo?: Run; qgrid_v2?: Run }; replay_matches_benchmark: boolean
   admm: { iterations: Record<string, { k: number; r_primal: number; r_dual: number; agreed: boolean; proposals: Record<string, number[]> }[]>; summary: Record<string, any>; lines: [string, string][] }
   explanations: Record<string, Record<string, string[]>>; qaoa_file: string; benchmark: Record<string, any>[]
   headline?: any; live_solve?: LiveSolve[]; provenance: Provenance
+  v2?: V2Data
+  qgrid_story?: QStory
   problem?: { rs_lost: number; reusable_kwh: number; co2_kg: number; dg_hours: number; cost_rs: number; critical_downtime_h: number; definition: string } | null
 }
 export type LiveSolve = { zone: string; slot: number; time: string; n_qubits: number; var_names: string[]; qubo_matrix: number[][];
@@ -83,3 +85,76 @@ export async function post<T>(path: string, body: any): Promise<T> {
   return r.json()
 }
 export const fmt = (v: number, d = 0) => (v ?? 0).toLocaleString('en-IN', { maximumFractionDigits: d, minimumFractionDigits: d })
+
+// ---- optimiser v2 (results/v2, scripts/run_benchmark_v2.py)
+export type V2Row = Record<string, any> & { method: string }
+export type BendersIter = { k: number; UB: number; best_UB: number; LB: number; gap_pct: number; admm_iters: number;
+  admm_converged: boolean; admm_r: number[]; cuts_per_building: number }
+export type Commitment = { dg: Record<string, number>; mode: Record<string, number>; pump: Record<string, number>; flex: Record<string, number> }
+export type V2Example = {
+  slot: number; time: string; benders: BendersIter[]; binaries: Record<string, number>; first_hour: number; note: string
+  block: LiveSolve & { kind: string; hours: number[] }
+  commitment: Record<string, Commitment>
+  admm_rounds: { k: number; r_primal: number; agreed: boolean; proposals: Record<string, number[]> }[]
+}
+export type V2Data = { rows: V2Row[]; summary: (V2Row & { day_set: string; n_days: number })[]; tariff_status: string
+  demand_rs_per_kva_month: number; days_per_month: number; power_factor: number; label: string
+  replay_matches_benchmark?: boolean; example?: V2Example }
+
+// ---- benchmark v3 (results/bench_v3, scripts/run_bench_v3.py + scripts/write_bench_v3.py)
+export type BenchStat = { mean: number; std: number; ci_lo: number; ci_hi: number; n: number }
+export type BenchMethod = { key: string; name: string; group: string; without_coordinator: boolean }
+export type BenchMetric = { key: string; label: string; group: string; better: 'lower' | 'higher'; unit: string; digits: number }
+export type Bench = {
+  tariff_status: string
+  methods: BenchMethod[]
+  reference: BenchMethod
+  metrics: BenchMetric[]
+  datasets: { key: string; label: string; n_days: number }[]
+  table: Record<string, Record<string, Record<string, BenchStat>>>          // dataset -> method -> metric
+  wilcoxon: Record<string, Record<string, Record<string, number | null>>>   // dataset -> method -> metric -> p vs Q-Grid
+  comms_day: { dataset: string; day: string; window: [number, number]; t: string[]; series: Record<string, number[]>; totals: Record<string, number> } | null
+  headline: { text: string; detail: string; story?: { dataset: string; n_days: number; tariff_pending: boolean
+    step1: { text: string; tariff_dependent: boolean }; step7: { text: string; comms: string; tariff_dependent: boolean }; numbers: Record<string, number | null> } }
+  design_choices: { key: string; name: string; what_changed: string; gap_pct: number | null; certified_gap_pct: number | null; critical_downtime_h: number | null; runtime_per_decision_s: number | null; source: string }[]
+}
+
+// ---- current Q-Grid worked example (headline day), written by scripts/make_replay.py (qgrid_story)
+export type QStory = {
+  slot: number; time: string; binaries: Record<string, number>
+  block: (LiveSolve & { kind: string; zone_label?: string }) | null
+  block_note: string
+  placement: Record<string, any>
+  admm_rounds: { k: number; r_primal: number; agreed: boolean; proposals: Record<string, number[]> }[]
+  outer: { round: number; admm_iters: number; admm_converged: boolean; buildings_changed_commitment: number | null; plan_cost_rs: number }[]
+  config: string
+}
+
+// ---- live demo moments (results/replay/live.json from scripts/make_live.py; live: /live/* on the backend)
+export type RemoveResult = { label: string; scenario: string; slot: number; time: string; zone: string; grid_up_now: boolean; lines_dark: number[]
+  before: { time_s: number; admm_rounds: number; converged: boolean; buildings: { cost_rs: number; crit_shed_kwh: number; shed_kwh: number }[] }
+  after: { time_s: number; admm_rounds: number; converged: boolean; buildings: { cost_rs: number; crit_shed_kwh: number; shed_kwh: number }[] }
+  others: { cost_before_rs: number; cost_after_rs: number; crit_shed_before_kwh: number; crit_shed_after_kwh: number; n: number }; compute_s: number }
+export type QaoaResult = { label: string; zone: string; time: string; n_qubits: number; var_names: string[]; seed: number; shots_total: number; backend: string
+  exact: { bits: string; objective: number; time_s: number }
+  qaoa: { best_bits: string; best_objective: number; matches_exact: boolean; p_opt: number; time_s: number; shots: { bits: string; count: number; optimal: boolean; objective: number }[] } }
+export type RuleEffectSide = { status: string; cost_rs?: number; objective_rs?: number; dg_hours?: number; dg_litres?: number; critical_downtime_h?: number; critical_unserved_kwh?: number; shed_noncritical_kwh?: number }
+export type RuleResult = { text: string; results: { ok: boolean; reason: string; rule: Record<string, any> | null; parser: string }[]
+  effect: { before: RuleEffectSide; after: RuleEffectSide; label: string } | null; day: string; day_type: string; time_s: number }
+export type LiveFile = { scenario: string; remove: Record<string, RemoveResult>; qaoa: QaoaResult[]; rules: RuleResult[] }
+
+// ---- impact (results/replay/impact.json from scripts/write_impact.py)
+export type Pct = { p5: number; p50: number; p95: number; prob_positive: number }
+export type Impact = {
+  status: string; n_buildings: number; n_days: number; battery_kwh_total: number
+  benefit: { bill_saving_rs_per_day_mean: number; bill_saving_rs_per_day_ci95: [number, number]; extra_throughput_kwh_per_day_mean: number; source: string }
+  central: { hardware_rs: number; om_rs_per_year: number; bill_saving_rs_per_year: number; battery_wear_rs_per_year: number; net_rs_per_year: number
+    discount_rate: number; npv_gross_rs: number; npv_net_rs: number; payback_gross_years: number | null; payback_net_years: number | null
+    wear_rs_per_kwh_throughput: number; breakeven_wear_rs_per_kwh: number | null }
+  monte_carlo: { samples: number; seed: number; npv_gross_rs: Pct; npv_net_rs: Pct; payback_gross_years: { p5: number; p50: number; p95: number } }
+  per_building: { zone: string; battery_kwh: number; hardware_rs: [number, number]; battery_value_rs: [number, number] }[]
+  assumptions: { name: string; value: [number, number] | null; unit: string; source: string }[]
+  scale: { stage: string; what: string; evidence: string; datasets?: { dataset: string; label: string; gap_pct: number; saving_pct: number; runtime_per_decision_s: number; messages_per_decision: number }[] }[]
+  variant: null | { name: string; wear_rs_per_kwh_in_objective: number; n_days: number; bill_saving_rs_per_day_mean: number; extra_throughput_kwh_per_day_mean: number
+    critical_downtime_h: number; net_rs_per_year: number; npv_net_rs: number; payback_net_years: number | null; mc_npv_net_rs: Pct; source: string }
+}

@@ -149,6 +149,55 @@ def rules_parse(req: RuleReq):
     return {"results": res, "effect": effect}
 
 
+# ---------------------------------------------------------------- live demo moments (each one decision, < 5 s)
+def _yd():
+    if "yd" not in _STATE:
+        from .v2.horizon import YearData
+        campus, proc = _ctx()
+        _STATE["yd"] = YearData(campus, proc, "A", forecast=False)
+    return _STATE["yd"]
+
+
+class RemoveReq(BaseModel):
+    scenario: str = "outage_fest"
+    zone: str = "heavy_labs"
+    slot: int | None = None
+
+
+@app.post("/live/remove")
+def live_remove(req: RemoveReq):
+    """Take a building offline for one decision of the current design; neighbours re-agree without its cables."""
+    from .live import remove_building
+    campus, _ = _ctx()
+    key = (req.scenario, req.slot)
+    base = _STATE.setdefault("remove_base", {}).get(key)
+    with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
+        out = remove_building(campus, _yd(), req.scenario, req.zone, req.slot, baseline=base)
+    _STATE["remove_base"][key] = out["before"]
+    return out
+
+
+class QaoaReq(BaseModel):
+    scenario: str = "outage_fest"
+    seed: int = 1234
+    shots: int = 256
+
+
+@app.post("/live/qaoa")
+def live_qaoa(req: QaoaReq):
+    """Re-measure the worked example's QUBO block with QAOA (simulator) and check it against exact search."""
+    from .live import qaoa_block
+    return qaoa_block(req.scenario, seed=req.seed, shots=min(max(req.shots, 64), 2048))
+
+
+@app.post("/live/rule")
+def live_rule(req: RuleReq):
+    """Parse and validate a faculty rule, then price it: best possible plan with vs without it (exact MILP)."""
+    from .live import rule_effect
+    campus, _ = _ctx()
+    return rule_effect(campus, _day(req.scenario), req.text)
+
+
 @app.websocket("/live")
 async def live(ws: WebSocket):
     """Streams one ADMM (exact local solver for speed) slot result per message for the requested scenario."""

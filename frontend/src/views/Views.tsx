@@ -7,7 +7,7 @@ import { Sandbox } from '../panels/Sandbox'
 import { getJSON } from '../lib/data'
 
 const SOURCE_LABEL: Record<string, string> = {
-  nasa_power: 'NASA POWER irradiance', ausgrid_hostel_shape: 'Ausgrid household shapes (hostels)', osm_layout: 'OpenStreetMap layout',
+  nasa_power: 'NASA POWER irradiance', ausgrid_hostel_shape: 'Ausgrid household shapes (hostels)', bdg2_load_shapes: 'BDG2 education-building meters (load shapes)', osm_layout: 'OpenStreetMap layout',
   iex: 'IEX day-ahead prices', tariff_A: 'KERC / BESCOM tariff', cea: 'CEA CO₂ factor', calendar: 'RVCE academic calendar',
   campus_loads: 'Campus meter data', lab_schedule: 'Lab schedule',
 }
@@ -44,6 +44,11 @@ export function VerifyView({ d, idx, online }: { d: StoryData; idx: Index; onlin
           <div className="seg">{['A', 'B'].map(p => <button key={p} className={price === p ? 'on' : ''} onClick={() => setPrice(p)}>Prices {p}</button>)}</div></div>
         <MetricsTable sc={d.sc} price={price} />
       </section>
+      {d.bench && d.bench.design_choices.length > 0 && <section className="card">
+        <h3>Design choices (ablation)</h3>
+        <p className="muted small">How each change to the design moved the gap to the best possible plan. Q-Grid uses the combination with the smallest gap that works without a central controller.</p>
+        <DesignTable rows={d.bench.design_choices} />
+      </section>}
       <section className="card">
         <h3>Solve a slot live</h3>
         <p className="muted small">Pick a zone and slot: the QUBO, QAOA’s best-of-256 plan, and the exact optimum. With <code>?live</code> and a running backend, it re-solves on the server.</p>
@@ -58,6 +63,19 @@ export function VerifyView({ d, idx, online }: { d: StoryData; idx: Index; onlin
         </tbody></table>
       </section>
     </main>
+  )
+}
+
+function DesignTable({ rows }: { rows: NonNullable<StoryData['bench']>['design_choices'] }) {
+  const f = (x: number | null | undefined, d = 2) => (x === null || x === undefined || Number.isNaN(x) ? '–' : x.toFixed(d))
+  const sorted = [...rows].sort((a, b) => (a.gap_pct ?? 1e9) - (b.gap_pct ?? 1e9))
+  return (
+    <div className="tablewrap"><table className="tbl">
+      <thead><tr><th>Design</th><th>Where measured</th><th>Gap %</th><th>Certified gap %</th><th>Critical downtime h</th><th>Time per decision s</th></tr></thead>
+      <tbody>{sorted.map(r => (
+        <tr key={r.key}><td>{r.name}</td><td className="muted small">{r.what_changed}</td><td className="tn">{f(r.gap_pct)}</td>
+          <td className="tn">{f(r.certified_gap_pct)}</td><td className="tn">{f(r.critical_downtime_h)}</td><td className="tn">{f(r.runtime_per_decision_s)}</td></tr>))}</tbody>
+    </table></div>
   )
 }
 

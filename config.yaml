@@ -106,6 +106,20 @@ campus:
       tank: {capacity_m3: 300, level0_frac: 0.6, min_frac: 0.15, max_frac: 0.98,
              pump_kw: 30, pump_m3_per_slot: 8.0, daily_demand_m3: 320}   # ASSUMPTIONS
 
+loads:
+  source: bdg2              # bdg2 (real meter shapes, data/raw/bdg2) | templates (configs/profiles.yaml + Ausgrid hostels)
+
+bdg2:                       # zone -> BDG2 primary / sub use (metadata.csv); zones not listed keep their profile
+  zones:
+    academic:      {primary: Education, subs: [College Classroom, Academic, Classroom]}
+    heavy_labs:    {primary: Education, subs: [College Laboratory, Research]}
+    hostels:       {primary: Lodging/residential, subs: [Dormitory, Residence Hall]}
+    library:       {primary: Public services, subs: [Library]}
+    canteen:       {primary: Education, subs: [Student Union]}
+    admin:         {primary: Office, subs: [Office]}
+    health_centre: {primary: Healthcare, subs: [Hospital, Patient Care]}
+  # server_room keeps a flat profile (no data-centre building in BDG2: ASSUMPTION); pumping_station has no own load
+
 pv_model: {noct_c: 45.0, gamma_per_c: -0.004, system_derate: 0.86}
 
 battery_defaults: {soc_min: 0.20, soc_max: 0.95, soc0: 0.50, eta_ch: 0.95, eta_dis: 0.95}
@@ -122,7 +136,29 @@ outage_costs:                 # ASSUMPTIONS: value of lost load used only inside
 
 economics:                    # ASSUMPTIONS for payback / per-semester figures
   battery_capex_rs_per_kwh: 25000
+  battery_cycle_life: 4000      # ASSUMPTION: full cycles to end of life (LFP datasheet class), for degradation cost
+  discount_rate: 0.08           # ASSUMPTION: for the 10-year NPV of savings
   semester_days: 120
+
+battery_wear:                 # battery wear priced in every optimiser's objective and in the scored objective
+  in_objective: true          # Rs per kWh charged or discharged = economics.battery_capex / (2 x cycle life x DoD)
+  depth_of_discharge: 0.75    # ASSUMPTION (same as the degradation metric)
+
+impact:                       # "Is it worth it?" (scripts/write_impact.py). Every value is an ASSUMPTION unless a source is
+                              # given; [low, high] ranges are sampled uniformly in the Monte Carlo. Vendor quotes are PENDING.
+  status: ASSUMPTION
+  per_building:               # incremental hardware for one building's Q-Grid node (the controller runs on it)
+    edge_controller_rs: [15000, 40000]   # ASSUMPTION: industrial single-board computer / small IPC, quote PENDING
+    energy_meter_rs: [8000, 20000]       # ASSUMPTION: three-phase Modbus meter with CT set, quote PENDING
+    network_rs: [3000, 10000]            # ASSUMPTION: switch / Wi-Fi bridge and cabling, quote PENDING
+    integration_rs: [20000, 60000]       # ASSUMPTION: electrician + commissioning (BMS / battery / DG interfaces), PENDING
+  om_share_per_year: [0.05, 0.15]        # ASSUMPTION: maintenance and software upkeep as a share of hardware cost
+  discount_rate: [0.06, 0.10]            # ASSUMPTION (central value 0.08 = economics.discount_rate)
+  years: 10
+  battery_capex_rs_per_kwh: [15000, 25000]  # ASSUMPTION: LFP pack + inverter share; upper end = economics.battery_capex
+  battery_cycle_life: [3000, 6000]          # ASSUMPTION: LFP datasheet class; central 4000 = economics.battery_cycle_life
+  battery_dod: 0.75                         # ASSUMPTION (same as the benchmark's degradation metric)
+  monte_carlo: {samples: 10000, seed: 2026}
 
 # ----------------------------------------------------------------------------- prices
 prices:
@@ -199,3 +235,26 @@ qaoa:
   warm_start_iters: 6         # COBYLA refinement steps from the zone's previous parameters
 
 rules_dir: rules
+
+# ----------------------------------------------------------------------------- optimiser v2
+tariff_v2:                    # demand charge on the campus peak (one HT connection; kVA = kW / pf)
+  status: PENDING
+  source: "BESCOM HT educational institutions: demand charge Rs/kVA/month on recorded maximum demand (KERC tariff order)"
+  standin_note: "STAND-IN placeholder demand charge, NOT taken from a BESCOM/KERC document"
+  demand_rs_per_kva_month: 350.0
+  power_factor: 0.95          # ASSUMPTION
+  days_per_month: 30          # ASSUMPTION: daily figures carry 1/30 of the monthly charge on the day's peak kVA
+  pages: {}
+
+v2:
+  horizon_slots: 96           # 24 h rolling horizon, re-planned every slot (MPC)
+  block_slots: 4              # one on/off decision per device per hour of the horizon
+  dg_min_off_slots: 4         # ASSUMPTION: 1 h minimum down time (min up time: diesel.min_on_slots per zone)
+  benders: {rel_gap: 0.005, max_iter: 6, master_every_slots: 4, trust_radius0: 3}
+  admm: {rho: 0.02, max_iter: 300, tol_kw: 1.0, tol_rel: 0.001}
+  forecast: {blend_tau_slots: 16}
+  master: {max_block_qubits: 16, sweeps: 2}
+  qaoa: {p: 2, shots: 256, seed: 1234}
+  hardware:                   # optional, needs the team lead's tokens; never runs without explicit opt-in
+    ibm: {env_token: QGRID_IBM_TOKEN, opt_in: QGRID_ALLOW_IBM, n_samples: 8}
+    dwave: {env_token: DWAVE_API_TOKEN, opt_in: QGRID_ALLOW_DWAVE}

@@ -18,11 +18,18 @@ def _solver(time_limit=120):
     return s if s.available() else pulp.PULP_CBC_CMD(msg=False, timeLimit=time_limit, gapRel=MIP_GAP)
 
 
-def solve_milp(campus: Campus, day: DayData, zones: list[int], with_lines: bool, time_limit: int = 120) -> dict:
+def solve_milp(campus: Campus, day: DayData, zones: list[int], with_lines: bool, time_limit: int = 120,
+               demand_charge: dict | None = None, rules: list[dict] | None = None) -> dict:
+    """demand_charge = {rate_day, pf}: adds rate_day * campus peak kVA (v2 tariff) to the objective.
+    rules: compiled operator rules (qgrid.rules.apply_rules -> agent_rules) enforced as hard constraints:
+      dg_forbid   {zone | "*", unless_outage}: diesel off (in grid-up slots only if unless_outage)
+      tank_min_by {zone, level_frac, by_slot}: tank level >= level_frac x capacity at by_slot"""
+    rules = rules or []
     m = pulp.LpProblem("qgrid", pulp.LpMinimize)
     V = pulp.LpVariable
     pi, pe, grid = day.obj_imp, day.price_exp, day.grid
     obj, bal, vars_ = [], {}, {}
+    imps: dict = {}
     for i in zones:
         b = campus.buildings[i]
         bat = b.battery
@@ -38,6 +45,9 @@ def solve_milp(campus: Campus, day: DayData, zones: list[int], with_lines: bool,
                 m += dis[t] <= bat.kw * (1 - md[t])
                 m += e[t + 1] == e[t] + (bat.eta_ch * ch[t] - dis[t] * (1 / bat.eta_dis)) * DT
             obj.append(-day.term_value * (e[T] - bat.e0))
+            wr = getattr(day, "wear", 0.0)
+            if wr > 0:                                       # battery wear per kWh charged or discharged
+                obj.append(wr * DT * pulp.lpSum(ch[t] + dis[t] for t in range(T)))
             zv["ch"], zv["dis"] = ch, dis
         flex_t = [0] * T
         for j in b.flex:
@@ -58,6 +68,9 @@ def solve_milp(campus: Campus, day: DayData, zones: list[int], with_lines: bool,
             pump_t = [tk.pump_kw * w[t] for t in range(T)]
             obj.append(-water_value(campus, day, i) * (lv[T] - tk.level0))
             zv["w"] = w
+            for r in rules:
+                if r["type"] == "tank_min_by" and r["zone"] == campus.names[i]:
+                    m += lv[min(int(r["by_slot"]), T)] >= r["level_frac"] * tk.capacity
         dg_t = [0] * T
         if b.dg:
             g = b.dg
@@ -73,6 +86,11 @@ def solve_milp(campus: Campus, day: DayData, zones: list[int], with_lines: bool,
                 obj.append((g.fuel_a * g.kw * on[t] + g.fuel_b * pg[t]) * DT * (g.price + day.lam * g.co2_per_l))
             dg_t = pg
             zv["dg"] = pg
+            for r in rules:
+                if r["type"] == "dg_forbid" and r["zone"] in ("*", campus.names[i]):
+                    for t in range(T):
+                        if not (r.get("unless_outage") and not grid[t]):
+                            m += on[t] == 0
         for t in range(T):
             demand = float(day.load[i, t]) + flex_t[t] + pump_t[t]
             ex = demand + zv["ch"][t] - zv["dis"][t] - float(day.pv[i, t]) - dg_t[t]
@@ -80,6 +98,7 @@ def solve_milp(campus: Campus, day: DayData, zones: list[int], with_lines: bool,
                 imp, exp = V(f"imp_{i}_{t}", 0), V(f"exp_{i}_{t}", 0)
                 ex = ex - imp + exp
                 obj.append((pi[t] * imp - pe[t] * exp) * DT)
+                imps.setdefault(t, []).append(imp)
             else:
                 snc, sc, sp = V(f"snc_{i}_{t}", 0), V(f"sc_{i}_{t}", 0), V(f"sp_{i}_{t}", 0)
                 m += snc <= demand - float(day.crit[i, t])
@@ -98,6 +117,11 @@ def solve_milp(campus: Campus, day: DayData, zones: list[int], with_lines: bool,
                 bal[(c, t)] = bal[(c, t)] - f
     for k, expr in bal.items():
         m += expr == 0
+    if demand_charge and demand_charge.get("rate_day", 0) > 0:
+        Pk = V("peak_kva", 0)
+        for t, lst in imps.items():
+            m += pulp.lpSum(lst) * (1.0 / demand_charge["pf"]) <= Pk
+        obj.append(demand_charge["rate_day"] * Pk)
     m += pulp.lpSum(obj)
     status = m.solve(_solver(time_limit))
     return {"status": pulp.LpStatus[status], "vars": vars_, "flows": flows, "objective": pulp.value(m.objective)}
