@@ -29,7 +29,8 @@ def solve(campus: Campus, day: DayData, rules=None) -> Schedule:
                 ag.e = float(ag.bat.step(ag.e, p))
             g = 0.0
             if ag.dg is not None:
-                on = safety.dg_decision(ag.dg, (not day.grid[t]) and r + p > 0, ag.dg_run, True)
+                # backup-only DG: the minimum on-time never keeps it running once the grid is back
+                on = (not day.grid[t]) and safety.dg_decision(ag.dg, r + p > 0, ag.dg_run, True)
                 g = float(np.clip(r + p, ag.dg.p_min, ag.dg.kw)) if on else 0.0
                 ag.dg_run = ag.dg_run + 1 if on else 0
             s.p_bat[i, t], s.dg_kw[i, t], s.pump_on[i, t] = p, g, float(pump)
