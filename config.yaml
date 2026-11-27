@@ -302,9 +302,9 @@ tariff_v2:                    # demand charge on the campus peak (one HT connect
 #   TO-2022 (FY2022-23) HT-2(c)(ii), p.412 [38]: 825 paise/unit for the first one lakh units, 865 paise for the balance
 #   (two slabs) -> neither 8.50 nor 7.5-7.9. The ~7.25/7.65 slabs belong to HT-2(c)(i) (government/aided institutions,
 #   hostels of all educational institutions, p.411 [37]), which may be where the "7.5-7.9" figure comes from.
-#   8.50 is kept ONLY for the FY2023-24 order and is unverified until the TO-2023 rate schedule is checked.
-# DEMAND CHARGE FLAG: TO-2022 HT-2(c)(ii) is Rs 265/kVA/month (p.412 [38]), not the brief's Rs 350 (350 is kept for
-#   FY2023-24 as TEAM BRIEF, PENDING).
+#   RESOLVED (lead decision): the brief's 8.50 / Rs 350 are dropped; both orders use the TO-2022 slabs and Rs 265.
+#   The FY2023-24 order carries the TO-2022 values over (status PENDING_CARRIED_OVER) until TO-2023 is obtained.
+# DEMAND CHARGE: TO-2022 HT-2(c)(ii) is Rs 265/kVA/month (p.412 [38]).
 tariff_ht2c:
   status: PENDING            # REAL only if every value below is checked against the PDF with a page number
   category: "HT-2(c)(ii) educational institutions"
@@ -328,13 +328,19 @@ tariff_ht2c:
       status: VERIFIED
     - valid_from: "2023-04-01"
       valid_to: "2024-03-31"
-      energy_rs_kwh: 8.50          # TEAM BRIEF, NOT VERIFIED (see flag above); no slab structure known
-      demand_rs_kva_month: 350     # TEAM BRIEF, NOT VERIFIED
+      # LEAD DECISION: TO-2022 values carried over until the TO-2023 rate schedule is obtained (NOT verified for FY2023-24)
+      energy_rs_kwh: 8.65          # carried over from TO-2022 p.412 (balance-units slab)
+      energy_slabs:                # carried over from TO-2022 p.412 [38]
+        - {upto_kwh: 100000, rs_kwh: 8.25}
+        - {upto_kwh: null, rs_kwh: 8.65}
+      demand_rs_kva_month: 265     # carried over from TO-2022 p.412 [38]
       tod_min_contract_kva: null   # null -> tod.min_contract_kva (500 kVA, TEAM BRIEF)
       source: "KERC Tariff Order 2023 (BESCOM), dated 12.05.2023, HT-2(c)(ii) (rate schedule PDF missing)"
+      values_from: "KERC Tariff Order 2022 (BESCOM), dated 04.04.2022, HT-2(c)(ii), p.412"
+      note: "TO-2022 values carried over until the TO-2023 rate schedule is obtained"
       file: null
       page: null
-      status: PENDING
+      status: PENDING_CARRIED_OVER
   tod:                       # hours are [start, end) local time; offpeak wraps midnight
     months: [12, 1, 2, 3, 4, 5, 6]   # VERIFIED TO-2022 p.412 [38]: Dec-Jun; Jul-Nov (monsoon) 0
     peak_hours: [18, 22]

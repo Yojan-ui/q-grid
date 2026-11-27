@@ -34,6 +34,12 @@ def test_config_interface(cfg):
 def test_order_switch_on_1_april_2023(cfg):
     assert order_for(cfg, "2023-03-31")["valid_from"] == "2022-04-01"      # FY2022-23 (TO-2022)
     assert order_for(cfg, "2023-04-01")["valid_from"] == "2023-04-01"      # FY2023-24 (TO-2023)
+    # identity of the order used, independent of the rates (FY2023-24 currently carries the TO-2022 values over)
+    assert "Tariff Order 2022" in order_for(cfg, "2023-03-31")["source"]
+    assert "Tariff Order 2023" in order_for(cfg, "2023-04-01")["source"]
+    assert order_for(cfg, "2023-03-31")["status"] == "VERIFIED"
+    assert order_for(cfg, "2023-04-01")["status"] == "PENDING_CARRIED_OVER"
+    assert order_for(cfg, "2024-03-31")["valid_from"] == "2023-04-01"
     a = energy_price_slots(cfg, "2023-03-31")
     b = energy_price_slots(cfg, "2023-04-01")
     o22, o23 = order_for(cfg, "2023-03-31"), order_for(cfg, "2023-04-01")

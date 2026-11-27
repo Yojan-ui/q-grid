@@ -19,8 +19,9 @@ values from the pages. Two of the brief's tariff numbers **disagree with the off
 
 The "~7.5-7.9" secondary figure is close to **HT-2(c)(i)** (government/aided institutions and hostels of all
 educational institutions: 725 / 765 paise, p.411 [37]). The FY2023-24 order (KERC TO-2023, dated 12.05.2023) rate
-schedule was **not** obtainable, so FY2023-24 keeps the brief's 8.50 and 350, labelled PENDING. I did not pick between
-8.50 and 7.5-7.9: FY2022-23 uses the verified slabs, FY2023-24 uses the brief value with a flag. Details:
+schedule was **not** obtainable. **Lead decision (applied):** both orders use the TO-2022 values (Rs 265/kVA/month;
+825 / 865 paise slabs); the FY2023-24 order carries them over with `status: PENDING_CARRIED_OVER` and the note "TO-2022
+values carried over until the TO-2023 rate schedule is obtained". The 8.50 flag is resolved. Details:
 `docs/data_verification.md`.
 
 ## Changes
@@ -84,14 +85,15 @@ data-dependent tests (test_v2, test_operate, the dataset test) run too, instead 
   Rs 2,792,831.25; order switch 31 Mar / 1 Apr 2023; ToD Dec-Jun only; no ToD below 500 kVA (FY2023-24) and the
   FY2022-23 no-threshold rule; 85 % floor; excess at 2x; input forms). Pass.
 - `backend/tests/test_campus_rescale.py`: 7 tests. Pass.
-- Full suite: **91 passed, 0 skipped, 0 failed** (with the copied data). Without the data copy (clean worktree)
+- Full suite: **91 passed, 0 skipped, 0 failed** (with the copied data), re-run after the lead's decision to carry the
+  TO-2022 values over to FY2023-24 (the switch test now also checks order source and status). Without the data copy (clean worktree)
   the earlier run had all non-data tests passing and the data tests skipping, as on `real-data`.
 - Not run (per instructions): `scripts/run_bench_v3.py`, `make replay`. results/*.csv are therefore NOT regenerated
   for the new campus or tariff; every headline number must be re-run by the lead after Agent B's settlement change.
 
 ## Open questions for the lead
-1. Energy and demand charges: accept TO-2022's verified 8.25/8.65 slabs and Rs 265 for FY2022-23? For FY2023-24 we need
-   the TO-2023 rate schedule ("Electricity Tariff-2024", KERC, dated 12.05.2023); until then 8.50 / 350 are unverified.
+1. Obtain the KERC TO-2023 rate schedule ("Electricity Tariff-2024", dated 12.05.2023) to confirm the FY2023-24 rates
+   (currently TO-2022 values carried over, `PENDING_CARRIED_OVER`).
 2. Is RVCE billed under HT-2(c)(ii) (private) or HT-2(c)(i) (aided)? Are hostels / staff quarters separately metered
    (HT-2(c)(i) / HT-4)? One BESCOM bill answers this and the contract demand.
 3. Does the 67,721 m² built-up area include the 38,659 m² of hostels? (`campus.facts.built_up_includes_hostels`.)
@@ -117,7 +119,7 @@ data-dependent tests (test_v2, test_operate, the dataset test) run too, instead 
 ```
 tariff_ht2c.status | category | category_note
 tariff_ht2c.orders[].valid_from | valid_to | energy_rs_kwh | energy_slabs[{upto_kwh, rs_kwh}] | demand_rs_kva_month
-                     | tod_min_contract_kva | source | file | page | status
+                     | tod_min_contract_kva | source | values_from | note | file | page | status
 tariff_ht2c.tod.months | peak_hours | peak_adder_rs_kwh | offpeak_hours | offpeak_adder_rs_kwh | min_contract_kva
 tariff_ht2c.export_rs_kwh | billing_demand_floor_frac | excess_demand_multiplier | round_billing_demand
 tariff_ht2c.power_factor | contract_demand_kva | contract_demand_sweep | billing_month | not_modelled

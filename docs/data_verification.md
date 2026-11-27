@@ -19,10 +19,13 @@ itself is missing).
 1. **Energy charge, Rs 8.50 vs ~Rs 7.5-7.9/kWh: neither matches FY2022-23.** TO-2022 HT-2(c)(ii) charges 825 paise
    per unit for the first one lakh units in a month and 865 paise for the balance (p.412 [38]). The ~7.5-7.9 figure in
    secondary sources is close to HT-2(c)(i) (government/aided institutions, hostels of all educational institutions):
-   725 / 765 paise (p.411 [37]). Brief's 8.50 is kept **only** for the FY2023-24 order, labelled PENDING, until the
-   TO-2023 rate schedule is read. In the FY2022-23 order, `energy_rs_kwh` = 8.65 (the balance-units slab, i.e. the
-   marginal rate at campus scale) and `monthly_bill` applies both slabs exactly.
-2. **Demand charge: Rs 265/kVA/month in TO-2022, not Rs 350.** 350 (brief) is kept for FY2023-24 only, PENDING.
+   725 / 765 paise (p.411 [37]). **Resolved by lead decision:** the brief's 8.50 is dropped. Both orders use the
+   TO-2022 slabs; for FY2023-24 they are carried over (status `PENDING_CARRIED_OVER`, "TO-2022 values carried over
+   until the TO-2023 rate schedule is obtained"), not verified. `energy_rs_kwh` = 8.65 (the balance-units slab, i.e.
+   the marginal rate at campus scale) and `monthly_bill` applies both slabs exactly. Open: obtain TO-2023 to confirm
+   the FY2023-24 rates.
+2. **Demand charge: Rs 265/kVA/month in TO-2022, not Rs 350.** Resolved by lead decision: 265 for both orders
+   (FY2023-24 carried over, `PENDING_CARRIED_OVER`).
 3. **ToD threshold 500 kVA:** not found in TO-2022, which applies ToD to HT-2(a), (b) and (c) without a demand
    threshold (p.412 [38]) and says the evening +100 paise applies to "all the HT consumers" (p.408 [34], note 11).
    The FY2022-23 order therefore sets `tod_min_contract_kva: 0`; the 500 kVA rule (brief) applies to FY2023-24 only.
@@ -43,8 +46,8 @@ itself is missing).
 | FY2022-23 energy charge, first 1 lakh units/month | `orders[0].energy_slabs[0]` | 8.25 Rs/kWh | TO-2022, HT-2(c)(ii) rate schedule | p.412 [38] | VERIFIED |
 | FY2022-23 energy charge, balance units | `orders[0].energy_slabs[1]`, `orders[0].energy_rs_kwh` | 8.65 Rs/kWh | TO-2022, HT-2(c)(ii) | p.412 [38] | VERIFIED |
 | FY2022-23 demand charge | `orders[0].demand_rs_kva_month` | 265 Rs/kVA/month | TO-2022, HT-2(c)(ii) | p.412 [38] | VERIFIED |
-| FY2023-24 energy charge | `orders[1].energy_rs_kwh` | 8.50 Rs/kWh | team brief; TO-2023 rate schedule missing | – | PENDING (TEAM BRIEF) |
-| FY2023-24 demand charge | `orders[1].demand_rs_kva_month` | 350 Rs/kVA/month | team brief; TO-2023 missing | – | PENDING (TEAM BRIEF) |
+| FY2023-24 energy charge | `orders[1].energy_slabs`, `orders[1].energy_rs_kwh` | 8.25 / 8.65 Rs/kWh | TO-2022 values carried over (lead decision); TO-2023 rate schedule missing | TO-2022 p.412 [38] | PENDING_CARRIED_OVER |
+| FY2023-24 demand charge | `orders[1].demand_rs_kva_month` | 265 Rs/kVA/month | TO-2022 value carried over (lead decision); TO-2023 missing | TO-2022 p.412 [38] | PENDING_CARRIED_OVER |
 | ToD months | `tod.months` | Dec-Jun (none Jul-Nov) | TO-2022, ToD table for HT-2(a)/(b)/(c) | p.412 [38] | VERIFIED (FY2022-23); FY2023-24 PENDING |
 | ToD peak 18-22 h | `tod.peak_hours`, `tod.peak_adder_rs_kwh` | +1.00 Rs/kWh | TO-2022 | p.412 [38]; p.408 [34] note 11 | VERIFIED (FY2022-23) |
 | ToD off-peak 22-06 h | `tod.offpeak_hours`, `tod.offpeak_adder_rs_kwh` | -1.00 Rs/kWh | TO-2022 (not with the Special Incentive Scheme, note 10) | p.412 [38]; p.408 [34] | VERIFIED (FY2022-23) |
