@@ -71,28 +71,63 @@ METRICS = [  # key, label, group, better, unit, digits
 ]
 
 
-def daily() -> pd.DataFrame:
+def peak_priced(r: pd.DataFrame) -> bool:
+    """True when the runs priced the monthly-peak term in every planner's objective (run_bench_v3 PEAK)."""
+    return "peak_priced" in r and bool(r.peak_priced.fillna(False).astype(bool).all())
+
+
+def monthly_bill(r: pd.DataFrame, cfg: dict) -> pd.DataFrame:
+    """Bill = energy (per day) + the demand charge billed monthly (qgrid/ablation/demand.py monthly_settlement).
+
+    The days are a seeded sample across the year, not whole months. Per dataset, method and calendar month present in
+    the sample: recorded maximum demand = the highest sampled daily peak of that month; the month's charge (billing
+    floor, excess over the contract demand) is spread over the month's calendar days, so each sampled day carries
+    charge / days-in-month. The contract demand (floor, excess) applies to RVCE only."""
+    from qgrid.ablation.demand import monthly_settlement, tariff_params
+    pf_run = float(cfg.get("tariff_v2", {}).get("power_factor", 0.95))
+    cache: dict = {}
+
+    def params_for(ds, day):
+        k = (ds, str(day)[:7])
+        if k not in cache:
+            cache[k] = tariff_params(cfg, day, contract_kva="config" if ds == "rvce" else None)
+        return cache[k]
+    r = r.copy()
+    pf = r.apply(lambda x: params_for(x.dataset, x.day)["pf"], axis=1)
+    if "peak_import_kw" in r:
+        r["peak_kva_bill"] = r.peak_import_kw / pf
+    else:                                              # older runs: peak_kva was computed with tariff_v2's pf
+        r["peak_kva_bill"] = r.peak_kva * pf_run / pf
+    r["bill_prorata_rs"] = r.cost_incl_demand_rs     # earlier 1/30-per-day demand charge, kept for comparison
+    return monthly_settlement(r, params_for, peak_col="peak_kva_bill", energy_col="cost_rs")
+
+
+def daily(cfg: dict | None = None) -> pd.DataFrame:
+    cfg = cfg or yaml.safe_load((ROOT / "config.yaml").read_text(encoding="utf-8"))
     r = pd.read_csv(OUT / "runs.csv")
     b = pd.read_csv(OUT / "bounds.csv")
+    # scored objective: what every planner optimised (objective_plan_rs = objective + monthly-peak term) when the runs
+    # priced it; otherwise the earlier objective (energy + diesel + wear + VoLL + terminal value)
+    r["obj_scored"] = r.objective_plan_rs if "objective_plan_rs" in r else r.objective_rs
     key = lambda d: d.dataset + "|" + d.day   # noqa: E731
     bm = b.assign(k=key(b)).set_index("k")
     # Reference for "gap to the best plan" = the cheapest feasible plan known for the day: the central MILP with perfect
     # information (its run in runs.csv, or the bounds solve if that found a cheaper plan), or any controller's realised
     # plan if it is cheaper within solver tolerance. So no gap is negative, and the reference row's own gap is >= 0.
     feas = r[r.feasible.astype(bool)]
-    best_run = feas.assign(k=key(feas)).groupby("k").objective_rs.min()
+    best_run = feas.assign(k=key(feas)).groupby("k").obj_scored.min()
     k_r = key(r)
     r["opt"] = np.fmin(k_r.map(best_run), k_r.map(bm.opt_central))
     # a valid lower bound can never exceed a feasible plan; where it does (solver tolerance) it is capped and counted
     lb_raw = k_r.map(bm.LB)
     r["LB_capped"] = lb_raw > r.opt + 1e-6 * r.opt.abs()
     r["LB"] = np.fmin(lb_raw, r.opt)
-    r["bill_rs"] = r.cost_incl_demand_rs
+    r = monthly_bill(r, cfg)
     # every figure of a method-day (gap, downtime, unserved energy, bill...) comes from that one row of runs.csv
-    r["gap_pct"] = 100 * (r.objective_rs - r.opt) / r.opt
-    r["certified_gap_pct"] = 100 * (r.objective_rs - r.LB) / r.LB
-    money = r.objective_rs - r.voll_rs
-    opt_money = feas.assign(k=key(feas), mm=feas.objective_rs - feas.voll_rs).groupby("k").mm.min()
+    r["gap_pct"] = 100 * (r.obj_scored - r.opt) / r.opt
+    r["certified_gap_pct"] = 100 * (r.obj_scored - r.LB) / r.LB
+    money = r.obj_scored - r.voll_rs
+    opt_money = feas.assign(k=key(feas), mm=feas.obj_scored - feas.voll_rs).groupby("k").mm.min()
     r["gap_novoll_pct"] = 100 * (money - k_r.map(opt_money)) / k_r.map(opt_money)
     assert (r.gap_pct >= -1e-9).all() and (r.certified_gap_pct >= r.gap_pct - 1e-9).all(), "inconsistent gap / bound"
     b0 = r[r.method == "status_quo"].assign(k=lambda d: key(d)).set_index("k").bill_rs
@@ -267,7 +302,7 @@ def story_headlines(s, labels, cfg, ds: str = "rvce") -> dict:
 def main():
     cfg = yaml.safe_load((ROOT / "config.yaml").read_text(encoding="utf-8"))
     from qgrid.datasets import SPECS
-    r = daily()
+    r = daily(cfg)
     s = summary(r, float(cfg["economics"].get("discount_rate", 0.08)))
     w = wilcoxon(r)
     labels = {k: SPECS[k].label for k in r.dataset.unique()}
@@ -355,8 +390,16 @@ def write_docs(r, s, w, labels, order, hl, cfg):
          "the 00:00 forecast; MPC methods: rolling). Status quo and the rule-based controller react to the current measurement only. "
          "The best possible plan (central MILP with perfect information) is the only oracle and is shown as a reference line.",
          f"- **Same objective and VoLL**: energy + diesel fuel + battery wear (Rs per kWh charged or discharged, from the battery cost and cycle life — ASSUMPTION) + value of lost load (non-critical Rs {oc['voll_noncritical_rs_kwh']}/kWh, "
-         f"critical Rs {oc['voll_critical_rs_kwh']}/kWh — ASSUMPTION, see docs/consistency.md) + terminal value. No method optimises the "
-         "demand charge; it is reported in the bill. Every gap is also reported on money alone (no VoLL).",
+         f"critical Rs {oc['voll_critical_rs_kwh']}/kWh — ASSUMPTION, see docs/consistency.md) + terminal value"
+         + (" + the monthly-peak demand term (demand rate × campus peak kVA above the peak already set this month — the billing "
+            "floor on RVCE — in every planning method: GA, PSO, per-building MPC, central MPC, Q-Grid and the best possible plan; "
+            "status quo and rule-based do not plan and are only settled)." if peak_priced(r) else
+            ". No method optimises the demand charge; it is reported in the bill.")
+         + " Every gap is also reported on money alone (no VoLL).",
+         "- **Bill**: energy charges per day + the demand charge billed monthly: per calendar month in the sample, billing demand = "
+         "max(the month's highest sampled daily peak, floor × contract demand), kVA above the contract at the excess rate, the "
+         "month's charge spread over its calendar days (contract demand: RVCE only). The sample has 2–3 days per month, so the "
+         "month's recorded maximum is a sampled estimate (it can only be lower than the true monthly maximum).",
          "- **Best plan**: the cheapest feasible plan known for the day — the central MILP with perfect information, or a "
          "controller's realised plan where it is cheaper within solver tolerance. Every figure of a method-day (gap, critical "
          "downtime, unserved energy, bill) comes from the same run.",
