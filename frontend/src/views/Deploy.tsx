@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { StoryData } from '../lib/story'
 import { useC } from '../lib/theme'
 import { lakh } from '../story/Impact'
+import { reg } from '../lib/numcheck'
 
 type Box = { id: string; x: number; y: number; w: number; h: number; title: string; sub: string; does: string; hw: string[]; cost?: string }
 const BOXES: Box[] = [
@@ -108,8 +109,8 @@ function Shadow({ d }: { d: StoryData }) {
   const [n, setN] = useState(7)
   const pick = useMemo(() => rows.slice(0, n), [rows, n])
   if (!rows.length) return <section className="card"><h3>Shadow-mode simulator</h3><p className="muted small">Needs the per-day RVCE results in replay/bench_v3.json (python scripts/write_bench_v3.py).</p></section>
-  const sum = (k: 'bill_rs' | 'critical_downtime_h' | 'dg_litres' | 'co2_kg', side: 'status_quo' | 'qgrid') => pick.reduce((a, r) => a + r[side][k], 0)
-  const save = sum('bill_rs', 'status_quo') - sum('bill_rs', 'qgrid')
+  const sum = (k: 'bill_rs' | 'critical_downtime_h' | 'dg_litres' | 'co2_kg', side: 'status_quo' | 'qgrid') => reg(pick.reduce((a, r) => a + r[side][k], 0), `shadow report: sum of ${k} over the chosen days`)
+  const save = reg(sum('bill_rs', 'status_quo') - sum('bill_rs', 'qgrid'), 'shadow report: bill as run − bill recommended, summed')
   const rs = (v: number) => `${v < 0 ? '−' : ''}Rs ${Math.abs(Math.round(v)).toLocaleString('en-IN')}`
   return (
     <section className="card shadow">
@@ -122,7 +123,7 @@ function Shadow({ d }: { d: StoryData }) {
           with critical-load downtime of <b>{sum('critical_downtime_h', 'qgrid').toFixed(2)} h</b> instead of {sum('critical_downtime_h', 'status_quo').toFixed(2)} h and <b>{Math.round(sum('dg_litres', 'qgrid'))} L</b> of diesel instead of {Math.round(sum('dg_litres', 'status_quo'))} L.</p>
         <table className="tbl small"><thead><tr><th>Day</th><th>Bill as run</th><th>Bill recommended</th><th>Would have saved</th><th>Downtime h (as run → rec.)</th><th>Diesel L</th></tr></thead>
           <tbody>{pick.map(r => <tr key={r.day}><td>{new Date(r.day + 'T00:00').toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}{r.outage ? ' · outage' : ''}</td>
-            <td className="tn">{rs(r.status_quo.bill_rs)}</td><td className="tn">{rs(r.qgrid.bill_rs)}</td><td className="tn">{rs(r.status_quo.bill_rs - r.qgrid.bill_rs)}</td>
+            <td className="tn">{rs(r.status_quo.bill_rs)}</td><td className="tn">{rs(r.qgrid.bill_rs)}</td><td className="tn">{rs(reg(r.status_quo.bill_rs - r.qgrid.bill_rs, 'shadow report: bill as run − bill recommended, one day'))}</td>
             <td className="tn">{r.status_quo.critical_downtime_h.toFixed(2)} → {r.qgrid.critical_downtime_h.toFixed(2)}</td><td className="tn">{r.status_quo.dg_litres.toFixed(0)} → {r.qgrid.dg_litres.toFixed(0)}</td></tr>)}</tbody></table>
         <p className="muted small">Read-only: nothing on campus was switched. “As run” = today’s practice (status quo); “recommended” = Q-Grid on the same days, data and forecasts (scorecard benchmark, results/bench_v3). Loads are BDG2-derived profiles until RVCE meters are read.</p>
       </div>

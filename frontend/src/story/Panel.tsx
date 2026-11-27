@@ -93,10 +93,10 @@ function content(p: PanelProps): Body {
           : out ? <>Today the campus sells noon solar cheaply, buys power back expensively in the evening, and runs diesel when the grid fails.</>
           : <>Today the campus sells noon solar cheaply and buys power back expensively in the evening.</>,
         support: <>
-          <p>{hs ? `Averaged over ${hs.n_days} modelled RVCE days. ` : ''}One {SCENARIO(sc)} day up close ({fmtDate(sc.scenario.date)}{out ? `, BESCOM supply down ${slotT(out[0])}–${slotT(out[1])}` : ''}): {pr ? <>around noon it exported <b className="tn">{num(Number(pr.noon_export_kwh))} kWh</b> at Rs {noonPrice}/kWh, and in the evening imported <b className="tn">{num(Number(pr.evening_import_kwh))} kWh</b> at up to Rs {evePrice}/kWh.</> : 'every building acts on its own.'}</p>
+          <p>{hs ? `Average of ${hs.n_days} modelled RVCE days${hs.numbers.optimum_saving_pct ? `; the best possible plan would pay ${Number(hs.numbers.optimum_saving_pct).toFixed(1)}% less` : ''}. ` : ''}One {SCENARIO(sc)} day up close ({fmtDate(sc.scenario.date)}{out ? `, BESCOM supply down ${slotT(out[0])}–${slotT(out[1])}` : ''}): {pr ? <>around noon it exported <b className="tn">{num(Number(pr.noon_export_kwh))} kWh</b> at Rs {noonPrice}/kWh, and in the evening imported <b className="tn">{num(Number(pr.evening_import_kwh))} kWh</b> at up to Rs {evePrice}/kWh.</> : 'every building acts on its own.'}</p>
         </>,
         keys: sc.problem && <>
-          <Key label={`Value lost on ${fmtDate(sc.scenario.date)}`} pending={priceStatus ? 'Tariff' : undefined}><CountUp value={sc.problem.rs_lost} format={rs} /></Key>
+          <Key label="Value lost that day" pending={priceStatus ? 'Tariff' : undefined}><CountUp value={sc.problem.rs_lost} format={rs} /></Key>
           <Key label="CO₂ that day" pending={cea ? 'CEA CO₂ factor' : undefined}><CountUp value={sc.problem.co2_kg} format={v => `${num(v)} kg`} delay={0.1} /></Key>
           <Key label="Diesel running" note={`critical loads unserved ${sc.problem.critical_downtime_h.toFixed(1)} h`}><CountUp value={sc.problem.dg_hours} format={v => `${v.toFixed(1)} h`} delay={0.2} /></Key>
         </>,
@@ -402,10 +402,12 @@ function contentQ(p: PanelProps): Body | null {
       }
     }
     case '4e': {
-      const same = blk && blk.qaoa.best_bits === blk.exact.bits
+      // compare by cost, not bitstring: several settings can tie at the optimum
+      const same = blk && blk.qaoa.best_objective !== null && blk.qaoa.best_objective <= blk.exact.objective + 1e-6 * Math.max(1, Math.abs(blk.exact.objective))
+      const tie = same && blk && blk.qaoa.best_bits !== blk.exact.bits
       return {
-        answer: <>The best result reads back as on/off settings{blk ? (same ? ', and it matches the exact answer.' : ', and here it differs from the exact answer.') : '.'}</>,
-        support: <p className="muted small">Every block is checked against an exact search over all {blk ? num(2 ** blk.n_qubits) : '–'} settings.</p>,
+        answer: <>The best result reads back as on/off settings{blk ? (same ? ', and it is as cheap as the exact answer.' : ', and here it is dearer than the exact answer.') : '.'}</>,
+        support: <p className="muted small">Every block is checked against an exact search over all {blk ? num(2 ** blk.n_qubits) : '–'} settings.{tie ? ' Several settings tie at the lowest cost here, so QAOA’s bits differ from the first one exact search lists, at the same cost.' : ''}</p>,
         keys: blk ? <>
           <Key label="QAOA's best setting"><code className="bits">{blk.qaoa.best_bits ?? '–'}</code></Key>
           <Key label="Exact search"><code className="bits">{blk.exact.bits}</code></Key>

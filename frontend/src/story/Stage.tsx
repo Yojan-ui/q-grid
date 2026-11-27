@@ -143,11 +143,14 @@ function Scene({ stop, d, t, zone, onZone, killed, admmRound, pulseKey }: StageP
       </group>
       {/* the QAOA lab (tiles, circuit, histogram) is created when its steps first come up (lazy per step) */}
       {seen.current.lab && <Lab stop={stop} ex={ex} sc={sc} anchor={new THREE.Vector3(...A)} yaw={YAW} buildingH={exZone.h} pulseKey={pulseKey} />}
-      <Label3D show={stop === '4f'} position={[A[0], exZone.h + 22, A[2]]} center>
-        <div className={`verifytag ${ex.qaoa.best_bits === ex.exact.bits ? 'ok' : 'gap'}`}>
-          {ex.qaoa.best_bits === ex.exact.bits ? '✓ QAOA plan = exact optimum' : '≠ exact optimum → fallback tier'}
-        </div>
-      </Label3D>
+      {(() => {
+        // same cost as exact search (ties count as a match); the current design uses the exact solver either way
+        const ok = ex.qaoa.best_objective !== null && ex.qaoa.best_objective !== undefined
+          ? ex.qaoa.best_objective <= ex.exact.objective + 1e-6 * Math.max(1, Math.abs(ex.exact.objective)) : ex.qaoa.best_bits === ex.exact.bits
+        return <Label3D show={stop === '4f'} position={[A[0], exZone.h + 22, A[2]]} center>
+          <div className={`verifytag ${ok ? 'ok' : 'gap'}`}>{ok ? '✓ QAOA = exact search (same cost)' : d.qs ? '≠ exact search → exact plan used' : '≠ exact optimum → fallback tier'}</div>
+        </Label3D>
+      })()}
       
     </>
   )

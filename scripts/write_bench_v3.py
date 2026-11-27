@@ -229,9 +229,7 @@ def story_headlines(s, labels, cfg, ds: str = "rvce") -> dict:
     if None in (sq_dt, sq_bill, q_dt, q_sav, q_gap):
         return {}
     hm = lambda h: f"{h * 60:.0f} min" if h < 1 else f"{h:.1f} h"   # noqa: E731
-    step1 = (f"Today every building runs on its own: over {n} modelled days the campus loses power to critical loads for "
-             f"{hm(sq_dt)} a day on average and pays Rs {sq_bill:,.0f} a day"
-             + (f"; the best possible plan would pay {opt_sav:.1f}% less." if opt_sav is not None and opt_sav > 0 else "."))
+    step1 = f"Today each building runs on its own: critical loads lose power {hm(sq_dt)} a day and the bill is Rs {sq_bill:,.0f} a day."
     dt_verb = "cuts" if q_dt < sq_dt - 1e-9 else ("keeps" if abs(q_dt - sq_dt) <= 1e-9 else "raises")
     dt_txt = (f"{dt_verb} critical downtime from {hm(sq_dt)} to {hm(q_dt)} a day" if dt_verb != "keeps" else f"keeps critical downtime at {hm(q_dt)} a day")
     if q_dt1 is not None and q_dt1 < q_dt - 1e-9:

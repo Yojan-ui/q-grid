@@ -43,7 +43,7 @@ const { cdp, close } = await launch(arg('chrome'))
 try {
   await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false })
   for (const [name, qs, sel, wait, acts = [], after = 0] of SHOTS) {
-    const url = `${URL0}/${qs}${LIVE || name === 'demo-preset' ? '' : '&offline'}`
+    const url = `${URL0}/${qs}${LIVE || name === 'demo-preset' ? '' : '&offline'}${/theme=/.test(qs) ? '' : '&theme=light'}`
     await cdp.send('Page.navigate', { url })
     try { await waitFor(cdp, `!!document.querySelector('${sel}')`, 40000) } catch { console.log('timeout', name) }
     await sleep(wait)
