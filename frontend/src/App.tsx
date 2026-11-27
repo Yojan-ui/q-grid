@@ -230,7 +230,7 @@ export default function App() {
               {idx.scenarios.map(x => <option key={x.key} value={x.key}>{SCEN_NAME[x.key] ?? x.key}, {fmtDate(x.date)}</option>)}
             </select>
             <span className="devonly"><DataBadge idx={idx} /></span>
-            <button className="btn ghost small devonly" onClick={printSummary} title="Opens the print dialog: choose “Save as PDF”. Printed in the light theme.">Download summary (PDF)</button>
+            <button className="btn ghost small devonly" onClick={printSummary} title="Opens the print dialog: choose “Save as PDF”. Printed in the light theme." aria-label="Download summary (PDF)"><span className="wide">Download summary (PDF)</span><span className="narrow">Summary PDF</span></button>
             {!demo && <a className="btn ghost small devonly" href="?demo&stop=1" title="Demo preset: Explain step 1, presenter mode, live moments ready">Demo</a>}
             <button className={`btn small ${present ? 'primary' : 'ghost'}`} onClick={() => setPresent(x => !x)} aria-pressed={present} title="Presenter mode (P)" style={{ marginLeft: 8 }}>
               {present ? 'Exit presenter' : 'Present'}</button>

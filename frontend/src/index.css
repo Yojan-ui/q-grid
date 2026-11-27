@@ -545,7 +545,8 @@ details.defn { margin: 4px 0 0; }
 
 /* ---------------------------------------------------------------- asset status, sources, problem cards */
 .pending.proposed { text-transform: lowercase; margin-left: 4px; vertical-align: 1px; white-space: nowrap; }
-.kl .pending.proposed { margin-left: 4px; }
+.kl .pending.proposed { margin-left: 0; padding: 0 4px; }
+.kl:has(.proposed) { gap: 4px; }
 .tag3d { color: var(--pend-fg); font-weight: 600; }
 .infobtn { font: 600 11px/1 Inter, system-ui, sans-serif; width: 20px; height: 20px; padding: 0; border-radius: 50%; border: 1px solid var(--faint); background: var(--surface); color: var(--text2); cursor: pointer; vertical-align: 1px; font-style: italic; }
 .infobtn:hover { border-color: var(--text2); color: var(--text); }
@@ -579,3 +580,6 @@ details.defn { margin: 4px 0 0; }
 .bc-prop { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .bc-prop .pending.proposed { margin-left: 0; }
 .tbl.assets td:first-child, .tbl.assets th:first-child { text-align: left; }
+.brand { flex: none; }
+.top .narrow { display: none; }
+@media (max-width: 1400px) { .top .wide { display: none; } .top .narrow { display: inline; } .top { gap: 12px; } }
