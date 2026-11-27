@@ -8,6 +8,7 @@ from __future__ import annotations
 import numpy as np
 import pulp
 
+from qgrid.ablation.local import outage_run_lengths
 from qgrid.model import DT, T, Campus, DayData, Schedule, water_value
 
 MIP_GAP = 1e-3
@@ -20,7 +21,9 @@ def _solver(time_limit=120):
 
 def solve_milp(campus: Campus, day: DayData, zones: list[int], with_lines: bool, time_limit: int = 120,
                demand_charge: dict | None = None, rules: list[dict] | None = None) -> dict:
-    """demand_charge = {rate_day, pf}: adds rate_day * campus peak kVA (v2 tariff) to the objective.
+    """demand_charge = {rate_day, pf}: adds rate_day * campus peak kVA (v2 tariff) to the objective; or the monthly-peak
+      term {rate, pf, ref_kva, contract_kva, xs_rate} (qgrid/ablation/demand.py planner_params):
+      rate * max(0, peak - ref_kva) + xs_rate * max(0, peak - contract_kva), peak = campus grid import kVA.
     rules: compiled operator rules (qgrid.rules.apply_rules -> agent_rules) enforced as hard constraints:
       dg_forbid   {zone | "*", unless_outage}: diesel off (in grid-up slots only if unless_outage)
       tank_min_by {zone, level_frac, by_slot}: tank level >= level_frac x capacity at by_slot"""
@@ -77,11 +80,17 @@ def solve_milp(campus: Campus, day: DayData, zones: list[int], with_lines: bool,
             on = [V(f"on_{i}_{t}", cat="Binary") for t in range(T)]
             pg = [V(f"pg_{i}_{t}", 0, g.kw) for t in range(T)]
             stt = [V(f"st_{i}_{t}", cat="Binary") for t in range(T)]
+            # backup-only DG (no grid-parallel operation): off whenever the grid is up; a run's minimum on-time is
+            # cut short when the grid returns (same rule as qgrid/ablation/local.py)
+            run_left = outage_run_lengths(~np.asarray(grid, bool))
             for t in range(T):
                 m += pg[t] <= g.kw * on[t]
                 m += pg[t] >= g.p_min * on[t]
                 m += stt[t] >= on[t] - (on[t - 1] if t > 0 else 0)
-                L = min(g.min_on_slots, T - t)
+                if grid[t]:
+                    m += on[t] == 0
+                    continue
+                L = min(g.min_on_slots, int(run_left[t]))
                 m += pulp.lpSum(on[t:t + L]) >= L * stt[t]
                 obj.append((g.fuel_a * g.kw * on[t] + g.fuel_b * pg[t]) * DT * (g.price + day.lam * g.co2_per_l))
             dg_t = pg
@@ -122,6 +131,17 @@ def solve_milp(campus: Campus, day: DayData, zones: list[int], with_lines: bool,
         for t, lst in imps.items():
             m += pulp.lpSum(lst) * (1.0 / demand_charge["pf"]) <= Pk
         obj.append(demand_charge["rate_day"] * Pk)
+    elif demand_charge and demand_charge.get("rate", 0) > 0:          # monthly-peak term above the month's floor / peak
+        Pk = V("peak_above_ref_kva", 0)
+        ref = float(demand_charge.get("ref_kva") or 0.0)
+        for t, lst in imps.items():
+            m += pulp.lpSum(lst) * (1.0 / demand_charge["pf"]) - ref <= Pk
+        obj.append(demand_charge["rate"] * Pk)
+        if demand_charge.get("contract_kva") and demand_charge.get("xs_rate", 0) > 0:
+            Px = V("peak_above_contract_kva", 0)
+            for t, lst in imps.items():
+                m += pulp.lpSum(lst) * (1.0 / demand_charge["pf"]) - float(demand_charge["contract_kva"]) <= Px
+            obj.append(demand_charge["xs_rate"] * Px)
     m += pulp.lpSum(obj)
     status = m.solve(_solver(time_limit))
     return {"status": pulp.LpStatus[status], "vars": vars_, "flows": flows, "objective": pulp.value(m.objective)}

@@ -7,9 +7,10 @@ from qgrid.model import Campus, DayData, Schedule
 from .milp import MIP_GAP, solve_milp, to_schedule
 
 
-def solve(campus: Campus, day: DayData, rules=None) -> Schedule:
+def solve(campus: Campus, day: DayData, rules=None, demand: dict | None = None) -> Schedule:
+    """demand: monthly-peak term (qgrid/ablation/demand.py planner_params), priced on the campus peak; None = off."""
     s = Schedule.empty(campus)
-    r = solve_milp(campus, day, list(range(campus.n)), with_lines=True, time_limit=300)
+    r = solve_milp(campus, day, list(range(campus.n)), with_lines=True, time_limit=300, demand_charge=demand)
     to_schedule(campus, r, s)
     s.info = {"method": "B4", "milp_status": r["status"], "milp_objective": r["objective"], "mip_gap": MIP_GAP}
     return s

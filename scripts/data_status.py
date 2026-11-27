@@ -34,7 +34,7 @@ def present(pattern: str) -> bool:
 
 
 def main():
-    idx = json.loads((ROOT / "results" / "replay" / "index.json").read_text())
+    idx = json.loads((ROOT / "results" / "replay" / "index.json").read_text(encoding="utf-8"))
     st = idx["data_status"]
     items = []
     for k, status in st.items():
@@ -46,7 +46,7 @@ def main():
     out = {"checked_at": time.strftime("%Y-%m-%d %H:%M"), "n_real": sum(i["real"] for i in items), "n_pending": sum(not i["real"] for i in items),
            "items": items, "how": "bash scripts/refresh_all.sh after placing the files (see docs/BLOCKERS.md, docs/data_request.md)"}
     p = ROOT / "results" / "replay" / "data_status.json"
-    p.write_text(json.dumps(out, indent=1)); shutil.copy(p, ROOT / "frontend" / "public" / "replay" / p.name)
+    p.write_text(json.dumps(out, indent=1), encoding="utf-8"); shutil.copy(p, ROOT / "frontend" / "public" / "replay" / p.name)
     print(f"{out['n_real']} real, {out['n_pending']} pending")
     for i in items:
         if not i["real"]:
