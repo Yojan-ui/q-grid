@@ -60,7 +60,7 @@ def main(day: str):
            "series": final["series"], "events": s.events, "audit": s.audit, "report": rep, "lines": final["lines"]}
     js = json.dumps(out, separators=(",", ":"), default=lambda o: o.item() if hasattr(o, "item") else str(o))
     p = ROOT / "results" / "replay" / "operate_session.json"
-    p.write_text(js)
+    p.write_text(js, encoding="utf-8")
     shutil.copy(p, ROOT / "frontend" / "public" / "replay" / "operate_session.json")
     print(f"wrote {p} ({len(js) / 1e6:.1f} MB), saving vs status quo Rs {rep['saving_rs']:,.0f}, {time.time() - t0:.0f} s")
 

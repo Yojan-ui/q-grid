@@ -217,7 +217,7 @@ def main(workers: int, ndays: int, qgrid: str):
     pd.DataFrame(rows).to_csv(OUT / "runs.csv", index=False)
     pd.DataFrame(bounds).to_csv(OUT / "bounds.csv", index=False)
     json.dump({"runtime_s": time.time() - t_all, "workers": workers, "days_per_dataset": ndays, "qgrid_combo": qgrid,
-               "datasets": DATASETS, "methods": MAIN, "design_choices": DESIGN}, open(OUT / "run_info.json", "w"), indent=1)
+               "datasets": DATASETS, "methods": MAIN, "design_choices": DESIGN}, open(OUT / "run_info.json", "w", encoding="utf-8"), indent=1)
     print(f"done in {time.time() - t_all:.0f} s", flush=True)
 
 
