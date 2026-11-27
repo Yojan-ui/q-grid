@@ -277,10 +277,9 @@ V2_COLS = ["method", "objective_incl_demand_rs", "cost_incl_demand_rs", "cost_rs
 
 def attach_qgrid(campus, meta, outs: dict) -> None:
     """Current Q-Grid design (24 h, continuous dispatch, LP coordination, realistic forecasts) on every named day:
-    its run becomes runs.qgrid (the earlier prototype's run is kept as runs.earlier), and the headline day gets the
-    worked example qgrid_story."""
+    its run becomes runs.qgrid (the earlier prototype's run is kept as runs.earlier), and every named day gets the
+    worked example qgrid_story (flag headline=True on the headline day)."""
     from qgrid import data as qdata
-    from qgrid.ablation.engine import ACfg, run_day
     from qgrid.ablation.forecast import GBMForecaster
     from qgrid.ablation.story import qgrid_story
     from qgrid.model import Schedule, make_day
@@ -296,11 +295,10 @@ def attach_qgrid(campus, meta, outs: dict) -> None:
     for k, o in outs.items():
         sc = meta["days"]["scenarios"][k]
         with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
-            if k == hs:
-                sched, story = qgrid_story(campus, yd, sc["date"], sc.get("outage"), fc, slot=72, placement=placement)
-                o["qgrid_story"] = story
-            else:
-                sched, _ = run_day(campus, yd, sc["date"], sc.get("outage"), ACfg(True, True, True, True), forecaster=fc)
+            # every named day gets its own worked example (same controller run as run_day with ACfg 1111); without it
+            # the explainer falls back to older run blocks (runs.qgrid_v2) for the non-headline days
+            sched, story = qgrid_story(campus, yd, sc["date"], sc.get("outage"), fc, slot=72, placement=placement)
+            o["qgrid_story"] = {**story, "headline": k == hs}
         day = make_day(campus, proc, sc["date"], "A", k, sc.get("outage"))
         m = settle_v2(campus, day, sched)
         o["runs"]["earlier"] = o["runs"]["qgrid"]
