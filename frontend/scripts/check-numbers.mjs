@@ -1,6 +1,6 @@
 // Numbers test: every number shown on every screen must come from the data the page loaded.
 //   node scripts/check-numbers.mjs --url http://localhost:5173 [--verbose]
-// For each screen (all Explain steps, Operate recorded session, Deploy, Verify) it collects the replay JSON the page
+// For each screen (all Explain steps, Operate recorded session, Deploy, Plan, Verify) it collects the replay JSON the page
 // fetched (the one shared data layer, lib/data.ts getJSON) and every number token in visible text. A token passes if
 // (a) it equals, at its displayed precision, a scalar from those files (time series of > 40 values are not candidates,
 //     so a figure cannot match a series by accident), allowing the display conversions the UI uses (fraction -> %,
@@ -92,7 +92,7 @@ try {
     if (k) { await key(cdp, 'ArrowRight'); await sleep(STOPS[k] === '3' ? 4200 : 1800) }
     screens.push(['explain ' + STOPS[k], await evaluate(cdp, SCAN_JS)])
   }
-  for (const [name, qs, sel] of [['operate (recorded)', '?mode=operate&offline', '.op-grid'], ['deploy', '?mode=deploy&offline', '.arch'], ['verify', '?mode=verify&offline', '.metrics']]) {
+  for (const [name, qs, sel] of [['operate (recorded)', '?mode=operate&offline', '.op-grid'], ['deploy', '?mode=deploy&offline', '.arch'], ['plan', '?mode=plan&offline', '.plan .answer'], ['verify', '?mode=verify&offline', '.metrics']]) {
     await cdp.send('Page.navigate', { url: `${URL0}/${qs}` }); await waitFor(cdp, `!!document.querySelector('${sel}')`, 40000); await sleep(2500)
     screens.push([name, await evaluate(cdp, SCAN_JS)])
   }

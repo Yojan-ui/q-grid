@@ -1,51 +1,51 @@
 {
- "status": "ASSUMPTION + stand-in tariff (PENDING): not a headline result",
+ "status": "ASSUMPTION costs + HT-2(c)(ii) tariff (KERC TO-2023): not a headline result",
  "n_buildings": 9,
  "n_days": 30,
  "variant": null,
  "battery_kwh_total": 1460.0,
  "benefit": {
-  "bill_saving_rs_per_day_mean": 5692.317335196199,
+  "bill_saving_rs_per_day_mean": -866.9651912100536,
   "bill_saving_rs_per_day_ci95": [
-   3842.7626806673616,
-   7185.115601864346
+   -2262.922871744506,
+   223.57485483311066
   ],
-  "extra_throughput_kwh_per_day_mean": 127.900549331709,
+  "extra_throughput_kwh_per_day_mean": 215.37111890761688,
   "source": "results/bench_v3/daily.csv (RVCE, Q-Grid vs status quo, same days)"
  },
  "central": {
   "hardware_rs": 792000.0,
   "om_rs_per_year": 79200.0,
-  "bill_saving_rs_per_year": 2077695.8273466125,
-  "battery_wear_rs_per_year": 194515.41877530745,
-  "net_rs_per_year": 1803980.408571305,
+  "bill_saving_rs_per_year": -316442.2947916696,
+  "battery_wear_rs_per_year": 327543.5766720007,
+  "net_rs_per_year": -723185.8714636703,
   "discount_rate": 0.08,
-  "npv_gross_rs": 12618069.676940592,
-  "npv_net_rs": 11312855.383609097,
-  "payback_gross_years": 0.39629805034495985,
-  "payback_net_years": 0.4390291580978081,
+  "npv_gross_rs": -3446792.002916089,
+  "npv_net_rs": -5644636.064085631,
+  "payback_gross_years": null,
+  "payback_net_years": null,
   "wear_rs_per_kwh_throughput": 4.166666666666667,
-  "breakeven_wear_rs_per_kwh": 40.280964274755185
+  "breakeven_wear_rs_per_kwh": -6.534418705684436
  },
  "monte_carlo": {
   "samples": 10000,
   "seed": 2026,
   "npv_gross_rs": {
-   "p5": 8781837.848626474,
-   "p50": 12766798.310371574,
-   "p95": 16223852.163038827,
-   "prob_positive": 1.0
+   "p5": -6325043.414521992,
+   "p50": -3311463.8674663175,
+   "p95": -1050093.214677294,
+   "prob_positive": 0.0
   },
   "npv_net_rs": {
-   "p5": 7098414.908867332,
-   "p50": 11879856.91911307,
-   "p95": 15812494.338331167,
-   "prob_positive": 1.0
+   "p5": -9048255.156938791,
+   "p50": -4873864.483355349,
+   "p95": -1872489.8625889337,
+   "prob_positive": 0.0
   },
   "payback_gross_years": {
-   "p5": 0.26801122756372225,
-   "p50": 0.3937816781539212,
-   "p95": 0.5932642885260478
+   "p5": null,
+   "p50": null,
+   "p95": null
   }
  },
  "per_building": [
@@ -267,42 +267,42 @@
     {
      "dataset": "rvce",
      "label": "RVCE, Bengaluru (case study)",
-     "gap_pct": 0.758205497674614,
-     "saving_pct": 3.3476378659260337,
-     "runtime_per_decision_s": 4.560544354027903,
-     "messages_per_decision": 398.5555555555555
+     "gap_pct": 1.0637958089370878,
+     "saving_pct": -0.4334883966295994,
+     "runtime_per_decision_s": 4.6526821313898035,
+     "messages_per_decision": 2200.1666666666665
     },
     {
      "dataset": "bdg2_fox",
      "label": "BDG2 university site 'Fox' (Arizona)",
-     "gap_pct": 0.3575703142119273,
-     "saving_pct": -0.43646007980997,
-     "runtime_per_decision_s": 4.289762039576191,
-     "messages_per_decision": 200.70555555555558
+     "gap_pct": 8.309235213269227,
+     "saving_pct": 0.6790863953529099,
+     "runtime_per_decision_s": 2.424406254037684,
+     "messages_per_decision": 2196.25
     },
     {
      "dataset": "bdg2_bull",
      "label": "BDG2 university site 'Bull' (Texas)",
-     "gap_pct": 0.8663718795838591,
-     "saving_pct": 0.43975869125755523,
-     "runtime_per_decision_s": 4.807534047685639,
-     "messages_per_decision": 450.4888888888889
+     "gap_pct": 9.745362127411113,
+     "saving_pct": 0.4903067622270241,
+     "runtime_per_decision_s": 2.6707329819438095,
+     "messages_per_decision": 2936.363888888889
     },
     {
      "dataset": "bdg2_cockatoo",
      "label": "BDG2 university site 'Cockatoo' (New York)",
-     "gap_pct": 1.9853199595494995,
-     "saving_pct": 0.07778319466178149,
-     "runtime_per_decision_s": 4.9810433736005715,
-     "messages_per_decision": 560.5055555555555
+     "gap_pct": 10.559183766977073,
+     "saving_pct": 1.4013485278621753,
+     "runtime_per_decision_s": 2.019051048334869,
+     "messages_per_decision": 2325.011111111111
     },
     {
      "dataset": "cubems",
      "label": "CU-BEMS office building, Bangkok (7 floors)",
-     "gap_pct": 3.131123224468012,
-     "saving_pct": 4.226984377750319,
-     "runtime_per_decision_s": 4.251766483141567,
-     "messages_per_decision": 227.15555555555557
+     "gap_pct": 27.17627751991132,
+     "saving_pct": 6.571458453749448,
+     "runtime_per_decision_s": 4.093652932497207,
+     "messages_per_decision": 1982.644444444444
     }
    ]
   },

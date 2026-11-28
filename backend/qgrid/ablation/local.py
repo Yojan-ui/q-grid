@@ -19,6 +19,17 @@ from ..model import DT, T, Campus
 INF = highspy.kHighsInf
 
 
+def outage_run_lengths(down) -> np.ndarray:
+    """For each slot: how many consecutive grid-down slots start there (0 when the grid is up)."""
+    down = np.asarray(down, bool)
+    out = np.zeros(len(down), int)
+    run = 0
+    for h in range(len(down) - 1, -1, -1):
+        run = run + 1 if down[h] else 0
+        out[h] = run
+    return out
+
+
 @dataclass
 class LState:
     e: float
@@ -31,7 +42,8 @@ class LState:
 class LocalModel:
     def __init__(self, campus: Campus, i: int, w, st: LState, t0: int, H: int, *, disc: bool, disc_flows: bool,
                  term_slope: float, voll: tuple[float, float], lam_co2: float = 0.0, quad_flows: bool = False,
-                 pwl: int = 9, time_limit: float = 5.0, mip_gap: float = 1e-4, wear: float = 0.0):
+                 pwl: int = 9, time_limit: float = 5.0, mip_gap: float = 1e-4, wear: float = 0.0,
+                 peak: dict | None = None):
         # wear: battery wear cost in Rs per kWh charged and per kWh discharged (0 = not priced, as in the scorecard)
         b = campus.buildings[i]
         self.b, self.i, self.H, self.t0 = b, i, H, t0
@@ -80,8 +92,12 @@ class LocalModel:
             dg = b.dg
             c_on = dg.fuel_a * dg.kw * DT * (dg.price + lam_co2 * dg.co2_per_l)
             c_pg = dg.fuel_b * DT * (dg.price + lam_co2 * dg.co2_per_l)
-            add("on", H, 0, 1, c_on, True); add("st", H, 0, 1, 0.0, True)
-            add("pg", H, 0.0, dg.kw, c_pg)
+            # backup-only DG (no grid-parallel operation): off whenever the grid is up; a run's minimum on-time is cut
+            # short when the grid returns (the transfer switch hands back to the grid)
+            down = ~np.asarray(g, bool)
+            add("on", H, 0, down.astype(float), c_on, True); add("st", H, 0, down.astype(float), 0.0, True)
+            add("pg", H, 0.0, np.where(down, dg.kw, 0.0), c_pg)
+            run_left = outage_run_lengths(down)
             for h in range(H):
                 if disc:
                     row([(self.col["pg"][h], 1.0), (self.col["on"][h], -dg.kw)], 0.0, 0.0)
@@ -91,10 +107,11 @@ class LocalModel:
                 prev = [(self.col["on"][h - 1], 1.0)] if h > 0 else []
                 rhs0 = 0.0 if h > 0 else (1.0 if st.dg_on else 0.0)
                 row([(self.col["st"][h], 1.0), (self.col["on"][h], -1.0)] + prev, -rhs0, INF)
-                L = min(dg.min_on_slots, H - h)
-                row([(self.col["on"][k], 1.0) for k in range(h, h + L)] + [(self.col["st"][h], -float(L))], 0.0, INF)
-            if st.dg_on and st.dg_run < dg.min_on_slots:          # carry-over of a run started earlier
-                for h in range(min(H, dg.min_on_slots - st.dg_run)):
+                L = min(dg.min_on_slots, int(run_left[h]))
+                if L > 0:
+                    row([(self.col["on"][k], 1.0) for k in range(h, h + L)] + [(self.col["st"][h], -float(L))], 0.0, INF)
+            if st.dg_on and st.dg_run < dg.min_on_slots:          # carry-over of a run started earlier (outage slots only)
+                for h in range(min(H, dg.min_on_slots - st.dg_run, int(run_left[0]))):
                     cols_lb[self.col["on"][h]] = 1
         # ---------------- flexible jobs
         flex_load = np.zeros(H)
@@ -186,6 +203,21 @@ class LocalModel:
                     ent2.append((self.col["w"][h], -pump))
                 ent2 += [(c, -kw) for c, kw in flex_rows[h]]
                 row(ent2, -INF, max(base - float(w.crit[i][h]), 0.0))
+        # ---------------- monthly-peak term (qgrid/ablation/demand.py): this building's share of the campus peak
+        # pk >= imp[h] / pf - budget[h], cost rate * pk; px >= imp[h] / pf - cbudget[h], cost xs_rate * px (excess
+        # over its share of the contract demand). Budgets are per slot so they can follow the building's share of
+        # the campus import (they sum to the campus allowance over the buildings at every slot).
+        self.peak_rows, self.xs_rows = [], []
+        if peak is not None and peak.get("rate", 0) > 0:
+            add("pk", 1, 0.0, INF, float(peak["rate"]))
+            for h in range(H):
+                self.peak_rows.append(len(rows))
+                row([(self.col["imp"][h], 1.0 / peak["pf"]), (self.col["pk"][0], -1.0)], -INF, float(peak["budget"][h]))
+            if peak.get("cbudget") is not None and peak.get("xs_rate", 0) > 0:
+                add("px", 1, 0.0, INF, float(peak["xs_rate"]))
+                for h in range(H):
+                    self.xs_rows.append(len(rows))
+                    row([(self.col["imp"][h], 1.0 / peak["pf"]), (self.col["px"][0], -1.0)], -INF, float(peak["cbudget"][h]))
         self.lb0, self.ub0 = np.array(cols_lb, float), np.array(cols_ub, float)
         self.cost0 = np.array(cost, float)
         self.integ = np.array(integ, bool)
@@ -259,6 +291,19 @@ class LocalModel:
         return {"x": x, "obj": float(info.objective_function_value), "status": str(st),
                 "bound": float(getattr(info, "mip_dual_bound", np.nan)), "nodes": int(getattr(info, "mip_node_count", 0)),
                 "row_dual": np.array(s.row_dual), "col_dual": np.array(s.col_dual)}
+
+    def set_peak_budget(self, budget, cbudget=None) -> None:
+        """New per-slot peak budgets (kVA) for the monthly-peak rows; the solver model is rebuilt on the next solve."""
+        for r, b in zip(self.peak_rows, budget):
+            self.rhi[r] = float(b)
+        if cbudget is not None:
+            for r, b in zip(self.xs_rows, cbudget):
+                self.rhi[r] = float(b)
+        self._h = None
+
+    def imports(self, x):
+        """Planned grid import (kW) per horizon slot."""
+        return x[self.col["imp"]]
 
     def get(self, x, name):
         return x[self.col[name]] if name in self.col else np.zeros(self.H)

@@ -1,11 +1,11 @@
 {
   "A": {
-    "price_status": "PENDING",
+    "price_status": "REAL",
     "battery_kwh_total": 1460.0,
     "capex_rs_ASSUMPTION": 36500000.0,
-    "battery_saving_rs_per_day": 4459.929234964995,
-    "annual_saving_rs": 1627874.1707622232,
-    "simple_payback_years": 22.421880422680044,
+    "battery_saving_rs_per_day": 6090.802430547423,
+    "annual_saving_rs": 2223142.8871498094,
+    "simple_payback_years": 16.41819795343654,
     "method": "mean daily cost B5 without batteries minus B5 with batteries, 30-day set, x365"
   },
   "B": {

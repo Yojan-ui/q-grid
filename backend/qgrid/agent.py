@@ -221,7 +221,8 @@ class BuildingAgent:
         r = self.load[t] - self.pv[t] + self.running[t] + outflow_kw + (self.tank.pump_kw if pump else 0.0)
         g = 0.0
         if self.dg is not None:
-            on = safety.dg_decision(self.dg, (not self.gridup[t]) and r > 0, self.dg_run, True)
+            # backup only: off whenever the grid is up (the minimum on-time ends when the grid returns)
+            on = (not self.gridup[t]) and safety.dg_decision(self.dg, r > 0, self.dg_run, True)
             g = float(np.clip(r, self.dg.p_min, self.dg.kw)) if on else 0.0
             self.dg_run = self.dg_run + 1 if on else 0
         p = 0.0

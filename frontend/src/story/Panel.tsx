@@ -10,6 +10,10 @@ import { CommsChart, SmallMultiples } from './Scorecard'
 import { Tex } from './Tex'
 import { LiveQaoa, RemoveBuilding, RuleCard } from './Live'
 import { ImpactDetail, lakh } from './Impact'
+import { StatusBadge } from './Badges'
+import { SourcesButton } from '../panels/Sources'
+import { regText } from '../lib/numcheck'
+import { anyNotExisting, cablesProposed } from '../lib/labels'
 
 
 export type PanelProps = {
@@ -23,9 +27,11 @@ export type PanelProps = {
   online?: boolean
 }
 
+const hm = (h: number) => h < 1 ? `${Math.round(h * 60)} min` : `${h.toFixed(1)} h`
+
 const Pending = ({ what }: { what: string }) => <span className="pending" title={`${what} is a labelled stand-in until the official data arrives`}>stand-in</span>
 
-function Key({ label, children, pending, note }: { label: string; children: React.ReactNode; pending?: string; note?: string }) {
+function Key({ label, children, pending, note }: { label: React.ReactNode; children: React.ReactNode; pending?: string; note?: string }) {
   return <div className="key"><span className="kl">{label}{pending && <Pending what={pending} />}</span><b className="kv">{children}</b>{note && <span className="kn">{note}</span>}</div>
 }
 
@@ -79,7 +85,7 @@ function content(p: PanelProps): Body {
   const out = outageSpan(sc)
   const slotT = (i: number) => sc.slots.t[Math.min(95, i)]
   const zi = sc.campus.zones.findIndex(z => z.name === ex.zone)
-  const priceStatus = sc.price_status !== 'REAL'
+  const priceStatus = !['REAL', 'VERIFIED'].includes(sc.price_status)
   const cea = sc.data_status?.cea !== 'REAL'
   const qbody = contentQ(p)
   if (qbody) return qbody
@@ -88,21 +94,33 @@ function content(p: PanelProps): Body {
       const pr = d.problem
       const noonPrice = sc.slots.price_export[48], evePrice = Math.max(...sc.slots.price_import)
       const hs = d.bench?.headline.story
+      const L = hs?.locked
+      const exp = pr ? Number(pr.noon_export_kwh) : 0
+      const optSav = Number(hs?.numbers.optimum_saving_pct ?? 0)
+      const day = <>{hs ? `Average of ${hs.n_days} modelled RVCE days${optSav > 0 ? `; the best possible plan would pay ${optSav.toFixed(1)}% less` : ''}. ` : ''}One {SCENARIO(sc)} day up close ({fmtDate(sc.scenario.date)}{out ? `, BESCOM supply down ${slotT(out[0])}–${slotT(out[1])}` : ''}): {pr ? <>{exp > 1 ? <>around noon it exported <b className="tn">{num(exp)} kWh</b> at Rs {noonPrice}/kWh, and </> : ''}in the evening it imported <b className="tn">{num(Number(pr.evening_import_kwh))} kWh</b> at up to Rs {evePrice}/kWh.</> : 'every building acts on its own.'}</>
+      const pts = (sc.problem_points ?? []).filter(x => x && x.title).slice(0, 4)
       return {
         answer: hs ? <>{hs.step1.text}{hs.tariff_pending && <> <Pending what="Tariff" /></>}</>
-          : out ? <>Today the campus sells noon solar cheaply, buys power back expensively in the evening, and runs diesel when the grid fails.</>
-          : <>Today the campus sells noon solar cheaply and buys power back expensively in the evening.</>,
-        support: <>
-          <p>{hs ? `Average of ${hs.n_days} modelled RVCE days${hs.numbers.optimum_saving_pct ? `; the best possible plan would pay ${Number(hs.numbers.optimum_saving_pct).toFixed(1)}% less` : ''}. ` : ''}One {SCENARIO(sc)} day up close ({fmtDate(sc.scenario.date)}{out ? `, BESCOM supply down ${slotT(out[0])}–${slotT(out[1])}` : ''}): {pr ? <>around noon it exported <b className="tn">{num(Number(pr.noon_export_kwh))} kWh</b> at Rs {noonPrice}/kWh, and in the evening imported <b className="tn">{num(Number(pr.evening_import_kwh))} kWh</b> at up to Rs {evePrice}/kWh.</> : 'every building acts on its own.'}</p>
-        </>,
-        keys: sc.problem && <>
-          <Key label="Value lost that day" pending={priceStatus ? 'Tariff' : undefined}><CountUp value={sc.problem.rs_lost} format={rs} /></Key>
+          : out ? <>Today every building acts on its own, and only diesel keeps critical loads up when the grid fails.</>
+          : <>Today every building acts on its own.</>,
+        // problem cards (scenario.problem_points) when the replay has them; the day in numbers moves into a fold
+        support: pts.length
+          ? <div className="problems" role="list">{pts.map(x => <div key={x.key} className={`problem pk-${x.key}`} role="listitem"><b>{regText(x.title, 'problem_points title (replay text)')}</b><span>{regText(x.text, 'problem_points text (replay text)')}</span></div>)}</div>
+          : <p>{day} <SourcesButton rows={sc.data_provenance} /></p>,
+        // the locked headline's problem numbers (results/headline.json); the headline day's replay figures only without it
+        keys: L && L.n_outage_days > 0 ? <>
+          <Key label="Critical loads dark" note={`per outage, mean of ${L.n_outage_days} outage days`}><CountUp value={L.outage_downtime_h.status_quo} format={hm} /></Key>
+          <Key label="Diesel burned" note={`per outage day, ${num(L.outage_diesel_l.status_quo * (L.diesel_co2_kg_per_l ?? 2.68))} kg CO₂`}><CountUp value={L.outage_diesel_l.status_quo} format={v => `${num(v)} L`} delay={0.1} /></Key>
+          <Key label="Electricity bill" pending={priceStatus ? 'Tariff' : undefined} note={`per day, mean of ${L.n_days} days, energy + demand charge`}><CountUp value={L.status_quo_bill_rs} format={rs} delay={0.2} /></Key>
+        </> : sc.problem && <>
+          <Key label="Cost that day" pending={priceStatus ? 'Tariff' : undefined}><CountUp value={sc.problem.cost_rs} format={rs} /></Key>
           <Key label="CO₂ that day" pending={cea ? 'CEA CO₂ factor' : undefined}><CountUp value={sc.problem.co2_kg} format={v => `${num(v)} kg`} delay={0.1} /></Key>
           <Key label="Diesel running" note={`critical loads unserved ${sc.problem.critical_downtime_h.toFixed(1)} h`}><CountUp value={sc.problem.dg_hours} format={v => `${v.toFixed(1)} h`} delay={0.2} /></Key>
         </>,
         extra: <>
-          <DayChart sc={sc} t={p.t} />
-          {sc.problem && <details className="assume defn"><summary>How “value lost” is computed</summary><p className="muted small">Σ over zones of min(kWh exported by day, kWh bought back later) × (average later import price − average export price). {num(sc.problem.reusable_kwh)} kWh qualify on this day.</p></details>}
+          {pts.length > 0 && <details className="assume defn"><summary>One day up close</summary><p className="small">{day} <SourcesButton rows={sc.data_provenance} /></p><DayChart sc={sc} t={p.t} /></details>}
+          {!pts.length && <DayChart sc={sc} t={p.t} />}
+          {L && <details className="assume defn"><summary>Where these numbers come from</summary><p className="muted small">Status-quo simulation (each building on its own, diesel only in outages) on {L.n_days} RVCE days, {L.n_outage_days} with a synthetic BESCOM outage: results/bench_v3/daily.csv via scripts/write_bench_v3.py. Bill = energy charge + the day’s share of the monthly demand charge at {num(L.contract_kva_base)} kVA contract demand (assumed until the BESCOM bill arrives). Diesel CO₂ at {L.diesel_co2_kg_per_l ?? 2.68} kg per litre (assumed).</p></details>}
           <div className="row"><button className="btn ghost small" onClick={p.onPlay}>{p.playing ? 'Pause the day' : 'Replay the day'}</button></div>
         </>,
       }
@@ -112,10 +130,10 @@ function content(p: PanelProps): Body {
       const sel = zs.find(z => z.name === p.zone)
       return {
         answer: <>Every 15 minutes we decide what each of these does.</>,
-        support: <p>RVCE as {zs.length} zones traced from OpenStreetMap, joined by {sc.campus.lines.length} cables. Click a building to see what it can control.</p>,
+        support: <p>RVCE as {zs.length} zones traced from OpenStreetMap, joined by {sc.campus.lines.length} cables{cablesProposed(sc) && <> <StatusBadge s="PROPOSED" what="Inter-building cables" /></>}. Click a building to see what it can control. <SourcesButton rows={sc.data_provenance} /></p>,
         keys: <>
-          <Key label="Rooftop solar">{num(zs.reduce((a, z) => a + z.pv_kwp, 0))} kWp</Key>
-          <Key label="Batteries">{num(zs.reduce((a, z) => a + z.battery_kwh, 0))} kWh</Key>
+          <Key label={<>Rooftop solar{anyNotExisting(sc, 'pv') && <StatusBadge s="PROPOSED" what="Some rooftop solar" />}</>}>{num(zs.reduce((a, z) => a + z.pv_kwp, 0))} kWp</Key>
+          <Key label={<>Batteries{anyNotExisting(sc, 'battery') && <StatusBadge s="PROPOSED" what="Some batteries" />}</>}>{num(zs.reduce((a, z) => a + z.battery_kwh, 0))} kWh</Key>
           <Key label="Diesel sets">{num(zs.reduce((a, z) => a + z.dg_kw, 0))} kW</Key>
         </>,
         extra: <>
@@ -123,7 +141,7 @@ function content(p: PanelProps): Body {
           {sel ? (
             <div className="card">
               <h3>{zn(sel.name)}</h3>
-              <ul className="devlist">{devices(sel, sc).map(dv => <li key={dv.id ?? dv.key}><i className={`dot ${dv.key}`} /><span>{dv.label}</span><span className="muted tn">{dv.detail}</span></li>)}</ul>
+              <ul className="devlist">{devices(sel, sc).map(dv => <li key={dv.id ?? dv.key}><i className={`dot ${dv.key}`} /><span>{dv.label} <StatusBadge s={dv.status} what={dv.label} /></span><span className="muted tn">{dv.detail}</span></li>)}</ul>
               <p className="muted small">Loads are area-based estimates until RVCE meter data arrives.</p>
             </div>
           ) : <p className="muted small">Tip: hover lifts a building; click focuses it.</p>}
@@ -354,7 +372,7 @@ function contentQ(p: PanelProps): Body | null {
   const { d } = p
   const { sc, example: ex } = d
   const Q = d.qs, B = d.bench
-  const priceStatus = sc.price_status !== 'REAL' || (B?.tariff_status ?? 'PENDING') !== 'REAL'
+  const priceStatus = !['REAL', 'VERIFIED'].includes(sc.price_status) || !['REAL', 'VERIFIED'].includes(B?.tariff_status ?? 'PENDING')
   const ds = p.benchDs ?? 'rvce'
   if (p.stop.startsWith('7') && B) return step7(p, B, ds, priceStatus)
   if (!Q) return null
@@ -481,7 +499,7 @@ function step7(p: PanelProps, B: NonNullable<StoryData['bench']>, ds: string, pr
       support: <p>Rows are grouped Today / Research methods / Smart control / Central control / Ours. ▲ marks the best value in each column among methods that work without a central controller; the best possible plan (central, perfect information) is a reference line, not a competitor.</p>,
       keys: <>
         <Key label="Q-Grid gap to best plan" note={g('qgrid', 'certified_gap_pct') !== undefined ? `proven at most ${pct(g('qgrid', 'certified_gap_pct')!, 2)}` : undefined}>{g('qgrid', 'gap_pct') !== undefined ? pct(g('qgrid', 'gap_pct')!, 2) : '–'}</Key>
-        <Key label="Bill saving vs today" pending={priceStatus ? 'Tariff' : undefined}>{g('qgrid', 'saving_pct') !== undefined ? pct(g('qgrid', 'saving_pct')!, 1) : '–'}</Key>
+        {(() => { const sv = g('qgrid', 'saving_pct'); return <Key label={sv !== undefined && sv < 0 ? 'Bill vs today' : 'Bill saving vs today'} pending={priceStatus ? 'Tariff' : undefined} note={sv !== undefined && sv < 0 ? 'higher than today' : undefined}>{sv === undefined ? '–' : sv < 0 ? `+${pct(-sv, 1)}` : pct(sv, 1)}</Key> })()}
         <Key label="Critical downtime" note="h per day">{g('qgrid', 'critical_downtime_h') !== undefined ? g('qgrid', 'critical_downtime_h')!.toFixed(2) : '–'}</Key>
       </>,
       extra: <>{chips}<p className="muted small">{dsl?.label}: mean of {dsl?.n_days} days. Full tables with ± and 95 % intervals: docs/benchmark_v3.md.</p></>,
@@ -525,9 +543,9 @@ function step7(p: PanelProps, B: NonNullable<StoryData['bench']>, ds: string, pr
         answer: c.npv_net_rs > 0
           ? <>Is it worth it? On these assumptions, yes: the nodes pay back in {c.payback_net_years?.toFixed(1)} years, battery wear included.</>
           : <>Is it worth it? Not yet on these assumptions: after battery wear the 10-year value is negative.</>,
-        support: <p>{m.n_buildings} building nodes cost {lakh(c.hardware_rs)} (assumed). Over {m.n_days} RVCE days the bill falls by {lakh(c.bill_saving_rs_per_year)} a year; extra battery wear costs {lakh(c.battery_wear_rs_per_year)} a year, because every optimiser prices wear and cycles only when it pays.{v ? ` A design under test nets ${lakh(v.net_rs_per_year)} a year.` : ''}</p>,
+        support: <p>{m.n_buildings} building nodes cost {lakh(c.hardware_rs)} (assumed). Over {m.n_days} RVCE days the bill {c.bill_saving_rs_per_year >= 0 ? 'falls' : 'rises'} by {lakh(Math.abs(c.bill_saving_rs_per_year))} a year; extra battery wear costs {lakh(c.battery_wear_rs_per_year)} a year, because every optimiser prices wear and cycles only when it pays.{v ? ` A design under test nets ${lakh(v.net_rs_per_year)} a year.` : ''}</p>,
         keys: <>
-          <Key label="Payback, after wear" pending="Tariff">{c.payback_net_years !== null ? `${c.payback_net_years.toFixed(1)} y` : 'none'}</Key>
+          <Key label="Payback, after wear" pending={priceStatus ? 'Tariff' : undefined}>{c.payback_net_years !== null ? `${c.payback_net_years.toFixed(1)} y` : 'none'}</Key>
           <Key label="10-yr NPV, after wear" note={`P5–P95 ${lakh(m.monte_carlo.npv_net_rs.p5)} to ${lakh(m.monte_carlo.npv_net_rs.p95)}`}>{lakh(c.npv_net_rs)}</Key>
           <Key label="Chance NPV is positive" note={`${m.monte_carlo.samples.toLocaleString('en-IN')} Monte Carlo samples`}>{`${Math.round(100 * m.monte_carlo.npv_net_rs.prob_positive)}%`}</Key>
         </>,
@@ -536,10 +554,25 @@ function step7(p: PanelProps, B: NonNullable<StoryData['bench']>, ds: string, pr
     }
     case '7e': {
       const hs = B.headline.story
+      const L = hs?.locked
+      const base = L?.demand_by_contract.find(x => x.contract_kva === L.contract_kva_base)
+      const dl = L ? L.outage_diesel_l.status_quo - L.outage_diesel_l.qgrid : 0
       return {
         answer: hs ? <>{hs.step7.text}{hs.tariff_pending && <> <Pending what="Tariff" /></>}</> : <>{B.headline.text}</>,
-        support: <>{hs?.step7.comms && <p>{hs.step7.comms}</p>}<p>{B.headline.text} {B.headline.detail}</p></>,
-        extra: <p className="muted small">Sentences generated from results/bench_v3 by scripts/write_bench_v3.py. Tariffs and demand charge are stand-ins until the official BESCOM/KERC tariff is added{priceStatus ? ' (PENDING)' : ''}.</p>,
+        support: hs ? <>{hs.step7.comms && <p>{hs.step7.comms}</p>}</> : <p>{B.headline.text} {B.headline.detail}</p>,
+        keys: L && <>
+          {L.n_outage_days > 0 && <Key label="Critical loads dark, per outage" note={`today ${hm(L.outage_downtime_h.status_quo)}; best plan ${hm(L.outage_downtime_h.optimum)}`}>{hm(L.outage_downtime_h.qgrid)}</Key>}
+          {L.n_outage_days > 0 && Math.abs(dl) >= 0.5 && <Key label={dl > 0 ? 'Diesel saved, per outage' : 'Extra diesel, per outage'} note={`${num(Math.abs(dl) * (L.diesel_co2_kg_per_l ?? 2.68))} kg CO₂`}>{num(Math.abs(dl))} L</Key>}
+          {base && <Key label="Monthly demand charge" pending={priceStatus ? 'Tariff' : undefined} note={`at ${num(base.contract_kva)} kVA contract demand (assumed)`}>{base.change_rs_month <= 0 ? '−' : '+'}{rs(Math.abs(base.change_rs_month))}</Key>}
+        </>,
+        extra: <>
+          {hs && <details className="assume defn"><summary>Day by day, and on the other campuses</summary><p className="small">{B.headline.text} {B.headline.detail}</p></details>}
+          {L && L.demand_by_contract.length > 1 && <details className="assume defn"><summary>Demand charge at other contract demands</summary>
+            <table className="metrics"><thead><tr><th>Contract demand</th><th>Today</th><th>Q-Grid</th><th>Change / month</th></tr></thead>
+              <tbody>{L.demand_by_contract.map(x => <tr key={x.contract_kva}><td>{num(x.contract_kva)} kVA</td><td>{rs(x.status_quo_rs_month)}</td><td>{rs(x.qgrid_rs_month)}</td><td>{x.change_rs_month <= 0 ? '−' : '+'}{rs(Math.abs(x.change_rs_month))}</td></tr>)}</tbody></table>
+            <p className="muted small">RVCE’s contract demand is not known until its BESCOM HT bill arrives; billing demand is the month’s maximum or 85 % of contract demand, whichever is higher.</p></details>}
+          <p className="muted small">Generated from results/bench_v3 by scripts/write_bench_v3.py (also results/headline.json). Tariff: BESCOM HT-2(c)(ii), KERC Tariff Orders 2022 and 2023{priceStatus ? ' (not fully verified)' : ', verified'}. Outages are synthetic and seeded.</p>
+        </>,
       }
     }
   }

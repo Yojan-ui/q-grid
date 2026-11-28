@@ -56,16 +56,59 @@ def values() -> dict:
                   "replan_time_s", "admm_convergence_rate", "qaoa_p_opt", "cost_rs_semester", "co2_t_year", "self_consumption_pct"):
             if k in r and not pd.isna(r[k]):
                 v[f"{r.method}.{r.day_set}.{r.price_scenario}.{k}"] = float(r[k])
-    h = json.loads((ROOT / "results" / "headline.json").read_text())
+    h = json.loads((ROOT / "results" / "headline.json").read_text(encoding="utf-8"))
+    hv1 = h.get("legacy_v1", h)                  # v1 card (superseded); the locked headline is h["sentence"]
     for side in ("before", "after", "optimum_B4"):
-        for k, x in h[side].items():
+        for k, x in (hv1.get(side) or {}).items():
             v[f"headline.{side}.{k}"] = x
-    eco = json.loads((ROOT / "results" / "economics.json").read_text())
+    if h.get("sentence"):
+        v["headline.sentence"] = h["sentence"]
+        v["headline.step1"] = h.get("step1", "")
+    n = h.get("numbers") or {}
+    if n:                                        # the locked headline's numbers, keys hl.* (pitch, deck, Q&A templates)
+        co2 = float(n.get("diesel_co2_kg_per_l", 2.68))
+        dt, dl = n["outage_downtime_h"], n["outage_diesel_l"]
+        v.update({"hl.n_days": float(n["n_days"]), "hl.n_outage_days": float(n["n_outage_days"]),
+                  "hl.sq_downtime_h": dt["status_quo"], "hl.q_downtime_h": dt["qgrid"], "hl.opt_downtime_h": dt["optimum"],
+                  "hl.sq_downtime_min": 60 * dt["status_quo"], "hl.q_downtime_min": 60 * dt["qgrid"],
+                  "hl.downtime_cut_h": dt["status_quo"] - dt["qgrid"], "hl.downtime_cut_min": 60 * (dt["status_quo"] - dt["qgrid"]),
+                  "hl.downtime_cut_pct": 100 * (dt["status_quo"] - dt["qgrid"]) / dt["status_quo"] if dt["status_quo"] else 0.0,
+                  "hl.sq_diesel_l": dl["status_quo"], "hl.q_diesel_l": dl["qgrid"], "hl.opt_diesel_l": dl["optimum"],
+                  "hl.diesel_saved_l": dl["status_quo"] - dl["qgrid"], "hl.co2_saved_kg": (dl["status_quo"] - dl["qgrid"]) * co2,
+                  "hl.sq_diesel_co2_kg": dl["status_quo"] * co2, "hl.diesel_co2_kg_per_l": co2,
+                  "hl.normal_saving_pct": n["normal_day_saving_pct"], "hl.all_saving_pct": n["all_day_saving_pct"],
+                  "hl.normal_extra_pct": -n["normal_day_saving_pct"], "hl.all_extra_pct": -n["all_day_saving_pct"],
+                  "hl.sq_bill_rs": n["status_quo_bill_rs"], "hl.contract_kva": n["contract_kva_base"],
+                  "hl.normal_abs_pct": abs(n["normal_day_saving_pct"]), "hl.all_abs_pct": abs(n["all_day_saving_pct"]),
+                  "hl.normal_dir": "lower" if n["normal_day_saving_pct"] >= 0 else "higher",
+                  "hl.all_dir": "lower" if n["all_day_saving_pct"] >= 0 else "higher",
+                  "hl.diesel_verb": "saves" if dl["status_quo"] >= dl["qgrid"] else "uses more",
+                  "hl.diesel_abs_l": abs(dl["status_quo"] - dl["qgrid"]), "hl.co2_abs_kg": abs(dl["status_quo"] - dl["qgrid"]) * co2})
+        for m_, x in (n.get("normal_day_gap_pct") or {}).items():       # gap on the no-outage days, per method
+            if x is not None:
+                v[f"hl.ngap.{m_}"] = float(x)
+        if n.get("normal_day_best_nocoord"):
+            v["hl.ngap_best"] = float(n["normal_day_best_nocoord"]["gap_pct"])
+            v["hl.ngap_best_name"] = n["normal_day_best_nocoord"]["name"]
+        if n.get("gap_pct") is not None:
+            v["hl.gap_pct"] = float(n["gap_pct"])
+        if n.get("alt"):
+            v["hl.alt"] = n["alt"]; v["hl.alt_gap_pct"] = float(n["alt_gap_pct"])
+        for x in n.get("demand_by_contract", []):
+            k = f"hl.dc.{x['contract_kva']:.0f}"
+            v.update({f"{k}.sq_rs": x["status_quo_rs_month"], f"{k}.q_rs": x["qgrid_rs_month"], f"{k}.change_rs": x["change_rs_month"],
+                      f"{k}.abs_change_rs": abs(x["change_rs_month"]), f"{k}.sq_md_kva": x["status_quo_max_md_kva"],
+                      f"{k}.q_md_kva": x["qgrid_max_md_kva"]})
+            if x["contract_kva"] == n["contract_kva_base"]:
+                v.update({"hl.dc.base.change_rs": x["change_rs_month"], "hl.dc.base.abs_change_rs": abs(x["change_rs_month"]),
+                          "hl.dc.base.verb": "falls" if x["change_rs_month"] < 0 else "rises",
+                          "hl.dc.base.sq_rs": x["status_quo_rs_month"], "hl.dc.base.q_rs": x["qgrid_rs_month"]})
+    eco = json.loads((ROOT / "results" / "economics.json").read_text(encoding="utf-8"))
     for sc_, e in eco.items():
         for k, x in e.items():
             if isinstance(x, (int, float)) or x is None:
                 v[f"eco.{sc_}.{k}"] = x
-    ss = json.loads((ROOT / "results" / "search_space.json").read_text())
+    ss = json.loads((ROOT / "results" / "search_space.json").read_text(encoding="utf-8"))
     v["search.N"] = ss["centralised_full_day"]["N_binary"]
     v["search.log10"] = ss["centralised_full_day"]["log10_states"]
     v["search.max_qubits"] = max(ss["local_qubo_qubits"].values())
@@ -88,11 +131,22 @@ def values() -> dict:
         v[f"scaling.p{p}.nmax.p_opt"] = float(t.loc[(nmax, p)])
     v["scaling.nmax"] = nmax
     v["scaling.uniform_nmax"] = 2.0 ** -nmax
-    meta = json.loads((ROOT / "data" / "processed" / "meta.json").read_text())
+    meta = json.loads((ROOT / "data" / "processed" / "meta.json").read_text(encoding="utf-8"))
     v["price_A_status"] = meta["prices"]["A"]["status"]
     v["price_B_status"] = meta["prices"]["B"]["status"]
     v.update(values_v2())
     v.update(values_v3())
+    if "imp.hardware_rs" in v:                   # one spoken line for the pitch / runbook, sign-aware
+        hw, nb_ = v["imp.hardware_rs"] / 1e5, v["imp.n_buildings"]
+        pb, npv = v.get("imp.payback_net_years"), v.get("imp.npv_net_rs", 0.0)
+        if npv > 0 and pb:
+            v["imp.spoken"] = (f"About Rs {hw:.1f} lakh of node hardware for {nb_:.0f} buildings; with battery wear counted it pays "
+                               f"back in about {pb:.1f} years on our assumed costs.")
+        else:
+            why = (" The case today is reliability: fewer dark hours for critical loads when BESCOM fails."
+                   if v.get("hl.downtime_cut_h", 0) > 0 else "")
+            v["imp.spoken"] = (f"About Rs {hw:.1f} lakh of node hardware for {nb_:.0f} buildings. On the electricity bill alone it "
+                               f"does not pay back on our assumed costs.{why}")
     return v
 
 
@@ -101,12 +155,12 @@ def values_v3() -> dict:
     v = {}
     qp = ROOT / "results" / "quantum_placement" / "summary.json"
     if qp.exists():
-        for k, x in json.loads(qp.read_text()).items():
+        for k, x in json.loads(qp.read_text(encoding="utf-8")).items():
             if isinstance(x, (int, float)) and x is not None:
                 v[f"q3.qp.{k}"] = float(x)
     sv = ROOT / "results" / "ablation" / "shapley.json"
     if sv.exists():
-        for metric, d in json.loads(sv.read_text()).items():
+        for metric, d in json.loads(sv.read_text(encoding="utf-8")).items():
             for f, x in d.items():
                 v[f"q3.shap.{metric}.{f}"] = float(x)
     ab = ROOT / "results" / "ablation" / "ablation_summary.csv"
@@ -128,7 +182,7 @@ def values_v3() -> dict:
         v["q3.b.n_datasets"] = float(b.dataset.nunique())
     rb = ROOT / "results" / "replay" / "bench_v3.json"
     if rb.exists():
-        h = json.loads(rb.read_text())["headline"]
+        h = json.loads(rb.read_text(encoding="utf-8"))["headline"]
         v["q3.headline"] = h["text"] + " " + h["detail"]
         st = h.get("story") or {}
         if st:
@@ -146,10 +200,15 @@ def values_v3() -> dict:
         rv = h.get("rvce") or {}
         if rv:
             v["q3.alt_name"] = rv["alt"]; v["q3.alt_gap"] = float(rv["alt_gap"])
+            if rv.get("p") is not None:
+                v["q3.rv.p"] = float(rv["p"])
+            if rv.get("qgrid_closer_days") is not None:
+                v["q3.rv.qgrid_closer_days"] = float(rv["qgrid_closer_days"]); v["q3.rv.n_days"] = float(rv["n_days"])
+                v["q3.rv.alt_closer_days"] = float(rv["n_days"] - rv["qgrid_closer_days"])
         v["q3.best_on_n"] = float(len(h.get("best_on", []))); v["q3.n_campuses"] = float(h.get("n", 0))
     im = ROOT / "results" / "impact" / "impact.json"
     if im.exists():
-        m = json.loads(im.read_text())
+        m = json.loads(im.read_text(encoding="utf-8"))
         c = m["central"]
         for k, x in c.items():
             if isinstance(x, (int, float)):
@@ -159,6 +218,15 @@ def values_v3() -> dict:
                 v[f"imp.mc.{side}.{q}"] = float(x) * (100 if q == "prob_positive" else 1e-5)
         v["imp.n_buildings"] = float(m["n_buildings"]); v["imp.hw_lo"] = float(m["per_building"][0]["hardware_rs"][0]); v["imp.hw_hi"] = float(m["per_building"][0]["hardware_rs"][1])
         v["imp.throughput_kwh_day"] = float(m["benefit"]["extra_throughput_kwh_per_day_mean"])
+        bs, npv, pb = c["bill_saving_rs_per_year"], c["npv_net_rs"], c.get("payback_net_years")
+        mc = m["monte_carlo"]["npv_net_rs"]
+        v["imp.sentence"] = (                    # sign-aware wording, so the README never says "saving" for a cost
+            f"Node hardware ≈ Rs {c['hardware_rs'] / 1e5:.1f} lakh for {m['n_buildings']} buildings (assumed costs); the bill "
+            f"{'falls' if bs >= 0 else 'rises'} by ≈ Rs {abs(bs) / 1e5:.1f} lakh/year; extra battery wear ≈ Rs "
+            f"{c['battery_wear_rs_per_year'] / 1e5:.1f} lakh/year (every optimiser prices wear in its objective). "
+            + (f"Payback ≈ {pb:.1f} years; 10-year NPV Rs {npv / 1e5:.1f} lakh" if npv > 0 and pb else
+               f"On these assumptions the nodes do not pay back on the electricity bill alone (10-year NPV Rs {npv / 1e5:.1f} lakh)")
+            + f" (Monte Carlo P5–P95: Rs {mc['p5'] / 1e5:.1f} to {mc['p95'] / 1e5:.1f} lakh; P(NPV > 0) = {100 * mc['prob_positive']:.0f} %).")
         if m.get("variant"):
             vv = m["variant"]
             v["imp.var.net_lakh"] = vv["net_rs_per_year"] / 1e5; v["imp.var.npv_lakh"] = vv["npv_net_rs"] / 1e5
@@ -166,12 +234,16 @@ def values_v3() -> dict:
             v["imp.var.downtime_h"] = vv["critical_downtime_h"]; v["imp.var.wear"] = vv["wear_rs_per_kwh_in_objective"]
     lv = ROOT / "results" / "replay" / "live.json"
     if lv.exists():
-        L = json.loads(lv.read_text())
+        L = json.loads(lv.read_text(encoding="utf-8"))
         rm = L["remove"].get("heavy_labs")
         if rm:
             v["live.remove.rounds_after"] = float(rm["after"]["admm_rounds"]); v["live.remove.rounds_before"] = float(rm["before"]["admm_rounds"])
             v["live.remove.crit_after"] = float(rm["others"]["crit_shed_after_kwh"]); v["live.remove.compute_s"] = float(rm["compute_s"])
             v["live.remove.lines"] = float(len(rm["lines_dark"])); v["live.remove.time"] = rm["time"]
+            cs, cs0 = float(rm["others"]["crit_shed_after_kwh"]), float(rm["others"]["crit_shed_before_kwh"])
+            v["live.remove.crit_text"] = ("every critical load in the other buildings is still served" if cs < 0.5
+                                          else f"the other buildings leave {cs:,.1f} kWh of critical load unserved over the next "
+                                               f"24 h (with it online: {cs0:,.1f} kWh)")
         v["live.remove.max_s"] = float(max(r["compute_s"] for r in L["remove"].values()))
         if L["qaoa"]:
             v["live.qaoa.max_s"] = float(max(q["qaoa"]["time_s"] + q["exact"]["time_s"] for q in L["qaoa"]))
@@ -197,6 +269,25 @@ def values_v3() -> dict:
             v["cons.qaoa_beats_exact_days"] = float((pv.design_benders_qaoa < pv.design_benders_exact * (1 - 1e-8)).sum())
             v["cons.days"] = float(len(pv))
             v["cons.qaoa_agree_pct"] = 100 * float(rv_[rv_.method == "design_benders_qaoa"].master_opt_share.mean())
+    pl = ROOT / "results" / "planner" / "planner.json"       # investment planner (scripts/plan_investment.py)
+    if pl.exists():
+        P = json.loads(pl.read_text(encoding="utf-8"))
+        o, b0 = P["optimum"], P["baseline"]
+        v["plan.extra_kwp"] = float(sum(o["extra_kwp"].values())); v["plan.battery_kwh"] = float(o["battery_kwh"])
+        v["plan.contract_kva"] = float(o["contract_kva"]); v["plan.capex_lakh"] = o["capex_rs"] / 1e5
+        v["plan.saving_lakh"] = o["annual_saving_rs"] / 1e5; v["plan.npv_lakh"] = o["npv10_rs"] / 1e5
+        v["plan.payback_years"] = float(o["payback_years"] or 0.0); v["plan.peak_kva"] = float(o["peak_kva"])
+        v["plan.base_cost_lakh"] = b0["annual_cost_rs"] / 1e5; v["plan.base_peak_kva"] = float(b0["peak_kva"])
+        v["plan.base_contract_kva"] = float(b0["contract_kva"]); v["plan.n_cases"] = float(len(P["cases"]))
+        v["plan.existing_kwp"] = float(sum(g["existing_kwp"] for g in P["roof_groups"]))
+        v["plan.payback_text"] = (f"payback ≈ {o['payback_years']:.1f} years" if o.get("payback_years") and o["annual_saving_rs"] > 0
+                                  else "no payback on these assumptions")
+    sj = ROOT / "results" / "sensitivity" / "summary.json"    # scripts/write_sensitivity.py
+    if sj.exists():
+        for case, d in json.loads(sj.read_text(encoding="utf-8")).items():
+            for k, x in d.items():
+                if isinstance(x, (int, float)):
+                    v[f"sens.{case}.{k}"] = float(x)
     return v
 
 
@@ -239,7 +330,7 @@ def values_v2() -> dict:
             v[f"v2.fc.max.{k}"] = float(f_[k].max())
     hw = d / "hardware.json"
     if hw.exists():
-        hj = json.loads(hw.read_text())
+        hj = json.loads(hw.read_text(encoding="utf-8"))
         v["v2.hw.ibm_status"] = hj["ibm"]["status"]
         v["v2.hw.dwave_status"] = hj["dwave"].get("dwave", "")
         v["v2.hw.campus_n"] = hj["dwave"].get("n_binaries")
@@ -249,7 +340,7 @@ def values_v2() -> dict:
             v["v2.hw.aer_found_opt_pct"] = 100 * float(np.mean([r["aer_found_opt"] for r in rows]))
             v["v2.hw.n_blocks"] = len(rows)
     import yaml
-    cfg = yaml.safe_load((ROOT / "config.yaml").read_text())
+    cfg = yaml.safe_load((ROOT / "config.yaml").read_text(encoding="utf-8"))
     v["v2.tariff_status"] = cfg["tariff_v2"]["status"]
     v["v2.demand_rate_month"] = float(cfg["tariff_v2"]["demand_rs_per_kva_month"])
     return v
@@ -291,7 +382,7 @@ def write_results_v2(v: dict):
         return
     s = pd.read_csv(d / "benchmark_v2_summary.csv")
     b = pd.read_csv(d / "benchmark_v2.csv")
-    meta = json.loads((ROOT / "data" / "processed" / "meta.json").read_text())
+    meta = json.loads((ROOT / "data" / "processed" / "meta.json").read_text(encoding="utf-8"))
     out = [f"# Results — hybrid Benders design (an earlier design step; computed on the previous template load profiles)\n\n> {QUANTUM_LABEL}. "
            "† QIEA = quantum-inspired evolutionary algorithm, classical CPU — not quantum computing.\n",
            "_Generated by `scripts/write_results_md.py` from `results/v2/*.csv` (produced by `scripts/run_benchmark_v2.py`); "
@@ -335,7 +426,7 @@ def write_results_v2(v: dict):
                    "and smooth, so real rooftop forecasting error would be larger.\n")
     hw = d / "hardware.json"
     if hw.exists():
-        hj = json.loads(hw.read_text())
+        hj = json.loads(hw.read_text(encoding="utf-8"))
         out.append("## Real quantum hardware (optional, experimental)\n")
         out.append(f"- IBM Quantum: {hj['ibm']['status']}. Qiskit Aer on the same {len(hj['ibm']['rows'])} recorded master blocks: "
                    f"best measured assignment = exact optimum in {sum(r['aer_found_opt'] for r in hj['ibm']['rows'])} of {len(hj['ibm']['rows'])}.")
@@ -343,7 +434,7 @@ def write_results_v2(v: dict):
         out.append(f"- D-Wave Leap: {dw.get('dwave')}. Whole-campus 24 h commitment QUBO: {dw.get('n_binaries')} binaries; simulated "
                    f"annealing {dw.get('sa_gap_pct', float('nan')):.2f} % from the exact MILP masters.")
         out.append("\nHardware results, when run, are noisy and are shown next to simulator and exact results.\n")
-    (ROOT / "docs" / "results_v2.md").write_text("\n".join(out))
+    (ROOT / "docs" / "results_v2.md").write_text("\n".join(out), encoding="utf-8")
 
 
 def render(text: str, v: dict) -> str:
@@ -361,7 +452,7 @@ def render(text: str, v: dict) -> str:
 
 def main():
     s = pd.read_csv(ROOT / "results" / "benchmark_summary.csv")
-    meta = json.loads((ROOT / "data" / "processed" / "meta.json").read_text())
+    meta = json.loads((ROOT / "data" / "processed" / "meta.json").read_text(encoding="utf-8"))
     st = meta["data_status"]
     pend = [f"{k}: {x}" for k, x in st.items() if x != "REAL"]
     out = [f"# Results (RVCE campus model)\n\n> {QUANTUM_LABEL}. † QIEA = quantum-inspired evolutionary algorithm, classical CPU — not quantum computing.\n",
@@ -369,8 +460,13 @@ def main():
            "Earlier generic 5-building results: `docs/results_v1.md`._\n",
            "## ⚠️ Data status — read first\n",
            "Real: NASA POWER (PV), Ausgrid (hostel load shape), OpenStreetMap (layout). **PENDING:** " + "; ".join(pend) + ". "
-           "Both price scenarios use labelled STAND-IN prices and campus loads are area-based estimates, so **no Rs figure "
-           "below is a headline result yet**; comparisons between methods on identical inputs are meaningful. "
+           + (f"Price scenario A is the BESCOM HT-2(c)(ii) tariff from the KERC Tariff Orders 2022 and 2023 ({meta['prices']['A']['status']}); "
+              "campus loads are area-based estimates, so Rs figures are modelled, not metered. "
+              if meta["prices"]["A"]["status"] in ("REAL", "VERIFIED") else
+              "Both price scenarios use labelled STAND-IN prices and campus loads are area-based estimates, so **no Rs figure "
+              "below is a headline result yet**; ")
+           + "Comparisons between methods on identical inputs are meaningful. The locked headline is in `docs/headline.md` "
+           "(from the five-campus scorecard, `docs/benchmark_v3.md`). "
            "Re-run `scripts/refresh_all.sh` when the files in `docs/data_request.md` arrive.\n",
            "## Setup\n",
            "9 OSM-derived zones, tie-lines from the real layout (MST + 2 mesh links), 96 × 15-min slots. QAOA in the loop on "
@@ -386,15 +482,15 @@ def main():
     v = values()
     tmpl = (ROOT / "docs" / "templates" / "results_tail.md")
     if tmpl.exists():
-        out.append(render(tmpl.read_text(), v))
-    (ROOT / "docs" / "results.md").write_text("\n".join(out))
+        out.append(render(tmpl.read_text(encoding="utf-8"), v))
+    (ROOT / "docs" / "results.md").write_text("\n".join(out), encoding="utf-8")
     for t in (ROOT / "docs" / "templates").glob("*.md"):
         if t.name == "results_tail.md":
             continue
         dest = ROOT / ("README.md" if t.name == "README.md" else f"docs/{t.name}")
-        dest.write_text(render(t.read_text(), v))
+        dest.write_text(render(t.read_text(), v), encoding="utf-8")
     write_results_v2(v)
-    missing = sum(p.read_text().count("⟨missing") for p in [ROOT / "README.md", *(ROOT / "docs").glob("*.md")])
+    missing = sum(p.read_text(encoding="utf-8").count("⟨missing") for p in [ROOT / "README.md", *(ROOT / "docs").glob("*.md")])
     print(f"wrote docs/results.md and rendered templates ({missing} missing placeholders)")
 
 

@@ -44,7 +44,9 @@ def _day_models(campus: Campus, yd, day: str, outage):
     return models, const
 
 
-def _central(campus, models, relax: bool, time_limit: float = 120.0, want_x: bool = False):
+def _central(campus, models, relax: bool, time_limit: float = 120.0, want_x: bool = False, peak: dict | None = None):
+    """peak: campus monthly-peak term {rate, pf, ref_kva, contract_kva, xs_rate} (qgrid/ablation/demand.py): extra columns
+    P >= sum_i imp_i[h] / pf - ref (cost rate) and X >= sum_i imp_i[h] / pf - contract (cost xs_rate), after the buildings' columns."""
     offs = np.cumsum([0] + [m.ncol for m in models])
     A = sp.block_diag([m.A for m in models], format="lil")
     rows = []
@@ -57,18 +59,27 @@ def _central(campus, models, relax: bool, time_limit: float = 120.0, want_x: boo
     for r, (p_, q_) in enumerate(rows):
         E[r, p_] = 1.0; E[r, q_] = -1.0
     A = sp.vstack([A.tocsc(), E.tocsc()], format="csc")
+    cost = np.concatenate([m.cost0 for m in models])
+    lo_c = np.concatenate([m.lb0 for m in models]); hi_c = np.concatenate([m.ub0 for m in models])
+    r_lo = np.concatenate([m.rlo for m in models] + [np.zeros(len(rows))])
+    r_hi = np.concatenate([m.rhi for m in models] + [np.zeros(len(rows))])
+    integ = np.concatenate([m.integ for m in models])
+    extra = _peak_block(models, offs, peak)
+    if extra is not None:
+        P, c_add, rlo_add, rhi_add = extra
+        A = sp.hstack([A, sp.csc_matrix((A.shape[0], len(c_add)))], format="csc")
+        A = sp.vstack([A, P], format="csc")
+        cost = np.r_[cost, c_add]; lo_c = np.r_[lo_c, np.zeros(len(c_add))]; hi_c = np.r_[hi_c, np.full(len(c_add), highspy.kHighsInf)]
+        r_lo = np.r_[r_lo, rlo_add]; r_hi = np.r_[r_hi, rhi_add]; integ = np.r_[integ, np.zeros(len(c_add), bool)]
     h = highspy.Highs(); h.setOptionValue("output_flag", False)
     h.setOptionValue("time_limit", time_limit); h.setOptionValue("mip_rel_gap", 1e-4)
     lp = highspy.HighsLp(); lp.num_col_, lp.num_row_ = A.shape[1], A.shape[0]
-    lp.col_cost_ = np.concatenate([m.cost0 for m in models])
-    lp.col_lower_ = np.concatenate([m.lb0 for m in models]); lp.col_upper_ = np.concatenate([m.ub0 for m in models])
-    lp.row_lower_ = np.concatenate([m.rlo for m in models] + [np.zeros(len(rows))])
-    lp.row_upper_ = np.concatenate([m.rhi for m in models] + [np.zeros(len(rows))])
+    lp.col_cost_, lp.col_lower_, lp.col_upper_ = cost, lo_c, hi_c
+    lp.row_lower_, lp.row_upper_ = r_lo, r_hi
     lp.a_matrix_.format_ = highspy.MatrixFormat.kColwise
     lp.a_matrix_.start_, lp.a_matrix_.index_, lp.a_matrix_.value_ = A.indptr, A.indices, A.data
     lp.a_matrix_.num_col_, lp.a_matrix_.num_row_ = A.shape[1], A.shape[0]
     if not relax:
-        integ = np.concatenate([m.integ for m in models])
         lp.integrality_ = [highspy.HighsVarType.kInteger if t else highspy.HighsVarType.kContinuous for t in integ]
     h.passModel(lp); h.run()
     info = h.getInfo()
@@ -78,17 +89,40 @@ def _central(campus, models, relax: bool, time_limit: float = 120.0, want_x: boo
             "status": str(h.getModelStatus()), "gap": float(getattr(info, "mip_gap", 0.0))}
 
 
-def _central_solve(campus, models, time_limit: float = 10.0) -> list:
+def _peak_block(models, offs, peak):
+    """Rows / columns of the campus monthly-peak term (None when off)."""
+    if not peak or peak.get("rate", 0) <= 0:
+        return None
+    H = models[0].H
+    ncol = int(offs[-1])
+    cols = [("rate", peak.get("ref_kva", 0.0) or 0.0, float(peak["rate"]))]
+    if peak.get("contract_kva") and peak.get("xs_rate", 0) > 0:
+        cols.append(("xs", float(peak["contract_kva"]), float(peak["xs_rate"])))
+    P = sp.lil_matrix((H * len(cols), ncol + len(cols)))
+    rhi = []
+    for k, (_, lim, _) in enumerate(cols):
+        for h in range(H):
+            r = k * H + h
+            for i, m in enumerate(models):
+                P[r, offs[i] + m.col["imp"][h]] = 1.0 / peak["pf"]
+            P[r, ncol + k] = -1.0
+            rhi.append(lim)
+    return P.tocsc(), np.array([c for *_, c in cols]), np.full(len(rhi), -highspy.kHighsInf), np.array(rhi)
+
+
+def _central_solve(campus, models, time_limit: float = 10.0, peak: dict | None = None) -> list:
     """Central MILP over the given building models (cables tied); returns each building's solution vector."""
     offs = np.cumsum([0] + [m.ncol for m in models])
-    r = _central(campus, models, relax=False, time_limit=time_limit, want_x=True)
+    r = _central(campus, models, relax=False, time_limit=time_limit, want_x=True, peak=peak)
     return [r["x"][offs[i]:offs[i + 1]] for i in range(len(models))]
 
 
-def day_bounds(campus: Campus, yd, day: str, outage) -> dict:
+def day_bounds(campus: Campus, yd, day: str, outage, demand: dict | None = None) -> dict:
+    """demand: the monthly-peak term (demand.planner_params) -> opt_central / LB_mip / LB_lp include it. LB_lag stays on
+    the energy objective alone, still a valid lower bound because the peak term is >= 0."""
     models, const = _day_models(campus, yd, day, outage)
-    lpb = _central(campus, models, relax=True)
-    mip = _central(campus, models, relax=False)
+    lpb = _central(campus, models, relax=True, peak=demand)
+    mip = _central(campus, models, relax=False, peak=demand)
     # Lagrangian bound with decentralised ADMM prices from the LP relaxation (integers relaxed: pass LP solution)
     relaxed = []
     for m in models:

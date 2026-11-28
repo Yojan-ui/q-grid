@@ -89,7 +89,7 @@ def build_scenario(key: str) -> dict:
     reset_stats()
     s_q, st = run_day(campus, day, method="qaoa", log=True, explain_slots=set(range(0, 96, 4)))
     m_q = settle(campus, day, s_q)
-    sq = json.loads(sched_file.read_text())["B0"] if sched_file.exists() else None
+    sq = json.loads(sched_file.read_text(encoding="utf-8"))["B0"] if sched_file.exists() else None
     bench_ours = rows[(rows.method == "OURS") & (rows.price_scenario == "A")]
     consistent = bool(len(bench_ours) and abs(float(bench_ours.cost_rs.iloc[0]) - m_q["cost_rs"]) < 1e-3)
 
@@ -163,7 +163,7 @@ def build_scenario(key: str) -> dict:
     v2s = ROOT / "results" / "v2" / "schedules" / f"{key}_V2-QAOA.json"
     if v2s.exists():
         from qgrid.v2.tariff import settle_v2
-        j = json.loads(v2s.read_text())
+        j = json.loads(v2s.read_text(encoding="utf-8"))
         sch2 = Schedule(np.asarray(j["p_bat"], float), [dict(x) for x in j["flex_start"]], np.asarray(j["flows"], float),
                         np.asarray(j["dg_kw"], float), np.asarray(j["pump_on"], float))
         m2 = settle_v2(campus, day, sch2)
@@ -206,7 +206,7 @@ def build_scenario(key: str) -> dict:
     }
     if key == campus.cfg["headline_scenario"]:
         hj = ROOT / "results" / "headline.json"
-        out["headline"] = json.loads(hj.read_text()) if hj.exists() else None
+        out["headline"] = json.loads(hj.read_text(encoding="utf-8")) if hj.exists() else None
     # worked examples (QAOA measured with Qiskit Aer + exact check) for every scenario, so each day in the demo's
     # scenario picker shows pipeline results
     if True:
@@ -256,6 +256,82 @@ def build_scenario(key: str) -> dict:
     return out
 
 
+def product_fields(cfg: dict, lay: dict, out: dict) -> None:
+    """Fields the Plan tab, the asset badges, the provenance dialog and the Step 1 cards read (all from config/results)."""
+    from qgrid.v2 import campus_scale
+    from qgrid.v2.tariff import ht2c_params
+    st = campus_scale.asset_status(cfg) if "asset_status" in cfg.get("campus", {}) else {}
+    for z in out["campus"]["zones"]:
+        z["asset_status"] = {k: st[k] for k in ("pv", "battery", "dg", "ev") if k in st}
+    if "cables" in st:
+        out["campus"]["cables_status"] = st["cables"]
+    tp = ht2c_params(cfg) if cfg.get("tariff_ht2c") else {}
+    co2 = cfg.get("co2", {})
+    pe = cfg.get("campus", {}).get("pv_existing", {})
+    facts = cfg.get("campus", {}).get("facts", {})
+    dgs = cfg.get("campus", {}).get("dg_sets", {})
+    rows = []
+    if tp:
+        o23 = tp['orders'][-1]
+        rows += [{"item": "Energy charge, HT-2(c)(ii), from 1 Apr 2023", "value_label": f"Rs {o23['energy_rs_kwh']:.2f} per kWh, single slab",
+                  "source": "KERC Tariff Order 2023 (BESCOM)", "page": "p.206", "status": str(o23.get("status", "PENDING"))},
+                 {"item": "Energy charge, HT-2(c)(ii), Jan-Mar 2023", "value_label": "Rs 8.25 / 8.65 per kWh (first 1 lakh units / balance)",
+                  "source": "KERC Tariff Order 2022 (BESCOM)", "page": "p.412", "status": "VERIFIED"},
+                 {"item": "Demand charge", "value_label": f"Rs {o23['demand_rs_kva_month']:g} per kVA per month (Rs {tp['orders'][0]['demand_rs_kva_month']:g} before Apr 2023)",
+                  "source": "KERC Tariff Orders 2023 / 2022 (BESCOM)", "page": "p.206 / p.412", "status": str(o23.get("status", "PENDING"))},
+                 {"item": "Time-of-day", "value_label": "+Rs 1.00 18-22 h, -Rs 1.00 22-06 h, Dec-Jun",
+                  "source": "KERC Tariff Order 2023 (BESCOM)", "page": "p.206", "status": "VERIFIED"},
+                 {"item": "Billing demand", "value_label": f"max(recorded maximum, {100 * tp['billing_demand_floor_frac']:.0f} % of contract demand); excess at 2x",
+                  "source": "KERC Tariff Order 2023, HT billing conditions", "page": "p.365", "status": "VERIFIED"},
+                 {"item": "Contract demand", "value_label": f"{tp['contract_demand_kva']:,.0f} kVA", "source": "modelling choice (RVCE bill pending)",
+                  "page": "", "status": "ASSUMPTION"},
+                 {"item": "Solar export rate", "value_label": f"Rs {tp['export_rs_kwh']:.2f} per kWh", "source": "KERC solar tariff order, 01.06.2023 (rooftop PV 1-2000 kW)",
+                  "page": "p.30", "status": "VERIFIED"}]
+    if co2:
+        rows.append({"item": "Grid CO2 factor", "value_label": f"{float(co2.get('tco2_per_mwh', co2.get('standin_tco2_per_mwh', 0))):.3f} t per MWh",
+                     "source": "CEA CO2 Baseline Database", "page": "", "status": str(co2.get("status", "PENDING"))})
+    if pe:
+        rows.append({"item": "Rooftop solar today", "value_label": f"{pe['modules']:,} modules x {pe['module_wp']} Wp = {pe['modules'] * pe['module_wp'] / 1000:,.2f} kWp on {pe['roofs']} roofs",
+                     "source": "team brief (RVCE estate data pending)", "page": "", "status": "TEAM BRIEF"})
+    if facts:
+        rows.append({"item": "Built-up area", "value_label": f"{facts['built_up_m2']:,} m2 + {facts['boys_hostels_m2']:,} m2 boys' hostels ({facts['boys_hostel_beds']:,} beds)",
+                     "source": "team brief (RVCE estate data pending)", "page": "", "status": "TEAM BRIEF"})
+    if dgs:
+        rows.append({"item": "Diesel generators", "value_label": f"{len(dgs['sets'])} sets, {dgs['total_kva']:,} kVA in total, backup only",
+                     "source": "team brief (RVCE estate data pending)", "page": "", "status": "TEAM BRIEF"})
+    rows.append({"item": "Battery, EV chargers, campus cables", "value_label": "not on campus today", "source": "proposed by this project",
+                 "page": "", "status": "PROPOSED"})
+    rows.append({"item": "Building loads", "value_label": "floor area x energy intensity, BDG2 university load shapes", "source": "stand-in until RVCE meter data",
+                 "page": "", "status": "PENDING"})
+    out["data_provenance"] = rows
+    m = out["runs"]["status_quo"]["metrics"]
+    day = out["scenario"]["date"]
+    pts = []
+    if (np.asarray(out["slots"]["grid_up"]) == 0).any():
+        h = 0.25 * int((np.asarray(out["slots"]["grid_up"]) == 0).sum())
+        pts.append({"key": "outages", "title": f"A {h:g}-hour grid outage on this day",
+                    "text": f"Diesel and UPS carry the campus today; critical load is unserved for {m['critical_downtime_h']:.2f} h."})
+    else:
+        pts.append({"key": "outages", "title": "Grid outages hit labs and hostels",
+                    "text": "When BESCOM supply drops, only diesel and UPS keep the campus running."})
+    pts.append({"key": "diesel", "title": f"{m['dg_litres']:,.0f} litres of diesel on this day" if m["dg_litres"] > 0 else "Diesel is the only backup",
+                "text": f"{len(dgs.get('sets', []))} generator sets ({dgs.get('total_kva', 0):,} kVA) run only in outages (status-quo simulation)." if dgs
+                        else "Generators run only in outages."})
+    if tp:
+        from qgrid.v2.tariff import order_for
+        try:
+            o_day = order_for(cfg, day)                  # the KERC order in force on the headline day
+        except ValueError:
+            o_day = tp["orders"][-1]
+        pts.append({"key": "demand_charges", "title": f"Every kVA of peak costs Rs {o_day['demand_rs_kva_month']:g} a month",
+                    "text": f"Billed on the month's peak, at least {100 * tp['billing_demand_floor_frac']:.0f} % of the {tp['contract_demand_kva']:,.0f} kVA contract. Peak today: {m['peak_import_kw'] / tp.get('power_factor', 0.95):,.0f} kVA."})
+    if pe:
+        rk = sum(float(lay["zones"][z].get("pv_kwp_osm_roof", 0.0)) for z in lay["zones"])
+        pts.append({"key": "roofs", "title": f"{pe['modules'] * pe['module_wp'] / 1000:,.0f} kWp on {pe['roofs']} roofs, more roof unused",
+                    "text": f"Usable roofs could hold about {rk:,.0f} kWp (assumed 45 % of roof, 180 Wp/m2). Plan sizes the next step."})
+    out["problem_points"] = pts
+
+
 def shot_table(samples, lp, qubos, exr):
     """Distinct measured bitstrings with their counts, true objective (Rs), feasibility and optimality."""
     from qgrid import qubo as Q
@@ -277,10 +353,9 @@ V2_COLS = ["method", "objective_incl_demand_rs", "cost_incl_demand_rs", "cost_rs
 
 def attach_qgrid(campus, meta, outs: dict) -> None:
     """Current Q-Grid design (24 h, continuous dispatch, LP coordination, realistic forecasts) on every named day:
-    its run becomes runs.qgrid (the earlier prototype's run is kept as runs.earlier), and the headline day gets the
-    worked example qgrid_story."""
+    its run becomes runs.qgrid (the earlier prototype's run is kept as runs.earlier), and every named day gets the
+    worked example qgrid_story (flag headline=True on the headline day)."""
     from qgrid import data as qdata
-    from qgrid.ablation.engine import ACfg, run_day
     from qgrid.ablation.forecast import GBMForecaster
     from qgrid.ablation.story import qgrid_story
     from qgrid.model import Schedule, make_day
@@ -291,16 +366,15 @@ def attach_qgrid(campus, meta, outs: dict) -> None:
     hold = meta["days"]["eval_days"] + [v["date"] for v in meta["days"]["scenarios"].values()]
     fc = GBMForecaster(campus, proc, yd, hold, cache=ROOT / "results" / "bench_v3" / "gbm_rvce.pkl")
     qp = ROOT / "results" / "quantum_placement" / "summary.json"
-    placement = json.loads(qp.read_text()) if qp.exists() else {}
+    placement = json.loads(qp.read_text(encoding="utf-8")) if qp.exists() else {}
     hs = campus.cfg["headline_scenario"]
     for k, o in outs.items():
         sc = meta["days"]["scenarios"][k]
         with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
-            if k == hs:
-                sched, story = qgrid_story(campus, yd, sc["date"], sc.get("outage"), fc, slot=72, placement=placement)
-                o["qgrid_story"] = story
-            else:
-                sched, _ = run_day(campus, yd, sc["date"], sc.get("outage"), ACfg(True, True, True, True), forecaster=fc)
+            # every named day gets its own worked example (same controller run as run_day with ACfg 1111); without it
+            # the explainer falls back to older run blocks (runs.qgrid_v2) for the non-headline days
+            sched, story = qgrid_story(campus, yd, sc["date"], sc.get("outage"), fc, slot=72, placement=placement)
+            o["qgrid_story"] = {**story, "headline": k == hs}
         day = make_day(campus, proc, sc["date"], "A", k, sc.get("outage"))
         m = settle_v2(campus, day, sched)
         o["runs"]["earlier"] = o["runs"]["qgrid"]
@@ -369,7 +443,7 @@ def attach_v2(campus, meta, outs: dict) -> None:
         proc = qdata.load_processed()
         yd = YearData(campus, proc, "A", forecast=False)
         with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
-            ex = explain_slot(campus, yd, sc["date"], sc.get("outage"), json.loads(sched.read_text()), t0=72,
+            ex = explain_slot(campus, yd, sc["date"], sc.get("outage"), json.loads(sched.read_text(encoding="utf-8")), t0=72,
                               zone="pumping_station", kind="pump")
         outs[hs]["v2"]["example"] = ex
         print(f"v2 worked example: {ex['time']}, {len(ex['benders'])} Benders iterations, "
@@ -398,7 +472,8 @@ def main():
     attach_qgrid(campus, meta, outs)
     for k, o in outs.items():
         o["provenance"] = prov
-        (RDIR / f"scenario_{k}.json").write_text(dump(o))
+        product_fields(campus.cfg, campus.layout, o)
+        (RDIR / f"scenario_{k}.json").write_text(dump(o), encoding="utf-8")
         index["scenarios"].append({"key": k, "date": o["scenario"]["date"], "note": o["scenario"]["note"],
                                    "replay_matches_benchmark": o["replay_matches_benchmark"]})
         print(f"{k}: replay matches benchmark: {o['replay_matches_benchmark']}")
@@ -423,13 +498,13 @@ def main():
           "scenario": hs, "cases": {}}
     for name, params in cases.items():
         sb["cases"][name] = whatif(WhatIf(**{"scenario": hs, **params}))
-    (RDIR / "sandbox.json").write_text(dump(sb))
-    (RDIR / "rules.json").write_text(dump([r.model_dump() for r in load_rules(campus)]))
+    (RDIR / "sandbox.json").write_text(dump(sb), encoding="utf-8")
+    (RDIR / "rules.json").write_text(dump([r.model_dump() for r in load_rules(campus)]), encoding="utf-8")
     index["files"] += ["sandbox.json", "rules.json"]
-    (RDIR / "index.json").write_text(dump(index))
+    (RDIR / "index.json").write_text(dump(index), encoding="utf-8")
     PUB.mkdir(parents=True, exist_ok=True)
     for p in RDIR.glob("*.json"):   # validate every replay file is strict JSON before publishing
-        json.loads(p.read_text(), parse_constant=lambda c: (_ for _ in ()).throw(ValueError(f"{p.name}: {c}")))
+        json.loads(p.read_text(encoding="utf-8"), parse_constant=lambda c: (_ for _ in ()).throw(ValueError(f"{p.name}: {c}")))
     for p in RDIR.glob("*"):
         if p.suffix in (".json", ".csv"):
             shutil.copy(p, PUB / p.name)

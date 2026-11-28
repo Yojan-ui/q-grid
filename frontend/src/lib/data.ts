@@ -4,7 +4,16 @@ export const API = (import.meta as any).env?.VITE_QGRID_API ?? 'http://localhost
 
 export type Zone = { name: string; cx: number; cy: number; pv_kwp: number; battery_kwh: number; battery_kw: number;
   dg_kw: number; tank_m3: number; critical_frac: number; source: string; flex?: { name: string; kw: number; slots: number }[];
-  buildings: { name: string | null; levels: number; polygon: [number, number][] }[] }
+  buildings: { name: string | null; levels: number; polygon: [number, number][] }[]
+  asset_status?: Partial<Record<AssetKey, AssetStatus>> }
+
+/** Whether an asset is on campus today or proposed (scripts/make_replay.py -> campus.zones[i].asset_status). */
+export type AssetStatus = 'EXISTING' | 'PROPOSED' | 'PENDING'
+export type AssetKey = 'pv' | 'battery' | 'dg' | 'ev'
+/** One input of the model and where it comes from (scenario_<key>.json -> data_provenance). */
+export type DataProvenanceRow = { item: string; value_label: string; source: string; page?: string | null; status: string }
+/** Step 1 problem cards (scenario_<key>.json -> problem_points). */
+export type ProblemPoint = { key: 'outages' | 'diesel' | 'demand_charges' | 'roofs' | string; title: string; text: string }
 
 export type Run = { p_bat: number[][]; soc: number[][]; flows: number[][]; dg_kw: number[][]; pump_on: number[][];
   tank_m3: Record<string, number[]>; net_kw: number[][]; grid_import_kw: number[]; grid_export_kw: number[];
@@ -14,13 +23,16 @@ export type Run = { p_bat: number[][]; soc: number[][]; flows: number[][]; dg_kw
 export type Scenario = {
   label: string; qiea_label: string; scenario: { key: string; date: string; day_type: string; note: string; outage: string[] | null }
   price_scenario: string; price_status: string; data_status: Record<string, string>
-  campus: { name: string; credit: string; outline: [number, number][] | null; zones: Zone[]; lines: [string, string][]; line_step_kw: number }
+  campus: { name: string; credit: string; outline: [number, number][] | null; zones: Zone[]; lines: [string, string][]; line_step_kw: number
+    cables_status?: 'PROPOSED' | 'EXISTING' }
   slots: { t: string[]; sun: { elevation_deg: number[]; azimuth_deg: number[] }; pv_kw: number[][]; load_kw: number[][];
     crit_kw: number[][]; price_import: number[]; price_export: number[]; grid_up: number[]; co2_kg_per_kwh: number }
   runs: { qgrid: Run; status_quo?: Run; qgrid_v2?: Run }; replay_matches_benchmark: boolean
   admm: { iterations: Record<string, { k: number; r_primal: number; r_dual: number; agreed: boolean; proposals: Record<string, number[]> }[]>; summary: Record<string, any>; lines: [string, string][] }
   explanations: Record<string, Record<string, string[]>>; qaoa_file: string; benchmark: Record<string, any>[]
   headline?: any; live_solve?: LiveSolve[]; provenance: Provenance
+  data_provenance?: DataProvenanceRow[]
+  problem_points?: ProblemPoint[]
   v2?: V2Data
   qgrid_story?: QStory
   problem?: { rs_lost: number; reusable_kwh: number; co2_kg: number; dg_hours: number; cost_rs: number; critical_downtime_h: number; definition: string } | null
@@ -105,6 +117,17 @@ export type V2Data = { rows: V2Row[]; summary: (V2Row & { day_set: string; n_day
 export type BenchStat = { mean: number; std: number; ci_lo: number; ci_hi: number; n: number }
 export type BenchMethod = { key: string; name: string; group: string; without_coordinator: boolean }
 export type BenchMetric = { key: string; label: string; group: string; better: 'lower' | 'higher'; unit: string; digits: number }
+// ---- the locked headline numbers (scripts/write_bench_v3.py locked_headline(); also results/headline.json)
+export type Locked = {
+  dataset: string; n_days: number; n_outage_days: number
+  outage_downtime_h: Record<string, number>; outage_diesel_l: Record<string, number>
+  normal_day_saving_pct: number; all_day_saving_pct: number; status_quo_bill_rs: number
+  gap_pct: number | null; alt: string | null; alt_gap_pct: number | null
+  demand_by_contract: { contract_kva: number; status_quo_rs_month: number; qgrid_rs_month: number; change_rs_month: number
+    status_quo_max_md_kva: number; qgrid_max_md_kva: number }[]
+  contract_kva_base: number; diesel_co2_kg_per_l?: number; status_quo_export_kwh_day?: number
+}
+
 export type Bench = {
   tariff_status: string
   methods: BenchMethod[]
@@ -115,7 +138,8 @@ export type Bench = {
   wilcoxon: Record<string, Record<string, Record<string, number | null>>>   // dataset -> method -> metric -> p vs Q-Grid
   comms_day: { dataset: string; day: string; window: [number, number]; t: string[]; series: Record<string, number[]>; totals: Record<string, number> } | null
   headline: { text: string; detail: string; story?: { dataset: string; n_days: number; tariff_pending: boolean
-    step1: { text: string; tariff_dependent: boolean }; step7: { text: string; comms: string; tariff_dependent: boolean }; numbers: Record<string, number | null> } }
+    step1: { text: string; tariff_dependent: boolean }; step7: { text: string; comms: string; tariff_dependent: boolean }; numbers: Record<string, number | null>
+    locked?: Locked } }
   shadow?: { day: string; outage: boolean; status_quo: ShadowSide; qgrid: ShadowSide }[]
   design_choices: { key: string; name: string; what_changed: string; gap_pct: number | null; certified_gap_pct: number | null; critical_downtime_h: number | null; runtime_per_decision_s: number | null; source: string }[]
 }
@@ -152,7 +176,7 @@ export type Impact = {
   central: { hardware_rs: number; om_rs_per_year: number; bill_saving_rs_per_year: number; battery_wear_rs_per_year: number; net_rs_per_year: number
     discount_rate: number; npv_gross_rs: number; npv_net_rs: number; payback_gross_years: number | null; payback_net_years: number | null
     wear_rs_per_kwh_throughput: number; breakeven_wear_rs_per_kwh: number | null }
-  monte_carlo: { samples: number; seed: number; npv_gross_rs: Pct; npv_net_rs: Pct; payback_gross_years: { p5: number; p50: number; p95: number } }
+  monte_carlo: { samples: number; seed: number; npv_gross_rs: Pct; npv_net_rs: Pct; payback_gross_years: { p5: number | null; p50: number | null; p95: number | null } }
   per_building: { zone: string; battery_kwh: number; hardware_rs: [number, number]; battery_value_rs: [number, number] }[]
   assumptions: { name: string; value: [number, number] | null; unit: string; source: string }[]
   scale: { stage: string; what: string; evidence: string; datasets?: { dataset: string; label: string; gap_pct: number; saving_pct: number; runtime_per_decision_s: number; messages_per_decision: number }[] }[]
@@ -161,3 +185,22 @@ export type Impact = {
 }
 
 export type ShadowSide = { bill_rs: number; critical_downtime_h: number; dg_litres: number; co2_kg: number; import_kwh: number; unserved_kwh: number }
+
+// ---- investment planner (results/replay/planner.json from scripts/plan_investment.py)
+export type PlanOutcome = { extra_kwp: Record<string, number>; battery_kwh: number; contract_kva: number
+  capex_rs: number; annual_saving_rs: number; payback_years: number | null; npv10_rs: number; peak_kva: number
+  diesel_litres_year: number; co2_t_year: number }
+export type Planner = {
+  status: string; generated_by: string; labels: { tariff?: string; costs?: string } & Record<string, string | undefined>
+  roof_groups: { key: string; label: string; existing_kwp: number; max_extra_kwp: number; step_kwp: number }[]
+  battery: { max_kwh: number; step_kwh: number }; contract_demand_options: number[]
+  cases: PlanOutcome[]; optimum: PlanOutcome & { note?: string }
+  assumptions: { name: string; value: number | string | [number, number] | null; unit: string; source: string }[]
+}
+/** The planner grid, or null when replay/planner.json has not been generated (or is not a planner file). */
+export async function loadPlanner(): Promise<Planner | null> {
+  try {
+    const p = await getJSON<Planner>('planner.json')
+    return p && Array.isArray(p.cases) && Array.isArray(p.roof_groups) && p.battery ? p : null
+  } catch { return null }
+}

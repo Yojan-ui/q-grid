@@ -1,5 +1,9 @@
 # Q-Grid: Decentralised, QAOA-Verified Scheduling for a Campus Solar–Battery–Diesel Microgrid (RVCE case study)
 
+> **Note.** Sections that quote the v1 headline day and the 30-day v1 set come from the earlier pipeline. The current
+> result is the five-campus scorecard ([benchmark_v3.md](benchmark_v3.md)) and the locked headline
+> ([headline.md](headline.md)): {{headline.sentence}}
+
 *Technical report, EUREKA Track 3. QAOA on a local simulator: verified against exact solutions, no quantum advantage claimed.*
 
 ## Abstract

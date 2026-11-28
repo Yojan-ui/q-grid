@@ -1,5 +1,8 @@
 # Viva / judge Q&A (25 questions) — answers grounded in our results
 
+> **Superseded** for the expo by [qa_prep.md](qa_prep.md) (20 questions, locked headline). Answers below that quote the v1
+> headline day or stand-in prices are from the earlier pipeline.
+
 1. **Why QAOA if brute force is instant at 16 qubits?** We need a formulation that is hardware-sized and verifiable. At this size
    we can check every QAOA answer exactly; QAOA is verified optimal in {{tiers.qaoa_pct|1}} % of local solves and the rest fall back.
    We claim no advantage.

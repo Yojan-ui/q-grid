@@ -29,6 +29,7 @@ import pandas as pd
 
 from . import data as qdata
 from .model import T, Battery, Building, Campus, DG, load_campus
+from .v2 import campus_scale
 
 RAW = qdata.RAW
 
@@ -153,13 +154,53 @@ def _eval_days(year: int, seed: int, n: int = 30) -> list[str]:
     return [str(days[k * step + int(rng.integers(0, step))].date()) for k in range(n)]
 
 
+def _rvce_rescaled(cfg: dict, proc: dict) -> tuple[Campus, dict]:
+    """RVCE campus rescaled to the team-brief estate (qgrid/v2/campus_scale.py): RVCE-only OSM buildings, built-up and
+    hostel floor areas, 500.48 kWp existing PV, two DG sets. PV is linear in kWp, so each zone's processed PV series is
+    rescaled exactly; loads are rebuilt with qgrid.data.build_zone_loads on the rescaled floor areas (same shapes, same
+    lab schedule and fest loads). If processed data were already built from a rescaled layout, nothing changes."""
+    layout0 = proc["campus"]
+    layout = campus_scale.rescale_layout(cfg, layout0)
+    cfg2 = campus_scale.apply_dg_sets(cfg)
+    campus = load_campus(cfg2, layout)
+    if layout is layout0:      # processed data already built from the rescaled layout: only record the facts
+        proc = dict(proc)
+        meta = copy.deepcopy(proc["meta"])
+        meta["campus_rescale"] = {k: v for k, v in layout["rescale"].items() if k != "floor_m2_after_exclusion"}
+        meta.setdefault("data_status", {})["campus_assets"] = "TEAM BRIEF (RVCE estate data pending); " + ", ".join(
+            f"{k}: {v}" for k, v in campus_scale.asset_status(cfg).items())
+        proc["meta"] = meta
+        return campus, proc
+    proc = dict(proc)
+    pv = proc["pv"].copy()
+    per_kwp = qdata.pv_output_kw(proc["weather"], 1.0, cfg["pv_model"]).to_numpy()
+    for z in pv.columns:
+        pv[z] = per_kwp * layout["zones"][z]["pv_kwp"]
+    from . import bdg2
+    if cfg.get("loads", {}).get("source") == "bdg2" and not bdg2.available():
+        raise RuntimeError("campus.rescale needs the BDG2 raw files to rebuild zone loads (scripts/fetch_data.py)")
+    load, crit, water, load_info = qdata.build_zone_loads(cfg, layout)
+    meta = copy.deepcopy(proc["meta"])
+    meta["loads"] = load_info
+    meta["campus_rescale"] = {k: v for k, v in layout["rescale"].items() if k != "floor_m2_after_exclusion"}
+    meta.setdefault("data_status", {})["campus_assets"] = "TEAM BRIEF (RVCE estate data pending); " + ", ".join(
+        f"{k}: {v}" for k, v in campus_scale.asset_status(cfg).items())
+    proc.update({"pv": pv, "load": load[campus.names], "crit": crit[campus.names], "water": water,
+                 "campus": layout, "meta": meta})
+    return campus, proc
+
+
 @lru_cache(maxsize=8)
 def build(key: str) -> tuple[Campus, dict]:
     spec = SPECS[key]
     seed = sum(map(ord, key))
     if spec.kind == "rvce":
-        campus = load_campus()
         proc = qdata.load_processed()
+        cfg = qdata.load_config()
+        if campus_scale.enabled(cfg):
+            campus, proc = _rvce_rescaled(cfg, proc)
+        else:
+            campus = load_campus()
         proc["meta"] = copy.deepcopy(proc["meta"])
         days = proc["meta"]["days"]["eval_days"]
         proc["meta"]["days"]["outages"] = _outages(days, seed)
@@ -212,7 +253,7 @@ def build(key: str) -> tuple[Campus, dict]:
     price["B_import"], price["B_export"] = price.A_import, price.A_export
     days = _eval_days(spec.year, seed)
     dtypes = _day_types(idx, office=spec.kind == "cubems")
-    meta = {"year": spec.year, "co2": {"tco2_per_mwh": cfg["co2"]["standin_tco2_per_mwh"], "status": "PENDING"},
+    meta = {"year": spec.year, "co2": {"tco2_per_mwh": cfg["co2"]["standin_tco2_per_mwh"], "status": cfg["co2"].get("status", "PENDING")},
             "prices": {"A": {"status": "PENDING"}, "B": {"status": "PENDING"}},
             "days": {"eval_days": days, "scenarios": {}, "outages": _outages(days, seed)},
             "data_status": {"loads": f"REAL ({spec.label}, {spec.licence})", "weather": "REAL (NASA POWER)",

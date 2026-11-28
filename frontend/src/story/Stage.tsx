@@ -163,7 +163,7 @@ function DeviceIcons({ sc, z, slot, show }: { sc: Scenario; z: ZoneGeo; slot: nu
   const zone = sc.campus.zones[zi]
   // one 3D icon per device type; the panel lists each flexible load with its power and run length
   const all = devices(zone, sc), flex = all.filter(x => x.key === 'flex')
-  const list = [...all.filter(x => x.key !== 'flex'), ...(flex.length ? [{ key: 'flex' as const, label: flex.length > 1 ? `${flex.length} flexible loads` : flex[0].label, detail: flex.map(f => f.detail.split(',')[0]).join(' + ') }] : [])]
+  const list = [...all.filter(x => x.key !== 'flex' && x.key !== 'ev'), ...(flex.length ? [{ key: 'flex' as const, label: flex.length > 1 ? `${flex.length} flexible loads` : flex[0].label, detail: flex.map(f => f.detail.split(',')[0]).join(' + ') }] : [])]
   const ref = useRef<(THREE.Group | null)[]>([])
   useEffect(() => {
     ref.current.forEach((g, i) => {
@@ -189,7 +189,7 @@ function DeviceIcons({ sc, z, slot, show }: { sc: Scenario; z: ZoneGeo; slot: nu
           {dv.key === 'critical' && <RoundedBox args={[5, 5, 5]} radius={0.6}><meshStandardMaterial color={C.critical} emissive={C.grid} emissiveIntensity={0.12} roughness={0.7} /></RoundedBox>}
           {dv.key === 'flex' && <RoundedBox args={[6, 3.6, 4]} radius={0.5}><meshStandardMaterial color={C.tile} roughness={0.7} /></RoundedBox>}
           <Label3D show={show} position={[0, 8, 0]} center>
-            <div className="devlabel">{dv.label}</div>
+            <div className="devlabel">{dv.label}{'status' in dv && dv.status === 'PROPOSED' && <span className="tag3d"> · proposed</span>}</div>
           </Label3D>
         </group>
       ))}

@@ -1,14 +1,15 @@
 # Pitch — 1 minute (elevator version)
 
-_Rendered from `docs/templates/pitch_1min.md`; numbers from `results/`._
+_Rendered from `docs/templates/pitch_1min.md`; numbers from `results/`, headline locked in `results/headline.json`.
+About 150 words; timing marks are targets._
 
-"Every building at RVCE runs its energy on its own. Today each building runs on its own: critical loads lose power 16 min a day and the bill is Rs 177,985 a day.
+**(0:00–0:15)** "Every building at RVCE runs its energy on its own. Today each building acts on its own: when BESCOM supply fails, critical loads go dark for 2.6 h per outage while the diesel sets burn 373 L; the electricity bill averages Rs 177,694 a day."
 
-Q-Grid gives each building its own controller: it solves its own on/off plan exactly, and agrees cable flows with its
-neighbours — no central computer, so there's no single point of failure. Q-Grid cuts critical downtime from 16 min to 8 min a day (0 min counting only shortfalls above 1 %), saves 3.3% on the bill versus today, and lands 0.8% from the best possible plan. When the campus network fails for 3 hours, central control loses 3.5 points of gap and Q-Grid 2.1, because each building keeps optimising on its own.
+**(0:15–0:30)** "Q-Grid gives each building its own small controller. It plans its own next 24 hours exactly, and agrees cable
+flows with its neighbours. No central computer, so no single point of failure."
 
-We also tested quantum honestly: QAOA on a simulator, verified against exact search on every block — it was correct but didn't
-speed anything up at this size, so it's not in the loop. No quantum advantage claimed.
+**(0:30–0:45)** "On 30 modelled RVCE days: In a BESCOM outage Q-Grid cuts critical-load downtime from 2.6 h to 20 min per outage (45 L more diesel, 122 kg CO₂, to keep those loads up); on normal days the bill is 0.1% lower and the demand charge falls by Rs 5,278 a month at 1,300 kVA contract demand; with no central controller it averages 1.1% from the best possible plan against 9.2% for Per-building MPC, a lead made on the outage days (normal days: 0.6% against 0.3%)."
 
-Tariffs are labelled stand-ins until the official BESCOM order. The hardware is about Rs 7.9 lakh for the
-campus and, with battery wear counted, pays back in about 0.4 years on our assumed costs."
+**(0:45–1:00)** "We tested quantum honestly: QAOA on a simulator, checked against exact search. It was correct, but no faster at
+this size, so it isn't in the control loop. No quantum advantage claimed. About Rs 7.9 lakh of node hardware for 9 buildings. On the electricity bill alone it does not pay back on our assumed costs. The case today is reliability: fewer dark hours for critical loads when BESCOM fails. Next: one RVCE BESCOM bill and the
+diesel logs, to replace our assumptions with campus data."

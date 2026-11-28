@@ -25,7 +25,7 @@ NAMES = {"status_quo": "Status quo", "rule_based": "Rule-based battery controlle
 
 
 def main(d: Path):
-    cfg = yaml.safe_load((ROOT / "config.yaml").read_text())
+    cfg = yaml.safe_load((ROOT / "config.yaml").read_text(encoding="utf-8"))
     oc = cfg["outage_costs"]
     r = pd.read_csv(d / "daily.csv")
     rv = r[r.dataset == "rvce"]
@@ -126,7 +126,7 @@ def main(d: Path):
         for m, x in g.groupby("method"):
             L.append(f"| {NAMES[m]} | {x.battery_cycles.mean():.2f} | {x.wear_rs.mean():,.0f} |")
         L.append("")
-    (ROOT / "docs" / "consistency.md").write_text("\n".join(L) + "\n")
+    (ROOT / "docs" / "consistency.md").write_text("\n".join(L) + "\n", encoding="utf-8")
     print("wrote docs/consistency.md")
 
 

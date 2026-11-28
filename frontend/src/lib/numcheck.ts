@@ -9,3 +9,11 @@ export function reg(v: number, why: string): number {
   }
   return v
 }
+
+/** Register every number quoted inside a text that came from a replay file (e.g. problem_points[i].text), so the
+ *  numbers test knows the figure was loaded, not typed into the UI. Returns the text unchanged. */
+export function regText(t: string | null | undefined, why: string): string {
+  const s = t ?? ''
+  for (const m of s.matchAll(/[−-]?\d{1,3}(?:,\d{2,3})+(?:\.\d+)?|[−-]?\d+(?:\.\d+)?/g)) reg(parseFloat(m[0].replace(/,/g, '').replace('−', '-')), why)
+  return s
+}

@@ -178,7 +178,12 @@ def build_layout(cfg: dict) -> dict:
            "origin": {"lat": lat0, "lon": lon0}, "outline": campus_outline, "zones": zones,
            "lines": [list(l) for l in lines]}
     PROC.mkdir(parents=True, exist_ok=True)
-    (PROC / "campus.json").write_text(json.dumps(out, indent=1))
+    # RVCE estate rescale (config campus.rescale): RVCE's own buildings only, 67,721 m2 built-up, 500.48 kWp, DG sets
+    from .v2.campus_scale import enabled, rescale_layout
+    (PROC / "campus_osm.json").write_text(json.dumps(out, indent=1), encoding="utf-8")   # the OSM layout before rescaling
+    if enabled(cfg):
+        out = rescale_layout(cfg, out)
+    (PROC / "campus.json").write_text(json.dumps(out, indent=1), encoding="utf-8")
     return out
 
 

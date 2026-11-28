@@ -1,7 +1,7 @@
 {
-  "git_commit": "9242bc258a302523d08a9c894b4171481454c714",
-  "python": "3.11.18",
-  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "git_commit": "65715224047311adcd018ae6bada5cb3032a9477",
+  "python": "3.12.10",
+  "platform": "Windows-11-10.0.26200-SP0",
   "packages": {
     "numpy": "2.2.6",
     "scipy": "1.17.1",
@@ -21,16 +21,16 @@
     "kmeans": 0
   },
   "files": {
-    "config.yaml": "425a0dc03b90525a002db9b2bb3f685060c8a9d2fc00c91e835503190553a0ae",
-    "configs/profiles.yaml": "0c6f0104d66136d52f63c497f7a8922aab0fb7d773185e00b0e85f95a1b8b102",
-    "data/raw/nasa_power/bengaluru_2023_hourly.json": "16eb50dc779967bc5e64885cefe16b3d413b0fd756ef6ce4365344b17280de2e",
-    "data/raw/ausgrid/Ausgrid_solar_home_data.zip": "5a766f52b6c8b3b72730380f4422e478934bc94640a4b089dd0e0e3c055c5d82",
+    "config.yaml": "fae3a51ba4bce358b7ec08c3eb242836cdc6e026bb1088c744f5a03ebbbbca6e",
+    "configs/profiles.yaml": "539f67b8fb89f06de39e93907e7bfb60a78ec30a21a1e03a89c32aa3d6e9ea67",
+    "data/raw/nasa_power/bengaluru_2023_hourly.json": "7c55ce1362c13df8e38ec10c88f5e1c09db123c90b15b0abee3f15fca00a50cc",
+    "data/raw/ausgrid/Ausgrid_solar_home_data.zip": null,
     "data/raw/osm_rvce.json": "04dfc10996581ef4ce9e27e3b1e660c4e2b8f8f47d31e4e9ec6fbc5a9ae36e76",
-    "data/raw/lab_schedule.csv": "71cb459d99bbb77836ed2aae3d6cbc598e5b169ca584c0b6ddaa9a9db224d495",
-    "data/processed/campus.json": "724a29ad0d223dcc3e68f8fb4bd54bce521da3572096cf72b4faf4a808e7c3e2",
-    "results/qaoa_params.json": "a8163fff4f9a8a4dd431b13dc0fd817d196e8e6d0f8f7514f66decfe83852e10",
-    "results/benchmark.csv": "2c7ecb58063abb10361dc2ddf0962dd7856358df414854d8e3db3404d166e57e",
-    "results/headline.json": "d88a00d8c11800b38c0831584e55987b7196f5fa7bd4fc76480a317fd5db3ef6"
+    "data/raw/lab_schedule.csv": "fec5c6499dbd27fd01b69d0688f88dd33b55eddea6f1fcf7950178fdacafeccb",
+    "data/processed/campus.json": "1f79b6badb48ea342a81aa3feb2ae438d6c821580501ce71e252d771b1afa8ad",
+    "results/qaoa_params.json": "cca565498373d1bb80c720ed42cefba4a6441abc1ed47a5b02bc870ee7f7ca86",
+    "results/benchmark.csv": "ae446374694deb31fcab14c9e7ab05ca447dbc357760dd5c800bfaf67bc78f9a",
+    "results/headline.json": "ee4797e178e560aad4e727c257f226854e5fe55c0c60067307efb036a9542d71"
   },
   "runtime": {
     "benchmark_runtime_s": 795,
@@ -43,7 +43,7 @@
       "scenario": "outage_fest",
       "price_scenario": "A",
       "metric": "cost_rs",
-      "value": 153498.65048852444,
+      "value": 187158.88839763904,
       "rel_tol": 1e-06,
       "abs_tol": 0.01
     },
@@ -70,7 +70,7 @@
       "scenario": "outage_fest",
       "price_scenario": "A",
       "metric": "cost_rs",
-      "value": 161701.71935166928,
+      "value": 202799.73653033568,
       "rel_tol": 0.002,
       "abs_tol": 0.01
     },
@@ -97,7 +97,7 @@
       "scenario": "outage_fest",
       "price_scenario": "A",
       "metric": "cost_rs",
-      "value": 162985.90393273442,
+      "value": 200412.16880733854,
       "rel_tol": 1e-06,
       "abs_tol": 0.01
     },
@@ -106,7 +106,7 @@
       "scenario": "outage_fest",
       "price_scenario": "A",
       "metric": "critical_downtime_h",
-      "value": 2.5,
+      "value": 0.0,
       "rel_tol": 1e-06,
       "abs_tol": 1e-06
     },
@@ -124,7 +124,7 @@
       "scenario": "outage_fest",
       "price_scenario": "A",
       "metric": "cost_rs",
-      "value": 161910.6815887255,
+      "value": 200730.6363492083,
       "rel_tol": 1e-06,
       "abs_tol": 0.01
     },
@@ -133,7 +133,7 @@
       "scenario": "outage_fest",
       "price_scenario": "A",
       "metric": "critical_downtime_h",
-      "value": 2.5,
+      "value": 0.0,
       "rel_tol": 1e-06,
       "abs_tol": 1e-06
     },
@@ -142,7 +142,7 @@
       "scenario": "outage_fest",
       "price_scenario": "A",
       "metric": "dg_hours",
-      "value": 5.75,
+      "value": 6.0,
       "rel_tol": 1e-06,
       "abs_tol": 1e-06
     }

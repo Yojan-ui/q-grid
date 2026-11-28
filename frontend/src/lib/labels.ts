@@ -1,5 +1,5 @@
 // Plain-English names for zones, QUBO variables and benchmark methods. Text only: no numbers are made here.
-import type { Scenario, Zone } from './data'
+import type { AssetKey, AssetStatus, Scenario, Zone } from './data'
 
 export const ZONE_NAME: Record<string, string> = {
   academic: 'Academic blocks', heavy_labs: 'Mechanical labs', hostels: 'Hostels', library: 'Library', canteen: 'Food court',
@@ -19,7 +19,14 @@ export const SCENARIO_NAME: Record<string, string> = {
 }
 export const fmtDate = (d: string) => new Date(d + 'T00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
 
-export type Device = { key: 'pv' | 'battery' | 'dg' | 'tank' | 'critical' | 'flex'; id?: string; label: string; detail: string }
+export type Device = { key: 'pv' | 'battery' | 'dg' | 'tank' | 'critical' | 'flex' | 'ev'; id?: string; label: string; detail: string; status?: AssetStatus }
+
+/** An asset's status from the replay (campus.zones[i].asset_status); undefined when the replay does not say. */
+export const assetStatus = (z: Zone | undefined, k: AssetKey): AssetStatus | undefined => z?.asset_status?.[k]
+/** True when any zone's asset of this kind is marked PROPOSED (or PENDING) in the replay. */
+export const anyNotExisting = (sc: Scenario, k: AssetKey) => sc.campus.zones.some(z => { const s = assetStatus(z, k); return s === 'PROPOSED' || s === 'PENDING' })
+/** The inter-building cables' status from the replay (campus.cables_status). */
+export const cablesProposed = (sc: Scenario) => sc.campus.cables_status === 'PROPOSED'
 
 /** Devices of a zone, straight from the campus model in the replay. */
 const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1)
@@ -28,8 +35,12 @@ const num0 = (v: number) => Math.round(v).toLocaleString('en-IN')
 export function devices(z: Zone, sc: Scenario): Device[] {
   const out: Device[] = []
   if (z.pv_kwp > 0) out.push({ key: 'pv', label: 'Rooftop solar', detail: `${Math.round(z.pv_kwp).toLocaleString('en-IN')} kWp` })
-  if (z.battery_kwh > 0) out.push({ key: 'battery', label: 'Battery', detail: `${z.battery_kwh} kWh · ${z.battery_kw} kW` })
-  if (z.dg_kw > 0) out.push({ key: 'dg', label: 'Diesel generator', detail: `${z.dg_kw} kW` })
+  if (z.pv_kwp > 0) out[out.length - 1].status = assetStatus(z, 'pv')
+  if (z.battery_kwh > 0) out.push({ key: 'battery', label: 'Battery', detail: `${z.battery_kwh} kWh · ${z.battery_kw} kW`, status: assetStatus(z, 'battery') })
+  if (z.dg_kw > 0) out.push({ key: 'dg', label: 'Diesel generator', detail: `${z.dg_kw} kW`, status: assetStatus(z, 'dg') })
+  // EV charging is not in the optimiser's campus model; listed only when the replay marks chargers proposed / pending
+  const ev = assetStatus(z, 'ev')
+  if (ev === 'PROPOSED' || ev === 'PENDING') out.push({ key: 'ev', label: 'EV chargers', detail: 'not in the schedule model', status: ev })
   if (z.tank_m3 > 0) out.push({ key: 'tank', label: 'Borewell pump + tank', detail: `${z.tank_m3} m³` })
   if (z.critical_frac > 0) out.push({ key: 'critical', label: 'Critical load', detail: `${Math.round(z.critical_frac * 100)}% of demand` })
   if (z.flex?.length) {

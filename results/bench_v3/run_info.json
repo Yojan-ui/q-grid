@@ -1,6 +1,6 @@
 {
- "runtime_s": 10230.713327884674,
- "workers": 9,
+ "runtime_s": 6955.47087264061,
+ "workers": 8,
  "days_per_dataset": 30,
  "qgrid_combo": "1111",
  "datasets": [
@@ -28,5 +28,2961 @@
   "design_benders_exact",
   "design_benders_qaoa",
   "design_benders_qiea"
+ ],
+ "peak_priced": true,
+ "config_override": null,
+ "reruns": [
+  {
+   "when": "2026-11-28 00:17",
+   "why": "check_feasibility applied the backup-only DG rule (min on-time cut short when the grid returns)",
+   "workers": 8,
+   "runtime_s": 214.50449633598328,
+   "rows": [
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-06-21",
+     "method": "central_mpc",
+     "old_objective_rs": 2993091.086329845,
+     "new_objective_rs": 2993091.086329845,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-06-21",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 3102600.576905746,
+     "new_objective_rs": 3102600.576905746,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-10-05",
+     "method": "central_mpc_comms_fail",
+     "old_objective_rs": 3497976.40413624,
+     "new_objective_rs": 3497976.40413624,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-10-05",
+     "method": "central_mpc",
+     "old_objective_rs": 3297882.041192112,
+     "new_objective_rs": 3297882.041192112,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-11-14",
+     "method": "central_mpc",
+     "old_objective_rs": 3422415.4219970885,
+     "new_objective_rs": 3422415.4219970885,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-11-30",
+     "method": "central_mpc",
+     "old_objective_rs": 3958745.879903871,
+     "new_objective_rs": 3958745.879903871,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-11-30",
+     "method": "qgrid",
+     "old_objective_rs": 3954128.968529256,
+     "new_objective_rs": 4193494.4697268372,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-03-02",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 3149629.238437124,
+     "new_objective_rs": 3149629.238437124,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-10-28",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 3182840.7947009504,
+     "new_objective_rs": 3177179.6658226745,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-04-02",
+     "method": "central_mpc",
+     "old_objective_rs": 1798186.909525381,
+     "new_objective_rs": 1798186.909525381,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-04-02",
+     "method": "central_mpc_comms_fail",
+     "old_objective_rs": 1745797.1513765482,
+     "new_objective_rs": 1745797.1513765482,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-04-02",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 1728780.2239552133,
+     "new_objective_rs": 1728780.2239552133,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-06-09",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 1829476.636831509,
+     "new_objective_rs": 1829476.636831509,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-03-04",
+     "method": "central_mpc_comms_fail",
+     "old_objective_rs": 64178.522571832844,
+     "new_objective_rs": 64178.522571832844,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-07-10",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 49409.0672965577,
+     "new_objective_rs": 49409.0672965577,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-09-21",
+     "method": "central_mpc_comms_fail",
+     "old_objective_rs": 24407.965534478528,
+     "new_objective_rs": 24407.965534478528,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-11-08",
+     "method": "central_mpc",
+     "old_objective_rs": 49948.721087261605,
+     "new_objective_rs": 49948.721087261605,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-11-08",
+     "method": "qgrid",
+     "old_objective_rs": 51555.482518732955,
+     "new_objective_rs": 51555.482518732955,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-11-08",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 51966.20436554437,
+     "new_objective_rs": 51966.20436554437,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-11-16",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 17876.815859612754,
+     "new_objective_rs": 17876.815859612754,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-03-08",
+     "method": "per_building_mpc",
+     "old_objective_rs": 372172.2110098747,
+     "new_objective_rs": 372172.2110098747,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-11-16",
+     "method": "qgrid",
+     "old_objective_rs": 17220.48733484694,
+     "new_objective_rs": 17220.48733484694,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-09-19",
+     "method": "design_prototype_1h_binary",
+     "old_objective_rs": 274897.9325464261,
+     "new_objective_rs": 274897.9325464261,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-06-21",
+     "method": "per_building_mpc",
+     "old_objective_rs": 3059592.7434454365,
+     "new_objective_rs": 3059592.7434454365,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-10-05",
+     "method": "optimum",
+     "old_objective_rs": 3625213.5214034934,
+     "new_objective_rs": 3625213.5214034934,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-11-14",
+     "method": "optimum",
+     "old_objective_rs": 3586800.383325731,
+     "new_objective_rs": 3586800.383325731,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-03-02",
+     "method": "status_quo",
+     "old_objective_rs": 2859145.1346995845,
+     "new_objective_rs": 2859145.1346995845,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-04-02",
+     "method": "per_building_mpc",
+     "old_objective_rs": 1689207.8925928657,
+     "new_objective_rs": 1689207.8925928657,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-09-18",
+     "method": "rule_based",
+     "old_objective_rs": 2269701.916716036,
+     "new_objective_rs": 2269701.916716036,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-03-04",
+     "method": "rule_based",
+     "old_objective_rs": 69311.17680683108,
+     "new_objective_rs": 69311.17680683108,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-03-04",
+     "method": "ga",
+     "old_objective_rs": 69545.4971661333,
+     "new_objective_rs": 69545.4971661333,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-03-04",
+     "method": "optimum",
+     "old_objective_rs": 63026.9913478279,
+     "new_objective_rs": 63026.9913478279,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-03-04",
+     "method": "pso",
+     "old_objective_rs": 69717.24754847378,
+     "new_objective_rs": 69717.24754847378,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-03-24",
+     "method": "ga",
+     "old_objective_rs": 17104.59294982633,
+     "new_objective_rs": 17104.59294982633,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-03-24",
+     "method": "pso",
+     "old_objective_rs": 17442.443456937344,
+     "new_objective_rs": 17442.443456937344,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-06-07",
+     "method": "status_quo",
+     "old_objective_rs": 63122.05213029043,
+     "new_objective_rs": 63122.05213029043,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-06-07",
+     "method": "optimum",
+     "old_objective_rs": 66293.92366940013,
+     "new_objective_rs": 66293.92366940013,
+     "feasible": true
+    }
+   ]
+  },
+  {
+   "when": "2026-11-28 07:41",
+   "why": "Q-Grid peak budgets keep each building's planned import plus a static share of the headroom (qgrid/ablation/engine.py _budgets); the earlier split in proportion to planned imports priced private peaks and charged batteries at the 18:00 peak (RVCE 2023-02-24)",
+   "workers": 8,
+   "runtime_s": 2796.8845331668854,
+   "rows": [
+    {
+     "dataset": "rvce",
+     "day": "2023-01-07",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 153560.54287318673,
+     "new_objective_rs": 152356.49757534175,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-01-07",
+     "method": "qgrid",
+     "old_objective_rs": 154240.3857688967,
+     "new_objective_rs": 152432.52171040524,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-01-19",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 176076.24739992685,
+     "new_objective_rs": 174927.0775837396,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-01-31",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 230920.5756880975,
+     "new_objective_rs": 219758.0736156383,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-01-31",
+     "method": "qgrid",
+     "old_objective_rs": 229556.6204880131,
+     "new_objective_rs": 218400.21826051272,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-01-19",
+     "method": "qgrid",
+     "old_objective_rs": 176166.6808507854,
+     "new_objective_rs": 175096.41644942088,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-02-12",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 139463.31217523626,
+     "new_objective_rs": 137931.2955906216,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-02-12",
+     "method": "qgrid",
+     "old_objective_rs": 140336.16955459697,
+     "new_objective_rs": 137917.40153122696,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-02-24",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 166607.57672462115,
+     "new_objective_rs": 164860.82944568773,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-03-08",
+     "method": "qgrid",
+     "old_objective_rs": 209618.81676566548,
+     "new_objective_rs": 202818.34631594978,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-06-16",
+     "method": "qgrid",
+     "old_objective_rs": 160036.61335649944,
+     "new_objective_rs": 157797.5160273714,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-06-16",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 159684.58682407657,
+     "new_objective_rs": 157715.40807367163,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-06-26",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 168564.76078354503,
+     "new_objective_rs": 167843.47087248106,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-07-08",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 179977.7577811672,
+     "new_objective_rs": 178529.32069489584,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-06-26",
+     "method": "qgrid",
+     "old_objective_rs": 169349.90849937397,
+     "new_objective_rs": 167907.57727814306,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-07-20",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 171727.97229851116,
+     "new_objective_rs": 170498.92036409135,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-07-08",
+     "method": "qgrid",
+     "old_objective_rs": 179311.65594311626,
+     "new_objective_rs": 177615.96573962737,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-07-20",
+     "method": "qgrid",
+     "old_objective_rs": 172253.81479201946,
+     "new_objective_rs": 170464.47478653397,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-08-01",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 160896.97413581633,
+     "new_objective_rs": 160183.71649207317,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-08-01",
+     "method": "qgrid",
+     "old_objective_rs": 161629.45307254686,
+     "new_objective_rs": 160172.34691685572,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-08-26",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 162754.94798337712,
+     "new_objective_rs": 161220.1134202806,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-08-26",
+     "method": "qgrid",
+     "old_objective_rs": 162203.0449460633,
+     "new_objective_rs": 161587.6585663078,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-09-07",
+     "method": "qgrid",
+     "old_objective_rs": 176270.92767105138,
+     "new_objective_rs": 175254.36865208132,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-08-14",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 158853.1963481557,
+     "new_objective_rs": 157168.09657790276,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-08-14",
+     "method": "qgrid",
+     "old_objective_rs": 159753.69371746838,
+     "new_objective_rs": 157174.56958990043,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-09-07",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 176009.46888760777,
+     "new_objective_rs": 175899.0303034589,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-10-01",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 154755.28690262648,
+     "new_objective_rs": 152701.3552755175,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-09-19",
+     "method": "qgrid",
+     "old_objective_rs": 216871.8510655222,
+     "new_objective_rs": 210788.73474540253,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-10-01",
+     "method": "qgrid",
+     "old_objective_rs": 154691.90778263597,
+     "new_objective_rs": 152599.38033633467,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-09-19",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 235901.91075544505,
+     "new_objective_rs": 233591.48460127076,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-10-26",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 172820.14470445216,
+     "new_objective_rs": 171359.74701547305,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-10-13",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 164993.5880046784,
+     "new_objective_rs": 163880.2461222192,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-10-13",
+     "method": "qgrid",
+     "old_objective_rs": 164743.49739293446,
+     "new_objective_rs": 163887.04913550435,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-10-26",
+     "method": "qgrid",
+     "old_objective_rs": 172804.69998643664,
+     "new_objective_rs": 171275.38797464213,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-11-19",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 146718.81337404894,
+     "new_objective_rs": 143617.8262001335,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-11-19",
+     "method": "qgrid",
+     "old_objective_rs": 147708.1391476521,
+     "new_objective_rs": 143599.38517743693,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-11-07",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 171487.29842233262,
+     "new_objective_rs": 170835.8754470367,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-11-07",
+     "method": "qgrid",
+     "old_objective_rs": 171638.5183095288,
+     "new_objective_rs": 170988.08429340372,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-12-01",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 176882.11907244977,
+     "new_objective_rs": 174186.40716820513,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-12-01",
+     "method": "qgrid",
+     "old_objective_rs": 179163.87577868692,
+     "new_objective_rs": 174301.64661187545,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-01-31",
+     "method": "design_prototype_1h_binary",
+     "old_objective_rs": 265861.81359542825,
+     "new_objective_rs": 324395.9901374277,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-02-12",
+     "method": "design_prototype_1h_binary",
+     "old_objective_rs": 146913.49276756306,
+     "new_objective_rs": 141886.68053334468,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-02-24",
+     "method": "design_prototype_1h_binary",
+     "old_objective_rs": 168756.01548236664,
+     "new_objective_rs": 171463.2728800938,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-03-08",
+     "method": "design_prototype_1h_binary",
+     "old_objective_rs": 309072.4340911561,
+     "new_objective_rs": 257825.26830477387,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-03-21",
+     "method": "design_prototype_1h_binary",
+     "old_objective_rs": 176676.79298914247,
+     "new_objective_rs": 174691.42601344423,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-04-02",
+     "method": "design_prototype_1h_binary",
+     "old_objective_rs": 174218.26107425737,
+     "new_objective_rs": 171349.51023544857,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-04-14",
+     "method": "design_prototype_1h_binary",
+     "old_objective_rs": 168454.26567346993,
+     "new_objective_rs": 162545.36116815268,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-04-26",
+     "method": "design_prototype_1h_binary",
+     "old_objective_rs": 173954.27053941909,
+     "new_objective_rs": 171454.95107991554,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-05-08",
+     "method": "design_prototype_1h_binary",
+     "old_objective_rs": 173000.46441993408,
+     "new_objective_rs": 174227.4672973527,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-05-20",
+     "method": "design_prototype_1h_binary",
+     "old_objective_rs": 149346.17568509403,
+     "new_objective_rs": 146026.31441053457,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-06-02",
+     "method": "design_prototype_1h_binary",
+     "old_objective_rs": 171679.44563286626,
+     "new_objective_rs": 173470.79736608107,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-06-16",
+     "method": "design_prototype_1h_binary",
+     "old_objective_rs": 165303.87569338654,
+     "new_objective_rs": 162570.37701161462,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-12-13",
+     "method": "qgrid",
+     "old_objective_rs": 173257.382686914,
+     "new_objective_rs": 171074.21231447466,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-12-13",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 173137.61835776662,
+     "new_objective_rs": 171052.85748892062,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-12-25",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 164454.20001564507,
+     "new_objective_rs": 163494.16701783997,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-12-25",
+     "method": "qgrid",
+     "old_objective_rs": 165179.30612845003,
+     "new_objective_rs": 163662.30806091314,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-01-07",
+     "method": "design_prototype_1h_binary",
+     "old_objective_rs": 160476.49318489965,
+     "new_objective_rs": 156444.70089652648,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-01-19",
+     "method": "design_prototype_1h_binary",
+     "old_objective_rs": 181469.432499156,
+     "new_objective_rs": 179964.3186076474,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-02-24",
+     "method": "qgrid",
+     "old_objective_rs": 168262.71605490413,
+     "new_objective_rs": 164298.87023838234,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-03-21",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 173933.32692917465,
+     "new_objective_rs": 171670.95600305678,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-03-08",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 208632.23544330752,
+     "new_objective_rs": 200672.6743024679,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-04-02",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 168578.87413194802,
+     "new_objective_rs": 167060.18292337118,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-03-21",
+     "method": "qgrid",
+     "old_objective_rs": 174872.30697397137,
+     "new_objective_rs": 171451.44956106294,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-04-02",
+     "method": "qgrid",
+     "old_objective_rs": 168696.10257191528,
+     "new_objective_rs": 167461.75996690127,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-04-14",
+     "method": "qgrid",
+     "old_objective_rs": 161360.57698386084,
+     "new_objective_rs": 158990.51989819124,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-04-14",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 161507.91678761216,
+     "new_objective_rs": 158996.58542825372,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-04-26",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 168454.0234267263,
+     "new_objective_rs": 167837.1647563283,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-04-26",
+     "method": "qgrid",
+     "old_objective_rs": 168281.9290839363,
+     "new_objective_rs": 167491.39522590162,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-05-08",
+     "method": "qgrid",
+     "old_objective_rs": 169581.7799602632,
+     "new_objective_rs": 168321.18141019056,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-05-08",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 170380.23979922535,
+     "new_objective_rs": 168217.5518236271,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-05-20",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 143855.50629111688,
+     "new_objective_rs": 141017.32626604196,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-06-02",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 168179.34007991033,
+     "new_objective_rs": 167666.56215164054,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-05-20",
+     "method": "qgrid",
+     "old_objective_rs": 143429.22695471573,
+     "new_objective_rs": 141031.38803264187,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-06-02",
+     "method": "qgrid",
+     "old_objective_rs": 168701.52838050036,
+     "new_objective_rs": 167693.79553363562,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-06-26",
+     "method": "design_prototype_1h_binary",
+     "old_objective_rs": 169094.72207954284,
+     "new_objective_rs": 172493.88830760997,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-07-08",
+     "method": "design_prototype_1h_binary",
+     "old_objective_rs": 182164.27557980578,
+     "new_objective_rs": 179875.2858017595,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-07-20",
+     "method": "design_prototype_1h_binary",
+     "old_objective_rs": 173383.8410583375,
+     "new_objective_rs": 175846.10333902983,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-08-01",
+     "method": "design_prototype_1h_binary",
+     "old_objective_rs": 163864.60750999374,
+     "new_objective_rs": 163738.21106782355,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-08-14",
+     "method": "design_prototype_1h_binary",
+     "old_objective_rs": 158468.25397139628,
+     "new_objective_rs": 158902.59134949252,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-08-26",
+     "method": "design_prototype_1h_binary",
+     "old_objective_rs": 162342.29073378976,
+     "new_objective_rs": 162775.38756674985,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-09-07",
+     "method": "design_prototype_1h_binary",
+     "old_objective_rs": 180979.25428403626,
+     "new_objective_rs": 177944.1891969377,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-09-19",
+     "method": "design_prototype_1h_binary",
+     "old_objective_rs": 274897.9325464261,
+     "new_objective_rs": 262820.0554160675,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-10-01",
+     "method": "design_prototype_1h_binary",
+     "old_objective_rs": 156722.41887053283,
+     "new_objective_rs": 159481.8814704153,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-10-13",
+     "method": "design_prototype_1h_binary",
+     "old_objective_rs": 170466.62344964713,
+     "new_objective_rs": 167964.18425429167,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-10-26",
+     "method": "design_prototype_1h_binary",
+     "old_objective_rs": 177730.542335249,
+     "new_objective_rs": 174402.6185233382,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-11-07",
+     "method": "design_prototype_1h_binary",
+     "old_objective_rs": 176883.6138602375,
+     "new_objective_rs": 175405.73369472582,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-11-19",
+     "method": "design_prototype_1h_binary",
+     "old_objective_rs": 148827.65046332817,
+     "new_objective_rs": 151073.50917575968,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-12-01",
+     "method": "design_prototype_1h_binary",
+     "old_objective_rs": 182437.46101957673,
+     "new_objective_rs": 181311.81298496688,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-12-13",
+     "method": "design_prototype_1h_binary",
+     "old_objective_rs": 174349.1368106859,
+     "new_objective_rs": 177952.79349196923,
+     "feasible": true
+    },
+    {
+     "dataset": "rvce",
+     "day": "2023-12-25",
+     "method": "design_prototype_1h_binary",
+     "old_objective_rs": 167512.80996647512,
+     "new_objective_rs": 165495.31127112437,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-09-17",
+     "method": "qgrid",
+     "old_objective_rs": 2567444.0467606043,
+     "new_objective_rs": 2594660.70695552,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-09-17",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 2577934.2701376565,
+     "new_objective_rs": 2584909.4118683618,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-09-05",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 3338084.9097806658,
+     "new_objective_rs": 3293991.4131408148,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-09-05",
+     "method": "qgrid",
+     "old_objective_rs": 3348141.677400725,
+     "new_objective_rs": 3270192.3934167577,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-08-15",
+     "method": "qgrid",
+     "old_objective_rs": 2937142.3090542667,
+     "new_objective_rs": 2920299.0902107037,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-08-15",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 2926619.753561042,
+     "new_objective_rs": 2932869.243929135,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-08-21",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 3012282.6133607733,
+     "new_objective_rs": 3033041.2664149706,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-08-06",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 2286784.0368041126,
+     "new_objective_rs": 2312007.5895126946,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-08-21",
+     "method": "qgrid",
+     "old_objective_rs": 3026261.5084357867,
+     "new_objective_rs": 3073021.2647916963,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-08-06",
+     "method": "qgrid",
+     "old_objective_rs": 2304458.391000004,
+     "new_objective_rs": 2305612.7856704923,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-07-18",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 2990196.34884118,
+     "new_objective_rs": 3015807.079348617,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-07-18",
+     "method": "qgrid",
+     "old_objective_rs": 2992509.662714215,
+     "new_objective_rs": 3014138.5543589233,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-07-05",
+     "method": "qgrid",
+     "old_objective_rs": 2684057.005515626,
+     "new_objective_rs": 2688256.074962778,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-07-05",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 2661921.1008096463,
+     "new_objective_rs": 2688231.5063075265,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-06-29",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 2864535.2848023814,
+     "new_objective_rs": 2982860.516709471,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-06-29",
+     "method": "qgrid",
+     "old_objective_rs": 2918012.9109461885,
+     "new_objective_rs": 2828617.8677902916,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-01-24",
+     "method": "qgrid",
+     "old_objective_rs": 3373116.6784894136,
+     "new_objective_rs": 3375222.1435495173,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-11-30",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 4158948.656850997,
+     "new_objective_rs": 4004022.1976607474,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-01-20",
+     "method": "qgrid",
+     "old_objective_rs": 3491456.4926039083,
+     "new_objective_rs": 3460014.440691337,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-11-10",
+     "method": "qgrid",
+     "old_objective_rs": 2907222.4861497693,
+     "new_objective_rs": 2952046.781258903,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-11-30",
+     "method": "qgrid",
+     "old_objective_rs": 4193494.4697268372,
+     "new_objective_rs": 3969963.0590098924,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-11-10",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 2925539.288784253,
+     "new_objective_rs": 2944342.432131429,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-11-14",
+     "method": "qgrid",
+     "old_objective_rs": 3419116.509407423,
+     "new_objective_rs": 3470771.6406525504,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-11-14",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 3496420.2623210964,
+     "new_objective_rs": 3553205.9433074286,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-10-22",
+     "method": "qgrid",
+     "old_objective_rs": 2653571.2225624677,
+     "new_objective_rs": 2683356.462005393,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-10-22",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 2676771.11365854,
+     "new_objective_rs": 2679130.6708557415,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-10-27",
+     "method": "qgrid",
+     "old_objective_rs": 3050273.205906778,
+     "new_objective_rs": 3054043.0788636524,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-09-28",
+     "method": "qgrid",
+     "old_objective_rs": 3423234.6514009745,
+     "new_objective_rs": 3827638.455546654,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-10-27",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 3050814.339456389,
+     "new_objective_rs": 3047317.4062266164,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-09-28",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 3448323.454953432,
+     "new_objective_rs": 3798116.8248493522,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-10-05",
+     "method": "qgrid",
+     "old_objective_rs": 3316252.1050067656,
+     "new_objective_rs": 3318749.6863585236,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-10-05",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 3306128.9737191037,
+     "new_objective_rs": 3327427.4723236263,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-04-13",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 3244945.6166596324,
+     "new_objective_rs": 3116583.3762945337,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-04-13",
+     "method": "qgrid",
+     "old_objective_rs": 3260470.8173630456,
+     "new_objective_rs": 3124968.1248432365,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-03-19",
+     "method": "qgrid",
+     "old_objective_rs": 2444421.460323301,
+     "new_objective_rs": 2452432.1115575614,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-04-01",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 3456546.3491865066,
+     "new_objective_rs": 3437438.7992870915,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-04-01",
+     "method": "qgrid",
+     "old_objective_rs": 3427118.674484284,
+     "new_objective_rs": 3442564.738405711,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-03-19",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 2445803.92722293,
+     "new_objective_rs": 2453275.199672041,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-03-06",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 3328672.6164284605,
+     "new_objective_rs": 3365316.9246805054,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-03-06",
+     "method": "qgrid",
+     "old_objective_rs": 3320514.975790663,
+     "new_objective_rs": 3355083.83651128,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-01-20",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 3470248.832017915,
+     "new_objective_rs": 3464015.9761517276,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-03-02",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 3149629.238437124,
+     "new_objective_rs": 3117852.6551279835,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-03-02",
+     "method": "qgrid",
+     "old_objective_rs": 3099600.8642499377,
+     "new_objective_rs": 3055747.9315093476,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-02-18",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 2751054.4615387786,
+     "new_objective_rs": 2759429.296251896,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-02-18",
+     "method": "qgrid",
+     "old_objective_rs": 2771094.607657732,
+     "new_objective_rs": 2762261.640179335,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-02-02",
+     "method": "qgrid",
+     "old_objective_rs": 3775692.773147806,
+     "new_objective_rs": 3775287.664769034,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-02-02",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 3742522.8125213147,
+     "new_objective_rs": 3813851.5827494734,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-01-24",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 3398626.959598679,
+     "new_objective_rs": 3353964.535038812,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-07-07",
+     "method": "qgrid",
+     "old_objective_rs": 2696427.81340449,
+     "new_objective_rs": 2673124.813952418,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-07-07",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 2693936.061596185,
+     "new_objective_rs": 2672967.5905118575,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-07-04",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 2265065.4676310997,
+     "new_objective_rs": 2257286.6385901137,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-07-04",
+     "method": "qgrid",
+     "old_objective_rs": 2254017.6727732606,
+     "new_objective_rs": 2247435.2522120676,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-06-23",
+     "method": "qgrid",
+     "old_objective_rs": 2616024.2074756217,
+     "new_objective_rs": 2605542.059557015,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-06-23",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 2620545.5487978845,
+     "new_objective_rs": 2610721.7571569625,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-05-12",
+     "method": "qgrid",
+     "old_objective_rs": 2967922.659135742,
+     "new_objective_rs": 3037721.6896208674,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-06-06",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 3201069.7537982007,
+     "new_objective_rs": 3207089.1238700845,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-06-06",
+     "method": "qgrid",
+     "old_objective_rs": 3126644.727267499,
+     "new_objective_rs": 3238542.2319286554,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-05-12",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 3014610.2108357768,
+     "new_objective_rs": 2984438.4125107825,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-05-27",
+     "method": "qgrid",
+     "old_objective_rs": 2829982.385924212,
+     "new_objective_rs": 2856734.911103334,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-05-08",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 3120953.7458298807,
+     "new_objective_rs": 3056342.8289370867,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-05-08",
+     "method": "qgrid",
+     "old_objective_rs": 3105261.2798724957,
+     "new_objective_rs": 3092556.6628810386,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-05-27",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 2824010.465206546,
+     "new_objective_rs": 2856662.4596059043,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-04-28",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 2995458.4386599255,
+     "new_objective_rs": 2963953.487552914,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-04-28",
+     "method": "qgrid",
+     "old_objective_rs": 2953461.6732907337,
+     "new_objective_rs": 2933352.7703320077,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-10-15",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 3084462.801974688,
+     "new_objective_rs": 3016857.474320228,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-09-29",
+     "method": "qgrid",
+     "old_objective_rs": 3774142.502368439,
+     "new_objective_rs": 3803386.9076428995,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-08-28",
+     "method": "qgrid",
+     "old_objective_rs": 3255920.181730366,
+     "new_objective_rs": 3207144.7961804504,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-09-29",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 3872957.6841974366,
+     "new_objective_rs": 3833965.457949066,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-10-07",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 3126558.93760746,
+     "new_objective_rs": 3104860.3122065845,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-08-28",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 3254594.5118987905,
+     "new_objective_rs": 3195755.5589986895,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-09-19",
+     "method": "qgrid",
+     "old_objective_rs": 3389736.684178759,
+     "new_objective_rs": 3346462.7400495736,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-09-19",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 3430927.871245136,
+     "new_objective_rs": 3354542.469158821,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-08-31",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 5962099.273893045,
+     "new_objective_rs": 5964763.211298602,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-08-31",
+     "method": "qgrid",
+     "old_objective_rs": 5963287.164296523,
+     "new_objective_rs": 5959620.927225312,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-08-12",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 2328166.2382513196,
+     "new_objective_rs": 2331537.07471661,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-08-12",
+     "method": "qgrid",
+     "old_objective_rs": 2352656.370684794,
+     "new_objective_rs": 2330360.46123229,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-07-28",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 2568749.079972978,
+     "new_objective_rs": 2555804.1911217845,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-07-28",
+     "method": "qgrid",
+     "old_objective_rs": 2564960.056314569,
+     "new_objective_rs": 2566872.027743906,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-07-18",
+     "method": "qgrid",
+     "old_objective_rs": 2594989.0644686287,
+     "new_objective_rs": 2626851.8997344016,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-07-18",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 2631738.8177548526,
+     "new_objective_rs": 2633530.6758295936,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-02-01",
+     "method": "qgrid",
+     "old_objective_rs": 2610241.3891478702,
+     "new_objective_rs": 2570938.466437016,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-02-01",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 2604756.2252212865,
+     "new_objective_rs": 2563422.208294995,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-01-13",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 2386056.444657175,
+     "new_objective_rs": 2386499.7089894963,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-01-13",
+     "method": "qgrid",
+     "old_objective_rs": 2383467.094046848,
+     "new_objective_rs": 2386766.2007811116,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-01-26",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 2871147.5887096724,
+     "new_objective_rs": 2867587.6760091474,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-01-26",
+     "method": "qgrid",
+     "old_objective_rs": 2876192.7841637633,
+     "new_objective_rs": 2870430.0286705545,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-10-07",
+     "method": "qgrid",
+     "old_objective_rs": 3102971.127856142,
+     "new_objective_rs": 3122782.9844773286,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-11-26",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 6916279.33148535,
+     "new_objective_rs": 6882291.256777055,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-11-26",
+     "method": "qgrid",
+     "old_objective_rs": 6897950.690704692,
+     "new_objective_rs": 6863962.40756819,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-11-23",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 2623053.241484198,
+     "new_objective_rs": 2619426.8654014496,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-11-23",
+     "method": "qgrid",
+     "old_objective_rs": 2582980.336791826,
+     "new_objective_rs": 2590325.787053114,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-11-05",
+     "method": "qgrid",
+     "old_objective_rs": 3309068.605774829,
+     "new_objective_rs": 3287690.839047329,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-11-05",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 3312245.751205218,
+     "new_objective_rs": 3296121.232405762,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-10-15",
+     "method": "qgrid",
+     "old_objective_rs": 3096556.8869519536,
+     "new_objective_rs": 3082599.484359518,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-10-28",
+     "method": "qgrid",
+     "old_objective_rs": 3102258.6374035683,
+     "new_objective_rs": 3120162.186279239,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_bull",
+     "day": "2017-10-28",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 3177179.6658226745,
+     "new_objective_rs": 3199648.191062926,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-05-04",
+     "method": "qgrid",
+     "old_objective_rs": 2368919.6561836177,
+     "new_objective_rs": 2354679.1565471445,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-05-04",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 2374400.959878607,
+     "new_objective_rs": 2362525.2812732994,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-04-13",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 1931654.5743715449,
+     "new_objective_rs": 1904110.3674566557,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-04-27",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 1843024.803153518,
+     "new_objective_rs": 1777791.8375706004,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-04-27",
+     "method": "qgrid",
+     "old_objective_rs": 1823206.8255209876,
+     "new_objective_rs": 1779787.114498364,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-04-13",
+     "method": "qgrid",
+     "old_objective_rs": 1930450.21127592,
+     "new_objective_rs": 1903595.7733889665,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-04-02",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 1728780.2239552133,
+     "new_objective_rs": 1713484.0791733658,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-04-02",
+     "method": "qgrid",
+     "old_objective_rs": 1671255.5782345699,
+     "new_objective_rs": 1708867.0370748432,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-03-10",
+     "method": "qgrid",
+     "old_objective_rs": 2475987.9265571134,
+     "new_objective_rs": 2457547.4087463417,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-03-20",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 2647845.2241604277,
+     "new_objective_rs": 2624920.659585227,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-03-10",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 2477263.7451514243,
+     "new_objective_rs": 2468955.7582473373,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-03-20",
+     "method": "qgrid",
+     "old_objective_rs": 2640764.778459435,
+     "new_objective_rs": 2619760.689340312,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-02-18",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 1874770.8004494135,
+     "new_objective_rs": 1902515.8070363132,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-02-18",
+     "method": "qgrid",
+     "old_objective_rs": 1882748.8553383476,
+     "new_objective_rs": 1914819.2641625637,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-03-03",
+     "method": "qgrid",
+     "old_objective_rs": 2350147.6096247914,
+     "new_objective_rs": 2341586.5660116486,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-03-03",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 2341945.389287357,
+     "new_objective_rs": 2341836.486864932,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-07-31",
+     "method": "qgrid",
+     "old_objective_rs": 1402491.478656169,
+     "new_objective_rs": 1395567.730273231,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-07-31",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 1390914.904642554,
+     "new_objective_rs": 1393406.188566718,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-07-22",
+     "method": "qgrid",
+     "old_objective_rs": 1939263.5889969717,
+     "new_objective_rs": 1943316.6553827992,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-07-22",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 1959921.9202249385,
+     "new_objective_rs": 1970573.4302625954,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-07-09",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 1252577.28437995,
+     "new_objective_rs": 1251301.6264970226,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-07-09",
+     "method": "qgrid",
+     "old_objective_rs": 1254242.1821944325,
+     "new_objective_rs": 1255304.5610337497,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-06-25",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 1471751.91107071,
+     "new_objective_rs": 1450507.714149061,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-06-25",
+     "method": "qgrid",
+     "old_objective_rs": 1425941.3530340847,
+     "new_objective_rs": 1450362.0664698426,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-05-27",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 1965390.905881189,
+     "new_objective_rs": 2109263.9438406895,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-06-20",
+     "method": "qgrid",
+     "old_objective_rs": 1639815.821472891,
+     "new_objective_rs": 1546913.2690668898,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-06-20",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 1644472.4128224691,
+     "new_objective_rs": 1538297.4863003388,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-06-09",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 1829476.636831509,
+     "new_objective_rs": 1689430.1531790025,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-05-27",
+     "method": "qgrid",
+     "old_objective_rs": 1975935.9581345583,
+     "new_objective_rs": 2133244.051852068,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-06-09",
+     "method": "qgrid",
+     "old_objective_rs": 1698191.4378482453,
+     "new_objective_rs": 1694843.9149537159,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-05-20",
+     "method": "qgrid",
+     "old_objective_rs": 1377457.5275251262,
+     "new_objective_rs": 1389561.3671506504,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-05-20",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 1349836.7366374987,
+     "new_objective_rs": 1355190.2760771713,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-10-12",
+     "method": "qgrid",
+     "old_objective_rs": 2532735.3503055787,
+     "new_objective_rs": 2537506.727806521,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-10-05",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 2083290.7391894143,
+     "new_objective_rs": 2061456.2410705006,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-10-24",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 2353060.227480553,
+     "new_objective_rs": 2338981.242113581,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-10-12",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 2522711.7039270285,
+     "new_objective_rs": 2537310.975102421,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-10-24",
+     "method": "qgrid",
+     "old_objective_rs": 2362440.7691621003,
+     "new_objective_rs": 2337970.3667385117,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-09-03",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 2288080.882058331,
+     "new_objective_rs": 2300395.1693775347,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-09-30",
+     "method": "qgrid",
+     "old_objective_rs": 2227657.8686510413,
+     "new_objective_rs": 2257135.9093855866,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-10-05",
+     "method": "qgrid",
+     "old_objective_rs": 2077133.847371788,
+     "new_objective_rs": 2075465.6491674131,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-09-30",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 2265526.475888734,
+     "new_objective_rs": 2265863.137431721,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-09-18",
+     "method": "qgrid",
+     "old_objective_rs": 2242707.001121283,
+     "new_objective_rs": 2178637.759847269,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-09-18",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 2217833.961957688,
+     "new_objective_rs": 2201530.984044452,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-09-03",
+     "method": "qgrid",
+     "old_objective_rs": 2283360.0043071466,
+     "new_objective_rs": 2301579.8049952006,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-08-21",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 2064789.3435266353,
+     "new_objective_rs": 2052763.9046076452,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-08-21",
+     "method": "qgrid",
+     "old_objective_rs": 2025977.4206674306,
+     "new_objective_rs": 2043992.3454392424,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-08-10",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 1601196.8570530794,
+     "new_objective_rs": 1592665.3721714653,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-08-10",
+     "method": "qgrid",
+     "old_objective_rs": 1602762.8450007741,
+     "new_objective_rs": 1592233.714994478,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-03-04",
+     "method": "qgrid",
+     "old_objective_rs": 65805.28435440878,
+     "new_objective_rs": 63278.91331447325,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-03-04",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 65214.32728961087,
+     "new_objective_rs": 64628.84705744682,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-02-21",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 47109.644712429224,
+     "new_objective_rs": 47039.49569602045,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-02-05",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 31815.02695570794,
+     "new_objective_rs": 31070.615422444764,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-02-21",
+     "method": "qgrid",
+     "old_objective_rs": 46994.741482294135,
+     "new_objective_rs": 46539.26002288624,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-02-05",
+     "method": "qgrid",
+     "old_objective_rs": 31454.619082203048,
+     "new_objective_rs": 31194.71398026917,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-01-31",
+     "method": "qgrid",
+     "old_objective_rs": 25632.91999227168,
+     "new_objective_rs": 25235.05168890956,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-01-31",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 26209.12584985483,
+     "new_objective_rs": 25736.410260799785,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-01-19",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 13353.197386693379,
+     "new_objective_rs": 13395.418276817938,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-01-19",
+     "method": "qgrid",
+     "old_objective_rs": 13040.457595202492,
+     "new_objective_rs": 13108.999699420394,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-11-19",
+     "method": "qgrid",
+     "old_objective_rs": 2611669.0976773566,
+     "new_objective_rs": 2609940.5896326136,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-11-06",
+     "method": "qgrid",
+     "old_objective_rs": 2883809.0423484687,
+     "new_objective_rs": 2871570.1946484465,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-11-19",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 2613578.154833548,
+     "new_objective_rs": 2617690.0759464204,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-11-06",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 2886560.7472703536,
+     "new_objective_rs": 2876438.9539123564,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-11-26",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 2445285.4582104767,
+     "new_objective_rs": 2430544.3715736265,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_cockatoo",
+     "day": "2017-11-26",
+     "method": "qgrid",
+     "old_objective_rs": 2434812.0522340834,
+     "new_objective_rs": 2431401.984444809,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-05-29",
+     "method": "qgrid",
+     "old_objective_rs": 53023.321879013885,
+     "new_objective_rs": 52581.44761925476,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-05-29",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 53488.07920221135,
+     "new_objective_rs": 52759.72719484623,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-05-13",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 55920.27923788843,
+     "new_objective_rs": 55301.279168983856,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-05-13",
+     "method": "qgrid",
+     "old_objective_rs": 56080.31794513156,
+     "new_objective_rs": 54958.01813157027,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-05-06",
+     "method": "qgrid",
+     "old_objective_rs": 17499.874873104945,
+     "new_objective_rs": 17693.323704648592,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-04-13",
+     "method": "qgrid",
+     "old_objective_rs": 14134.697409002449,
+     "new_objective_rs": 13678.782080678038,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-04-13",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 13932.053601829146,
+     "new_objective_rs": 13655.646610083842,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-04-19",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 54756.59521147753,
+     "new_objective_rs": 54238.94082274761,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-05-06",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 17216.014986897142,
+     "new_objective_rs": 17315.09984535042,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-04-19",
+     "method": "qgrid",
+     "old_objective_rs": 54500.00971047476,
+     "new_objective_rs": 53492.85579819634,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-04-05",
+     "method": "qgrid",
+     "old_objective_rs": 48335.62985454848,
+     "new_objective_rs": 47748.32916702762,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-03-24",
+     "method": "qgrid",
+     "old_objective_rs": 15067.129437268683,
+     "new_objective_rs": 15247.32623387649,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-03-24",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 14870.32775949843,
+     "new_objective_rs": 14695.808643758783,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-03-08",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 46662.009040788296,
+     "new_objective_rs": 46426.57998107501,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-04-05",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 48872.446125514136,
+     "new_objective_rs": 48259.63030602316,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-03-08",
+     "method": "qgrid",
+     "old_objective_rs": 45541.77651837484,
+     "new_objective_rs": 45356.49473830292,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-09-12",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 44096.949019372,
+     "new_objective_rs": 43726.12838211875,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-08-29",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 81867.74119133418,
+     "new_objective_rs": 80519.81271576516,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-08-09",
+     "method": "qgrid",
+     "old_objective_rs": 50347.84816504234,
+     "new_objective_rs": 50080.745771758935,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-08-09",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 50671.45759455706,
+     "new_objective_rs": 50225.30130923073,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-07-30",
+     "method": "qgrid",
+     "old_objective_rs": 56907.238671079795,
+     "new_objective_rs": 55750.40015502922,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-07-30",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 56895.85571781647,
+     "new_objective_rs": 55854.92394297494,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-07-21",
+     "method": "qgrid",
+     "old_objective_rs": 14560.067831087385,
+     "new_objective_rs": 15134.447554264756,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-07-21",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 14775.920723508512,
+     "new_objective_rs": 14906.620259012552,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-07-10",
+     "method": "qgrid",
+     "old_objective_rs": 49109.80214127927,
+     "new_objective_rs": 49213.3671464138,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-07-10",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 49409.0672965577,
+     "new_objective_rs": 48780.553389729816,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-06-25",
+     "method": "qgrid",
+     "old_objective_rs": 53172.06359029592,
+     "new_objective_rs": 52084.2951056934,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-06-07",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 66635.1968788548,
+     "new_objective_rs": 66876.93397153265,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-06-21",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 49734.93095945241,
+     "new_objective_rs": 48631.59649367959,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-06-21",
+     "method": "qgrid",
+     "old_objective_rs": 49326.0957936441,
+     "new_objective_rs": 48253.80264558725,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-06-25",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 53311.20759274697,
+     "new_objective_rs": 52567.15911598438,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-06-07",
+     "method": "qgrid",
+     "old_objective_rs": 64021.03235879004,
+     "new_objective_rs": 63776.42857349867,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-06-21",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 3102600.576905746,
+     "new_objective_rs": 3072757.5440294202,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-06-21",
+     "method": "qgrid",
+     "old_objective_rs": 3048773.9300130783,
+     "new_objective_rs": 3051537.6065702173,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-06-12",
+     "method": "qgrid",
+     "old_objective_rs": 2360996.09962802,
+     "new_objective_rs": 2355910.036160294,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-06-12",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 2375299.383602802,
+     "new_objective_rs": 2367898.150364421,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-05-26",
+     "method": "qgrid",
+     "old_objective_rs": 2302072.056704101,
+     "new_objective_rs": 2305869.483390521,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-05-26",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 2292997.9926436534,
+     "new_objective_rs": 2290155.141702625,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-05-16",
+     "method": "qgrid",
+     "old_objective_rs": 2313954.109966408,
+     "new_objective_rs": 2283647.0874127843,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-05-16",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 2310870.988761114,
+     "new_objective_rs": 2341875.6653177496,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-04-28",
+     "method": "qgrid",
+     "old_objective_rs": 2857760.209483948,
+     "new_objective_rs": 2854763.3053683415,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-05-06",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 2113237.4557665656,
+     "new_objective_rs": 2094382.3522242974,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-04-28",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 2875832.2185161356,
+     "new_objective_rs": 2867650.616100851,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-05-06",
+     "method": "qgrid",
+     "old_objective_rs": 2095235.830904212,
+     "new_objective_rs": 2094437.5823732081,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-04-13",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 2716957.114091595,
+     "new_objective_rs": 2717981.702868826,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-04-13",
+     "method": "qgrid",
+     "old_objective_rs": 2746064.0392995677,
+     "new_objective_rs": 2723571.514485121,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-03-25",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 2418914.387341275,
+     "new_objective_rs": 2414562.6638751333,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-04-06",
+     "method": "qgrid",
+     "old_objective_rs": 2692313.4269914473,
+     "new_objective_rs": 2741415.039012663,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-10-25",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 54042.91286199478,
+     "new_objective_rs": 53281.13222869248,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-11-08",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 51966.20436554437,
+     "new_objective_rs": 50971.24168020656,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-10-25",
+     "method": "qgrid",
+     "old_objective_rs": 54286.62079085672,
+     "new_objective_rs": 53281.132228692484,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-11-08",
+     "method": "qgrid",
+     "old_objective_rs": 51555.482518732955,
+     "new_objective_rs": 50105.955192002424,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-10-19",
+     "method": "qgrid",
+     "old_objective_rs": 15419.160397824271,
+     "new_objective_rs": 15073.864327823301,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-10-19",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 15622.818559251717,
+     "new_objective_rs": 15252.53045302215,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-09-21",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 27129.735145663617,
+     "new_objective_rs": 26677.518814102543,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-10-10",
+     "method": "qgrid",
+     "old_objective_rs": 43246.71089271622,
+     "new_objective_rs": 43577.74916234485,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-10-10",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 43647.18014818865,
+     "new_objective_rs": 43289.909242219685,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-09-21",
+     "method": "qgrid",
+     "old_objective_rs": 24144.556182341523,
+     "new_objective_rs": 23549.137308863003,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-08-24",
+     "method": "qgrid",
+     "old_objective_rs": 21084.393065072658,
+     "new_objective_rs": 20705.539756661787,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-08-24",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 20723.842594060006,
+     "new_objective_rs": 20250.4815882841,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-08-29",
+     "method": "qgrid",
+     "old_objective_rs": 80733.53336093851,
+     "new_objective_rs": 79299.6216496915,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-09-12",
+     "method": "qgrid",
+     "old_objective_rs": 43868.292156008916,
+     "new_objective_rs": 43621.63569654738,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-04-06",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 2710024.410659103,
+     "new_objective_rs": 2741745.5815573307,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-03-25",
+     "method": "qgrid",
+     "old_objective_rs": 2387748.534811018,
+     "new_objective_rs": 2387248.2453781446,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-03-11",
+     "method": "qgrid",
+     "old_objective_rs": 2294181.2893131035,
+     "new_objective_rs": 2334437.5344876014,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-03-11",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 2326399.237898797,
+     "new_objective_rs": 2361198.231484753,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-03-03",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 3225260.3234922606,
+     "new_objective_rs": 3133785.91764986,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-03-03",
+     "method": "qgrid",
+     "old_objective_rs": 3234929.413717866,
+     "new_objective_rs": 3165948.217969832,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-02-12",
+     "method": "qgrid",
+     "old_objective_rs": 2917118.943125677,
+     "new_objective_rs": 2980555.60834987,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-02-12",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 2928366.8727650717,
+     "new_objective_rs": 2983582.065594248,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-01-25",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 3926754.1617092844,
+     "new_objective_rs": 4089313.2747935313,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-01-25",
+     "method": "qgrid",
+     "old_objective_rs": 4135640.261562845,
+     "new_objective_rs": 4147447.327740464,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-02-03",
+     "method": "qgrid",
+     "old_objective_rs": 3217668.70404624,
+     "new_objective_rs": 3241280.463275104,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-02-03",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 3220438.4038216784,
+     "new_objective_rs": 3242221.889621207,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-12-05",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 15438.31587620846,
+     "new_objective_rs": 14956.855060223967,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-11-16",
+     "method": "qgrid",
+     "old_objective_rs": 17220.48733484694,
+     "new_objective_rs": 16629.76908034191,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-12-05",
+     "method": "qgrid",
+     "old_objective_rs": 15464.971577081613,
+     "new_objective_rs": 15135.967786846091,
+     "feasible": true
+    },
+    {
+     "dataset": "cubems",
+     "day": "2019-11-16",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 17876.815859612754,
+     "new_objective_rs": 24571.217620866002,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-01-17",
+     "method": "qgrid_comms_fail",
+     "old_objective_rs": 3389468.9912503357,
+     "new_objective_rs": 3383419.5430676667,
+     "feasible": true
+    },
+    {
+     "dataset": "bdg2_fox",
+     "day": "2017-01-17",
+     "method": "qgrid",
+     "old_objective_rs": 3385686.369288815,
+     "new_objective_rs": 3379141.0034114555,
+     "feasible": true
+    }
+   ]
+  }
  ]
 }

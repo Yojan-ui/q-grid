@@ -1,14 +1,15 @@
 # Pitch — 1 minute (elevator version)
 
-_Rendered from `docs/templates/pitch_1min.md`; numbers from `results/`._
+_Rendered from `docs/templates/pitch_1min.md`; numbers from `results/`, headline locked in `results/headline.json`.
+About 150 words; timing marks are targets._
 
-"Every building at RVCE runs its energy on its own. {{q3.story.step1}}
+**(0:00–0:15)** "Every building at RVCE runs its energy on its own. {{headline.step1}}"
 
-Q-Grid gives each building its own controller: it solves its own on/off plan exactly, and agrees cable flows with its
-neighbours — no central computer, so there's no single point of failure. {{q3.story.step7}} {{q3.story.comms}}
+**(0:15–0:30)** "Q-Grid gives each building its own small controller. It plans its own next 24 hours exactly, and agrees cable
+flows with its neighbours. No central computer, so no single point of failure."
 
-We also tested quantum honestly: QAOA on a simulator, verified against exact search on every block — it was correct but didn't
-speed anything up at this size, so it's not in the loop. No quantum advantage claimed.
+**(0:30–0:45)** "On {{hl.n_days|0}} modelled RVCE days: {{headline.sentence}}"
 
-Tariffs are labelled stand-ins until the official BESCOM order. The hardware is about Rs {{imp.hardware_rs_lakh|1}} lakh for the
-campus and, with battery wear counted, pays back in about {{imp.payback_net_years|1}} years on our assumed costs."
+**(0:45–1:00)** "We tested quantum honestly: QAOA on a simulator, checked against exact search. It was correct, but no faster at
+this size, so it isn't in the control loop. No quantum advantage claimed. {{imp.spoken}} Next: one RVCE BESCOM bill and the
+diesel logs, to replace our assumptions with campus data."

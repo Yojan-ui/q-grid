@@ -10,6 +10,17 @@ Coordination
      prices; with the binaries fixed, consensus ADMM (OSQP per building) agrees the continuous flows; the ADMM
      multipliers become the next prices (2 outer rounds); finally each building re-solves its LP with the agreed
      flows. Flows are continuous under C1 (ADMM needs a convex problem).
+
+Monthly-peak term (cfg.demand, see demand.py): rate x max(0, campus peak - ref) + excess over the contract demand,
+ref = max(billing floor, campus peak already recorded today). The central controller prices the campus peak exactly.
+The campus peak couples the buildings, so the decentralised controllers split the allowance into per-building,
+per-slot budgets that sum to the campus allowance at every slot: building i pays rate x max(0, max_h imp_i[h]/pf -
+share_i[h] x ref). Per-building MPC (no communication) uses static shares (each building's share of the campus mean
+load). Q-Grid re-agrees the budgets between its price rounds from the buildings' planned imports (the campus import
+profile is a sum over buildings, obtained over the cable graph by flooding: n rounds, counted as messages): where the
+planned campus import is under the allowance, each building keeps its planned import plus its static share of the
+headroom; where it is over, the allowance is split in proportion to the planned imports (_budgets). The per-building
+terms are never below the campus term, and equal it when the buildings' peaks coincide.
 """
 from __future__ import annotations
 
@@ -47,6 +58,7 @@ class ACfg:
     mip_gap: float = 0.01
     bin_rounds_cap: int = 6
     wear_rs_per_kwh: float | None = None   # battery wear Rs/kWh in each building's objective; None = config (model.wear_rate)
+    demand: dict | None = None       # monthly-peak term (qgrid/ablation/demand.py planner_params); None = not priced
 
     @property
     def H(self) -> int:
@@ -116,8 +128,45 @@ def _lp_admm(campus, models, ints, cfg: ACfg, z0, u0, trace: list | None = None)
     return z, u, it, conv
 
 
-def plan_hour(campus: Campus, models: list[LocalModel], cfg: ACfg, warm: dict, hook=None, trace: dict | None = None) -> tuple[list, dict]:
-    """Coordinate the buildings for one decision; returns each building's final solution x and stats."""
+def _planned_imports(models, xs) -> np.ndarray:
+    """Planned grid import (kW) per building and horizon slot."""
+    return np.array([np.maximum(m.imports(x), 0.0) for m, x in zip(models, xs)])
+
+
+def _budgets(imp, static, cap_kva: float, pf: float) -> np.ndarray:
+    """Split a campus allowance (cap_kva at every slot) into per-building, per-slot budgets that sum to it.
+    Where the planned campus import is under the cap, each building keeps its planned import plus its static share of
+    the headroom; where it is over, the cap is split in proportion to the planned imports (static shares where the
+    campus plans no import). A building is never given less than it planned while the campus has headroom, so no
+    building pays for a private peak the campus does not have (earlier rule, a pure split in proportion to the planned
+    imports, gave near-zero budgets at slots a building planned no import, and the private peaks it then priced let it
+    import freely at the campus peak: RVCE 2023-02-24, batteries charged at 18:00)."""
+    kva = np.asarray(imp, float) / pf
+    tot = kva.sum(axis=0)
+    w = np.asarray(static, float)[:, None] * np.ones_like(kva)
+    head = cap_kva - tot
+    with np.errstate(divide="ignore", invalid="ignore"):
+        prop = np.where(tot[None, :] > 1e-6, kva / np.where(tot > 1e-6, tot, 1.0)[None, :], w) * cap_kva
+    return np.where(head[None, :] >= 0.0, kva + w * head[None, :], prop)
+
+
+def _peak_budgets(imp, peak) -> tuple[np.ndarray, np.ndarray | None]:
+    b = _budgets(imp, peak["weights"], peak["ref_kva"], peak["pf"])
+    cb = _budgets(imp, peak["weights"], peak["contract_kva"], peak["pf"]) if peak.get("contract_kva") else None
+    return b, cb
+
+
+def _set_budgets(models, imp, peak):
+    b, cb = _peak_budgets(imp, peak)
+    for i, m in enumerate(models):
+        if m.peak_rows:
+            m.set_peak_budget(b[i], None if cb is None else cb[i])
+
+
+def plan_hour(campus: Campus, models: list[LocalModel], cfg: ACfg, warm: dict, hook=None, trace: dict | None = None,
+              peak: dict | None = None) -> tuple[list, dict]:
+    """Coordinate the buildings for one decision; returns each building's final solution x and stats.
+    peak: this decision's monthly-peak parameters (ref_kva already raised to today's recorded peak), or None."""
     n, H, F = len(models), models[0].H, campus.step_kw
     st = {"rounds": 0, "converged": False, "mip_solves": 0, "mip_nodes": 0, "mip_timelimit": 0, "messages": 0}
     if not cfg.share or warm.get("_isolated"):                         # each building alone, cables idle
@@ -129,7 +178,7 @@ def plan_hour(campus: Campus, models: list[LocalModel], cfg: ACfg, warm: dict, h
         return out, st
     if cfg.central:                                                    # one central MILP (needs a coordinator)
         from .bounds import _central_solve
-        xs = _central_solve(campus, models, time_limit=max(cfg.mip_time * 20, 5.0))
+        xs = _central_solve(campus, models, time_limit=max(cfg.mip_time * 20, 5.0), peak=peak)
         st["converged"] = True; st["mip_solves"] += 1
         st["messages"] = 2 * n                                         # every building -> coordinator -> building
         return xs, st
@@ -184,6 +233,9 @@ def plan_hour(campus: Campus, models: list[LocalModel], cfg: ACfg, warm: dict, h
                 hook(i, m, c)                              # quantum-placement experiment taps the commitment MILP
             s = m.solve(c); st["mip_solves"] += 1; st["mip_nodes"] += s["nodes"]; st["mip_timelimit"] += "TimeLimit" in s["status"]
             ints.append(s["x"])
+        if peak is not None:                               # re-agree the peak budgets on the planned imports
+            _set_budgets(models, _planned_imports(models, ints), peak)
+            st["messages"] += 2 * len(campus.lines) * n
         tr = [] if trace is not None else None
         z, u, it, conv = _lp_admm(campus, models, ints, cfg, z, u, trace=tr)
         st["rounds"] += it; st["converged"] = conv
@@ -215,6 +267,26 @@ def plan_hour(campus: Campus, models: list[LocalModel], cfg: ACfg, warm: dict, h
     return out, st
 
 
+def _realised_peak(campus, yd, d0, t0, n, outage, sched, states, pf) -> float:
+    """Campus grid import (kVA) recorded at the main meter over the applied slots t0..t0+n-1 (max)."""
+    pk = 0.0
+    for t in range(t0, t0 + n):
+        if not yd.window(d0, t, 1, outage).grid[0]:
+            continue
+        g = d0 + t
+        tot = 0.0
+        for i, b in enumerate(campus.buildings):
+            s = states[i]
+            dem = yd.load[i, g] + sched.pump_on[i, t] * (b.tank.pump_kw if b.tank else 0.0) + sum(
+                j.kw for j in b.flex if j.name in s.started and s.started[j.name] <= t < s.started[j.name] + j.slots)
+            net = dem - yd.pv[i, g] + sched.p_bat[i, t] - sched.dg_kw[i, t]
+            for l, (a, c_) in enumerate(campus.lines):
+                net += sched.flows[l, t] if a == i else (-sched.flows[l, t] if c_ == i else 0.0)
+            tot += max(net, 0.0)
+        pk = max(pk, tot / pf)
+    return pk
+
+
 def _rule_fallback(campus, yd, d0, t0, n, outage, sched, states):
     """Local safe mode for slots t0..t0+n-1 (no coordinator): battery self-consumption, diesel only in an outage,
     float-switch pump, flexible loads at their default time, cables idle (the rule-based controller)."""
@@ -240,7 +312,8 @@ def _rule_fallback(campus, yd, d0, t0, n, outage, sched, states):
             if b.battery.present:
                 s.e = float(b.battery.step(s.e, p))
             if b.dg:
-                on = dg_decision(b.dg, (not grid_up) and r + p > 0, s.dg_run if s.dg_on else 0, True)
+                # backup-only DG: the minimum on-time never keeps it running once the grid is back
+                on = (not grid_up) and dg_decision(b.dg, r + p > 0, s.dg_run if s.dg_on else 0, True)
                 sched.dg_kw[i, t] = float(np.clip(r + p, b.dg.p_min, b.dg.kw)) if on else 0.0
                 s.dg_run = s.dg_run + 1 if on == s.dg_on else 1
                 s.dg_on = on
@@ -270,9 +343,22 @@ def run_day(campus: Campus, yd, day: str, outage, cfg: ACfg, forecaster=None, ho
             ctg.append(CostToGo(b.battery, wd.load[i] - wd.pv[i], wd.pi, wd.pe, wd.term_value, wd.grid, noncrit, *voll))
     warm: dict = {}
     stats = {"rounds": [], "converged": [], "mip_solves": 0, "mip_nodes": 0, "mip_timelimit": 0, "plan_time_s": []}
+    dcfg = cfg.demand if (cfg.demand and cfg.demand.get("rate", 0) > 0) else None
+    peak_seen = 0.0                                 # campus peak kVA recorded today so far (main meter)
     for t0 in range(0, T, cfg.replan):
         tp = time.perf_counter()
         w = src.window(d0, t0, cfg.H, outage)
+        failing = cfg.comms_fail is not None and cfg.comms_fail[0] <= t0 <= cfg.comms_fail[1]
+        peak = None
+        if dcfg is not None:
+            peak = {**dcfg, "ref_kva": max(float(dcfg.get("ref_kva") or 0.0), peak_seen)}
+            dynamic = cfg.share and not cfg.central and not failing and "imp_plan" in warm
+            if dynamic:                                 # budgets from the last decision's planned imports
+                bud, cbud = _peak_budgets(warm["imp_plan"], peak)
+            else:                                       # static shares of the campus allowance
+                wts = np.repeat(np.asarray(dcfg["weights"], float)[:, None], cfg.H, axis=1)
+                bud = peak["ref_kva"] * wts
+                cbud = peak["contract_kva"] * wts if peak.get("contract_kva") else None
         models = []
         for i, b in enumerate(campus.buildings):
             if cfg.A:
@@ -282,16 +368,26 @@ def run_day(campus: Campus, yd, day: str, outage, cfg: ACfg, forecaster=None, ho
                 slope = float(-(ctg[i](t0 + cfg.H, e + 0.5) - ctg[i](t0 + cfg.H, e - 0.5))) if b.battery.present else 0.0
             models.append(LocalModel(campus, i, w, states[i], t0, cfg.H, disc=not cfg.B, disc_flows=(not cfg.B and not cfg.C),
                                      term_slope=slope, voll=voll, lam_co2=lam_co2, quad_flows=not cfg.C,
-                                     time_limit=cfg.mip_time, mip_gap=cfg.mip_gap, wear=wear))
-        failing = cfg.comms_fail is not None and cfg.comms_fail[0] <= t0 <= cfg.comms_fail[1]
+                                     time_limit=cfg.mip_time, mip_gap=cfg.mip_gap, wear=wear,
+                                     peak=None if (peak is None or cfg.central) else
+                                     {"rate": peak["rate"], "pf": peak["pf"], "budget": bud[i],
+                                      "cbudget": None if cbud is None else cbud[i],
+                                      "xs_rate": peak.get("xs_rate", 0.0)}))
         if failing and cfg.central:                    # coordinator unreachable: devices fall back to the rule-based controller
             stats["fallback_slots"] = stats.get("fallback_slots", 0) + cfg.replan
             _rule_fallback(campus, yd, d0, t0, cfg.replan, outage, sched, states)
             stats["plan_time_s"].append(time.perf_counter() - tp)
+            if dcfg is not None:
+                peak_seen = max(peak_seen, _realised_peak(campus, yd, d0, t0, cfg.replan, outage, sched, states, dcfg["pf"]))
             continue
         warm["_isolated"] = failing                    # peer links down: Q-Grid buildings keep optimising alone
         xs, st = plan_hour(campus, models, cfg, warm, hook=(lambda i, m, c, _t=t0: hook(_t, i, m, c)) if hook else None,
-                           trace=trace if (trace is not None and t0 == trace_slot) else None)
+                           trace=trace if (trace is not None and t0 == trace_slot) else None,
+                           peak=peak if (peak is not None and cfg.share and not cfg.central and not failing and cfg.C) or
+                           (peak is not None and cfg.central) else None)
+        if peak is not None and cfg.share and not cfg.central and not failing:
+            ip = _planned_imports(models, xs)                          # warm start for the next decision's budgets
+            warm["imp_plan"] = np.c_[ip[:, cfg.replan:], np.repeat(ip[:, -1:], cfg.replan, axis=1)]
         stats["rounds"].append(st["rounds"]); stats["converged"].append(st["converged"])
         stats["mip_solves"] += st["mip_solves"]; stats["mip_nodes"] += st["mip_nodes"]; stats["mip_timelimit"] += st["mip_timelimit"]
         stats["messages"] = stats.get("messages", 0) + st.get("messages", 0)
@@ -300,6 +396,7 @@ def run_day(campus: Campus, yd, day: str, outage, cfg: ACfg, forecaster=None, ho
         for h in range(cfg.replan):
             t = t0 + h
             g = d0 + t
+            up_t = bool(yd.window(d0, t, 1, outage).grid[0])
             for i, (b, m, x) in enumerate(zip(campus.buildings, models, xs)):
                 s = states[i]
                 if b.battery.present:
@@ -308,6 +405,8 @@ def run_day(campus: Campus, yd, day: str, outage, cfg: ACfg, forecaster=None, ho
                     on = m.get(x, "on")[h] > 0.5
                     if s.dg_on and s.dg_run < b.dg.min_on_slots:
                         on = True
+                    if up_t:                   # backup-only DG: never runs while the grid is up (min on-time ends)
+                        on = False
                     sched.dg_kw[i, t] = float(np.clip(m.get(x, "pg")[h], b.dg.p_min, b.dg.kw)) if on else 0.0
                     s.dg_run = s.dg_run + 1 if on == s.dg_on else 1
                     s.dg_on = on
@@ -340,6 +439,8 @@ def run_day(campus: Campus, yd, day: str, outage, cfg: ACfg, forecaster=None, ho
             for i, b in enumerate(campus.buildings):
                 if b.battery.present:
                     states[i].e = float(b.battery.step(states[i].e, sched.p_bat[i, t]))
+        if dcfg is not None:
+            peak_seen = max(peak_seen, _realised_peak(campus, yd, d0, t0, cfg.replan, outage, sched, states, dcfg["pf"]))
     for i, b in enumerate(campus.buildings):
         for j in b.flex:
             sched.flex_start[i].setdefault(j.name, j.default)

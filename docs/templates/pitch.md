@@ -1,5 +1,8 @@
 # Pitch (3 minutes, follows the six story chapters) — numbers from results/*.csv
 
+> **Superseded.** This is the earlier v1 pitch (one headline day, v1 pipeline). Use [pitch_3min.md](pitch_3min.md) and the
+> locked headline in [headline.md](headline.md): {{headline.sentence}}
+
 **1 · Problem (30 s).** "This is RVCE from OpenStreetMap — nine zones, rooftop PV from NASA data. Watch a fest evening: at
 18:00 BESCOM goes down. Today the campus runs diesel zone by zone and the server room loses power: {{headline.before.critical_downtime_h|2}}
 hours of critical-load downtime."
@@ -25,6 +28,6 @@ until we get the KERC/BESCOM documents — every number on screen is clickable t
 ## 1-minute version
 "RVCE, nine zones, real solar data. In a BESCOM outage during the fest, the status quo loses critical power for
 {{headline.before.critical_downtime_h|2}} h. Q-Grid turns each building's decisions into a ≤{{search.max_qubits}}-qubit QUBO, solves it
-with QAOA verified against the exact optimum, and lets buildings negotiate power with neighbours — no central server. Result:
+with a QAOA block tested on a simulator against the exact optimum (not in the control loop), and lets buildings negotiate power with neighbours — no central server. Result:
 {{headline.after.critical_downtime_h|2}} h downtime, {{OURS.eval30_mean.A.gap_to_B4_pct|1}} % from the global optimum, survives a
 building going offline. Honest labels: simulated QAOA, no quantum advantage, prices pending official tariffs."
