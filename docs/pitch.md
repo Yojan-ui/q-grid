@@ -1,7 +1,7 @@
 # Pitch (3 minutes, follows the six story chapters) — numbers from results/*.csv
 
 > **Superseded.** This is the earlier v1 pitch (one headline day, v1 pipeline). Use [pitch_3min.md](pitch_3min.md) and the
-> locked headline in [headline.md](headline.md): In a BESCOM outage Q-Grid cuts critical-load downtime from 2.6 h to 55 min per outage (41 L more diesel, 110 kg CO₂, to keep those loads up); on normal days the bill is 0.4% higher and the demand charge rises by Rs 16,685 a month at 1,300 kVA contract demand; with no central controller it averages 8.4% from the best possible plan against 9.2% for Per-building MPC, a lead made on the outage days (normal days: 7.4% against 0.3%).
+> locked headline in [headline.md](headline.md): In a BESCOM outage Q-Grid cuts critical-load downtime from 2.6 h to 20 min per outage (45 L more diesel, 122 kg CO₂, to keep those loads up); on normal days the bill is 0.1% lower and the demand charge falls by Rs 5,278 a month at 1,300 kVA contract demand; with no central controller it averages 1.1% from the best possible plan against 9.2% for Per-building MPC, a lead made on the outage days (normal days: 0.6% against 0.3%).
 
 **1 · Problem (30 s).** "This is RVCE from OpenStreetMap — nine zones, rooftop PV from NASA data. Watch a fest evening: at
 18:00 BESCOM goes down. Today the campus runs diesel zone by zone and the server room loses power: 3.00

@@ -30,8 +30,8 @@ proposal matched the exact one in {{cons.qaoa_agree_pct|1}} % of master solves. 
 **4. Why not just solve one big MILP centrally?**
 We do use MILP, inside each building: every node solves its own on/off plan exactly. The central MILP with perfect
 information is our reference, the "best possible plan". A central MPC with the same forecasts lands
-{{q3.b.rvce.central_mpc.gap_pct|2}} % from it; Q-Grid lands {{q3.b.rvce.qgrid.gap_pct|2}} %. The difference is what happens when
-the network fails (question 6).
+{{q3.b.rvce.central_mpc.gap_pct|2}} % from it; Q-Grid lands {{q3.b.rvce.qgrid.gap_pct|2}} %. With a working network the two are
+close; the real difference is what happens when the network fails (question 6).
 
 **5. RVCE has one owner. Why decentralise at all?**
 One owner still means one server and one network to keep alive. A node per building keeps optimising alone when links drop,
@@ -110,9 +110,9 @@ consensus ADMM converges (Boyd et al. 2011); the on/off choices stay inside each
 **19. What are the limits?**
 No quantum advantage. Outages and network failures are synthetic. RVCE loads are modelled until meter data arrives. Batteries,
 EV chargers and inter-building cables don't exist on campus today (PROPOSED). The outage gain comes from sharing the two
-diesel sets' power with other buildings, so it depends on which buildings those sets can feed. On normal days Q-Grid costs
-more than today ({{hl.normal_abs_pct|1}} % on the bill), partly from a defect found in the full run (batteries charged at
-the evening peak on some days). Contract demand is assumed until RVCE's bill arrives. Cables are lossless, without AC
+diesel sets' power with other buildings, so it depends on which buildings those sets can feed. There is no real bill saving: on
+normal days the bill is {{hl.normal_abs_pct|1}} % {{hl.normal_dir}}, over all days {{hl.all_abs_pct|1}} % {{hl.all_dir}} (diesel in outages),
+and the nodes don't pay back on the bill. Contract demand is assumed until RVCE's bill arrives. Cables are lossless, without AC
 power flow.
 
 **20. What do you need to deploy at RVCE?**

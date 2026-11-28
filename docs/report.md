@@ -2,7 +2,7 @@
 
 > **Note.** Sections that quote the v1 headline day and the 30-day v1 set come from the earlier pipeline. The current
 > result is the five-campus scorecard ([benchmark_v3.md](benchmark_v3.md)) and the locked headline
-> ([headline.md](headline.md)): In a BESCOM outage Q-Grid cuts critical-load downtime from 2.6 h to 55 min per outage (41 L more diesel, 110 kg CO₂, to keep those loads up); on normal days the bill is 0.4% higher and the demand charge rises by Rs 16,685 a month at 1,300 kVA contract demand; with no central controller it averages 8.4% from the best possible plan against 9.2% for Per-building MPC, a lead made on the outage days (normal days: 7.4% against 0.3%).
+> ([headline.md](headline.md)): In a BESCOM outage Q-Grid cuts critical-load downtime from 2.6 h to 20 min per outage (45 L more diesel, 122 kg CO₂, to keep those loads up); on normal days the bill is 0.1% lower and the demand charge falls by Rs 5,278 a month at 1,300 kVA contract demand; with no central controller it averages 1.1% from the best possible plan against 9.2% for Per-building MPC, a lead made on the outage days (normal days: 0.6% against 0.3%).
 
 *Technical report, EUREKA Track 3. QAOA on a local simulator: verified against exact solutions, no quantum advantage claimed.*
 

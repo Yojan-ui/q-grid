@@ -101,6 +101,6 @@ bottom line. It runs fully offline. Click order and fallbacks: [demo_runbook.md]
 ## Honest limits (say them before you're asked)
 
 No quantum advantage. Outages are simulated. RVCE loads are modelled until meter data arrives. Batteries and cables are
-proposals, and the outage gain depends on which buildings the two diesel sets can feed. On normal days Q-Grid costs more
-than today, partly from a defect we found (batteries charged at the evening peak on some days). Contract demand is
+proposals, and the outage gain depends on which buildings the two diesel sets can feed. There is no real bill saving: on
+normal days the bill is {{hl.normal_abs_pct|1}} % {{hl.normal_dir}}, over all days {{hl.all_abs_pct|1}} % {{hl.all_dir}} (outage diesel). Contract demand is
 assumed until RVCE's bill arrives.

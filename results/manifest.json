@@ -1,5 +1,5 @@
 {
-  "git_commit": "e4e144bb8c846cc7fbb8e291735c135b7bb67af5",
+  "git_commit": "65715224047311adcd018ae6bada5cb3032a9477",
   "python": "3.12.10",
   "platform": "Windows-11-10.0.26200-SP0",
   "packages": {
@@ -30,7 +30,7 @@
     "data/processed/campus.json": "1f79b6badb48ea342a81aa3feb2ae438d6c821580501ce71e252d771b1afa8ad",
     "results/qaoa_params.json": "cca565498373d1bb80c720ed42cefba4a6441abc1ed47a5b02bc870ee7f7ca86",
     "results/benchmark.csv": "ae446374694deb31fcab14c9e7ab05ca447dbc357760dd5c800bfaf67bc78f9a",
-    "results/headline.json": "943463f53c7d7a4340d6f5c79315d96ea500dd43a9950d8e9d9a4b1a8f39b65a"
+    "results/headline.json": "ee4797e178e560aad4e727c257f226854e5fe55c0c60067307efb036a9542d71"
   },
   "runtime": {
     "benchmark_runtime_s": 795,

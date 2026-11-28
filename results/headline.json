@@ -1,6 +1,6 @@
 {
   "locked": true,
-  "sentence": "In a BESCOM outage Q-Grid cuts critical-load downtime from 2.6 h to 55 min per outage (41 L more diesel, 110 kg CO\u2082, to keep those loads up); on normal days the bill is 0.4% higher and the demand charge rises by Rs 16,685 a month at 1,300 kVA contract demand; with no central controller it averages 8.4% from the best possible plan against 9.2% for Per-building MPC, a lead made on the outage days (normal days: 7.4% against 0.3%).",
+  "sentence": "In a BESCOM outage Q-Grid cuts critical-load downtime from 2.6 h to 20 min per outage (45 L more diesel, 122 kg CO\u2082, to keep those loads up); on normal days the bill is 0.1% lower and the demand charge falls by Rs 5,278 a month at 1,300 kVA contract demand; with no central controller it averages 1.1% from the best possible plan against 9.2% for Per-building MPC, a lead made on the outage days (normal days: 0.6% against 0.3%).",
   "step1": "Today each building acts on its own: when BESCOM supply fails, critical loads go dark for 2.6 h per outage while the diesel sets burn 373 L; the electricity bill averages Rs 177,694 a day.",
   "numbers": {
     "dataset": "rvce",
@@ -8,44 +8,44 @@
     "n_outage_days": 3,
     "outage_downtime_h": {
       "status_quo": 2.5833333333333335,
-      "qgrid": 0.9166666666666666,
+      "qgrid": 0.3333333333333333,
       "optimum": 0.0
     },
     "outage_diesel_l": {
       "status_quo": 373.0281759220141,
-      "qgrid": 414.09190964404576,
+      "qgrid": 418.42112316316155,
       "optimum": 388.83451922586636
     },
-    "normal_day_saving_pct": -0.4325619706739902,
-    "all_day_saving_pct": -0.8592651551860595,
+    "normal_day_saving_pct": 0.13888591551815174,
+    "all_day_saving_pct": -0.4334883966295994,
     "status_quo_bill_rs": 177694.16284741776,
-    "gap_pct": 8.367408417281434,
+    "gap_pct": 1.0637958089370878,
     "alt": "Per-building MPC (MILP)",
     "alt_gap_pct": 9.165955074129263,
     "demand_by_contract": [
       {
         "contract_kva": 1000.0,
         "status_quo_rs_month": 404202.80643093825,
-        "qgrid_rs_month": 445463.52907546045,
-        "change_rs_month": 41260.722644522204,
+        "qgrid_rs_month": 382320.4900679239,
+        "change_rs_month": -21882.31636301434,
         "status_quo_max_md_kva": 1194.002333712644,
-        "qgrid_max_md_kva": 1370.795596193001
+        "qgrid_max_md_kva": 1188.6000310827621
       },
       {
         "contract_kva": 1300.0,
         "status_quo_rs_month": 371985.01489648735,
-        "qgrid_rs_month": 388670.16728699236,
-        "change_rs_month": 16685.152390505013,
+        "qgrid_rs_month": 366707.44735436497,
+        "change_rs_month": -5277.567542122386,
         "status_quo_max_md_kva": 1194.002333712644,
-        "qgrid_max_md_kva": 1370.795596193001
+        "qgrid_max_md_kva": 1188.6000310827621
       },
       {
         "contract_kva": 1600.0,
         "status_quo_rs_month": 447100.0,
-        "qgrid_rs_month": 447338.4027492621,
-        "change_rs_month": 238.40274926210986,
+        "qgrid_rs_month": 447100.0,
+        "change_rs_month": 0.0,
         "status_quo_max_md_kva": 1194.002333712644,
-        "qgrid_max_md_kva": 1370.795596193001
+        "qgrid_max_md_kva": 1188.6000310827621
       }
     ],
     "contract_kva_base": 1300.0,
@@ -56,7 +56,7 @@
       "ga": 2.4153002691669703,
       "pso": 2.7560819945621944,
       "per_building_mpc": 0.3370350994137305,
-      "qgrid": 7.429858707659521,
+      "qgrid": 0.5900775246499697,
       "central_mpc": 1.3337262346847203,
       "optimum": 0.00023326156353689804
     },

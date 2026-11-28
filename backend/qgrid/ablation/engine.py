@@ -16,10 +16,11 @@ ref = max(billing floor, campus peak already recorded today). The central contro
 The campus peak couples the buildings, so the decentralised controllers split the allowance into per-building,
 per-slot budgets that sum to the campus allowance at every slot: building i pays rate x max(0, max_h imp_i[h]/pf -
 share_i[h] x ref). Per-building MPC (no communication) uses static shares (each building's share of the campus mean
-load). Q-Grid re-agrees the shares between its price rounds from the buildings' planned imports (the campus import
-profile is a sum over buildings, obtained over the cable graph by flooding: n rounds, counted as messages), so the
-budgets follow each building's share of the planned campus import. The per-building terms are never below the
-campus term, and equal it when the buildings' peaks coincide.
+load). Q-Grid re-agrees the budgets between its price rounds from the buildings' planned imports (the campus import
+profile is a sum over buildings, obtained over the cable graph by flooding: n rounds, counted as messages): where the
+planned campus import is under the allowance, each building keeps its planned import plus its static share of the
+headroom; where it is over, the allowance is split in proportion to the planned imports (_budgets). The per-building
+terms are never below the campus term, and equal it when the buildings' peaks coincide.
 """
 from __future__ import annotations
 
@@ -127,19 +128,39 @@ def _lp_admm(campus, models, ints, cfg: ACfg, z0, u0, trace: list | None = None)
     return z, u, it, conv
 
 
-def _shares(campus, models, xs, static):
-    """Each building's share of the planned campus import per slot (static share where the campus imports nothing)."""
-    imp = np.array([m.imports(x) for m, x in zip(models, xs)])
-    tot = imp.sum(axis=0)
-    st = np.asarray(static, float)[:, None] * np.ones_like(imp)
+def _planned_imports(models, xs) -> np.ndarray:
+    """Planned grid import (kW) per building and horizon slot."""
+    return np.array([np.maximum(m.imports(x), 0.0) for m, x in zip(models, xs)])
+
+
+def _budgets(imp, static, cap_kva: float, pf: float) -> np.ndarray:
+    """Split a campus allowance (cap_kva at every slot) into per-building, per-slot budgets that sum to it.
+    Where the planned campus import is under the cap, each building keeps its planned import plus its static share of
+    the headroom; where it is over, the cap is split in proportion to the planned imports (static shares where the
+    campus plans no import). A building is never given less than it planned while the campus has headroom, so no
+    building pays for a private peak the campus does not have (earlier rule, a pure split in proportion to the planned
+    imports, gave near-zero budgets at slots a building planned no import, and the private peaks it then priced let it
+    import freely at the campus peak: RVCE 2023-02-24, batteries charged at 18:00)."""
+    kva = np.asarray(imp, float) / pf
+    tot = kva.sum(axis=0)
+    w = np.asarray(static, float)[:, None] * np.ones_like(kva)
+    head = cap_kva - tot
     with np.errstate(divide="ignore", invalid="ignore"):
-        return np.where(tot[None, :] > 1e-6, imp / np.where(tot > 1e-6, tot, 1.0)[None, :], st)
+        prop = np.where(tot[None, :] > 1e-6, kva / np.where(tot > 1e-6, tot, 1.0)[None, :], w) * cap_kva
+    return np.where(head[None, :] >= 0.0, kva + w * head[None, :], prop)
 
 
-def _set_budgets(models, shares, peak):
-    for m, sh in zip(models, shares):
+def _peak_budgets(imp, peak) -> tuple[np.ndarray, np.ndarray | None]:
+    b = _budgets(imp, peak["weights"], peak["ref_kva"], peak["pf"])
+    cb = _budgets(imp, peak["weights"], peak["contract_kva"], peak["pf"]) if peak.get("contract_kva") else None
+    return b, cb
+
+
+def _set_budgets(models, imp, peak):
+    b, cb = _peak_budgets(imp, peak)
+    for i, m in enumerate(models):
         if m.peak_rows:
-            m.set_peak_budget(peak["ref_kva"] * sh, (peak["contract_kva"] * sh) if peak.get("contract_kva") else None)
+            m.set_peak_budget(b[i], None if cb is None else cb[i])
 
 
 def plan_hour(campus: Campus, models: list[LocalModel], cfg: ACfg, warm: dict, hook=None, trace: dict | None = None,
@@ -213,7 +234,7 @@ def plan_hour(campus: Campus, models: list[LocalModel], cfg: ACfg, warm: dict, h
             s = m.solve(c); st["mip_solves"] += 1; st["mip_nodes"] += s["nodes"]; st["mip_timelimit"] += "TimeLimit" in s["status"]
             ints.append(s["x"])
         if peak is not None:                               # re-agree the peak budgets on the planned imports
-            _set_budgets(models, _shares(campus, models, ints, peak["weights"]), peak)
+            _set_budgets(models, _planned_imports(models, ints), peak)
             st["messages"] += 2 * len(campus.lines) * n
         tr = [] if trace is not None else None
         z, u, it, conv = _lp_admm(campus, models, ints, cfg, z, u, trace=tr)
@@ -331,8 +352,13 @@ def run_day(campus: Campus, yd, day: str, outage, cfg: ACfg, forecaster=None, ho
         peak = None
         if dcfg is not None:
             peak = {**dcfg, "ref_kva": max(float(dcfg.get("ref_kva") or 0.0), peak_seen)}
-            dynamic = cfg.share and not cfg.central and not failing and "imp_shares" in warm
-            shares = warm["imp_shares"] if dynamic else np.repeat(np.asarray(dcfg["weights"], float)[:, None], cfg.H, axis=1)
+            dynamic = cfg.share and not cfg.central and not failing and "imp_plan" in warm
+            if dynamic:                                 # budgets from the last decision's planned imports
+                bud, cbud = _peak_budgets(warm["imp_plan"], peak)
+            else:                                       # static shares of the campus allowance
+                wts = np.repeat(np.asarray(dcfg["weights"], float)[:, None], cfg.H, axis=1)
+                bud = peak["ref_kva"] * wts
+                cbud = peak["contract_kva"] * wts if peak.get("contract_kva") else None
         models = []
         for i, b in enumerate(campus.buildings):
             if cfg.A:
@@ -344,8 +370,8 @@ def run_day(campus: Campus, yd, day: str, outage, cfg: ACfg, forecaster=None, ho
                                      term_slope=slope, voll=voll, lam_co2=lam_co2, quad_flows=not cfg.C,
                                      time_limit=cfg.mip_time, mip_gap=cfg.mip_gap, wear=wear,
                                      peak=None if (peak is None or cfg.central) else
-                                     {"rate": peak["rate"], "pf": peak["pf"], "budget": peak["ref_kva"] * shares[i],
-                                      "cbudget": (peak["contract_kva"] * shares[i]) if peak.get("contract_kva") else None,
+                                     {"rate": peak["rate"], "pf": peak["pf"], "budget": bud[i],
+                                      "cbudget": None if cbud is None else cbud[i],
                                       "xs_rate": peak.get("xs_rate", 0.0)}))
         if failing and cfg.central:                    # coordinator unreachable: devices fall back to the rule-based controller
             stats["fallback_slots"] = stats.get("fallback_slots", 0) + cfg.replan
@@ -360,8 +386,8 @@ def run_day(campus: Campus, yd, day: str, outage, cfg: ACfg, forecaster=None, ho
                            peak=peak if (peak is not None and cfg.share and not cfg.central and not failing and cfg.C) or
                            (peak is not None and cfg.central) else None)
         if peak is not None and cfg.share and not cfg.central and not failing:
-            sh = _shares(campus, models, xs, dcfg["weights"])          # warm start for the next decision's budgets
-            warm["imp_shares"] = np.c_[sh[:, cfg.replan:], np.repeat(sh[:, -1:], cfg.replan, axis=1)]
+            ip = _planned_imports(models, xs)                          # warm start for the next decision's budgets
+            warm["imp_plan"] = np.c_[ip[:, cfg.replan:], np.repeat(ip[:, -1:], cfg.replan, axis=1)]
         stats["rounds"].append(st["rounds"]); stats["converged"].append(st["converged"])
         stats["mip_solves"] += st["mip_solves"]; stats["mip_nodes"] += st["mip_nodes"]; stats["mip_timelimit"] += st["mip_timelimit"]
         stats["messages"] = stats.get("messages", 0) + st.get("messages", 0)

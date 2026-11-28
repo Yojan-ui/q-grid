@@ -33,7 +33,7 @@ Under 20 seconds. If you don't know: "We haven't measured that; here's how we wo
 - **7a scorecard:** outage downtime {{hl.sq_downtime_h|1}} h → {{hl.q_downtime_min|0}} min; {{hl.diesel_abs_l|0}} L more diesel
 - **7f energy flows:** pass through
 - **7b other campuses:** closest on {{q3.best_on_n|0}} of {{q3.n_campuses|0}} (drop if 15 s late at 3:00)
-- **7c network failure:** central loses {{q3.n.central_comms_penalty|1}} points, Q-Grid {{q3.n.qgrid_comms_penalty|1}}
+- **7c network failure:** central loses {{q3.n.central_comms_penalty|1}} points, Q-Grid {{q3.n.qgrid_comms_penalty|2}}
 - skip **7d**
 - **7e:** "Q-Grid buys reliability, not savings."
 
@@ -67,7 +67,7 @@ Yes: same forecasts, same objective, its own time budget for one central problem
 One 3-hour campus network outage per day, at the same seeded time for central MPC and Q-Grid. Central control's buildings fall back to simple rules; Q-Grid's buildings keep optimising alone.
 
 **Why five campuses?**
-To show it isn't tuned to RVCE. Three university campuses from Building Data Genome 2 and a Bangkok office building (CU-BEMS), each with its own real meter data. Q-Grid is closest on {{q3.best_on_n|0}} of {{q3.n_campuses|0}}; on the others per-building MPC (or PSO on CU-BEMS) is closer, and we say so.
+To show it isn't tuned to RVCE. Three university campuses from Building Data Genome 2 and a Bangkok office building (CU-BEMS), each with its own real meter data. Q-Grid is closest on {{q3.best_on_n|0}} of {{q3.n_campuses|0}}; on the other two (BDG2 Bull and Cockatoo) per-building MPC is closer, and we say so.
 
 **How do we know you didn't cherry-pick? (47)**
 Seeded days, the same for every method; every result file hashed in a manifest; `make verify` recomputes the headline numbers; we name where another method beats Q-Grid. Money-only gap (no lost-load penalty): today {{q3.b.rvce.status_quo.gap_novoll_pct|2}} %, Q-Grid {{q3.b.rvce.qgrid.gap_novoll_pct|2}} %, so on money alone Q-Grid is behind.
@@ -86,7 +86,7 @@ Yes, and it's logged. The feasibility audit wrongly flagged 37 outage-day rows (
 Paired comparison (same days for both methods), and daily differences are skewed because outage days dominate. The Wilcoxon signed-rank test doesn't assume a normal distribution.
 
 **Is Q-Grid significantly better than per-building MPC?**
-No, the honest answer is the other way round. Per-building MPC is closer to the best plan on {{q3.rv.alt_closer_days|0}} of {{q3.rv.n_days|0}} days (Wilcoxon p = {{q3.rv.p|3}}). Q-Grid's lower average comes from the outage days, where it keeps critical loads up.
+Not significantly. Day by day Q-Grid is closer on {{q3.rv.qgrid_closer_days|0}} of {{q3.rv.n_days|0}} days (Wilcoxon p = {{q3.rv.p|3}}, above 0.05). Most of its lower average comes from the outage days, where it keeps critical loads up; on normal days per-building MPC is slightly closer ({{hl.ngap.per_building_mpc|1}} % against {{hl.ngap.qgrid|1}} %).
 
 **Q-Grid vs nine methods: what about multiple comparisons?**
 We report each p-value as it is. With 9 comparisons a Bonferroni threshold is 0.05 / 9 ≈ 0.006.
@@ -99,16 +99,19 @@ The uncertainty of each mean across the 30 days. Where two methods' intervals ov
 ## 3. Reading the results
 
 **Does it save money?**
-No. On normal days the bill is {{hl.normal_abs_pct|1}} % {{hl.normal_dir}}; over all days {{hl.all_abs_pct|1}} % {{hl.all_dir}}. The value is reliability: {{hl.downtime_cut_min|0}} fewer minutes of blackout for critical loads per outage.
+Barely. On normal days the bill is {{hl.normal_abs_pct|1}} % {{hl.normal_dir}}; over all days {{hl.all_abs_pct|1}} % {{hl.all_dir}}, because it burns diesel in outages, and the nodes don't pay back on the bill. The value is reliability: {{hl.downtime_cut_min|0}} fewer minutes of blackout for critical loads per outage.
 
 **It uses more diesel in outages. Isn't that worse?**
 Today's practice saves diesel by letting critical loads go dark: {{hl.sq_diesel_l|0}} L and {{hl.sq_downtime_h|1}} h dark, against Q-Grid's {{hl.q_diesel_l|0}} L and {{hl.q_downtime_h|2}} h. That's a deliberate trade, priced in the objective.
 
-**Why is Q-Grid worse on normal days?**
-On normal days it's {{hl.ngap.qgrid|1}} % from the best plan, against {{hl.ngap.per_building_mpc|1}} % for per-building MPC and {{hl.ngap.status_quo|1}} % for today. One cause we found: on 24 February it charges the batteries at about 369 kW between 18:00 and 18:45, the dearest slot, and sets the month's peak above contract demand. It's reproducible and we're tracing it in the planner.
+**Why is per-building MPC slightly better on normal days?**
+On normal days Q-Grid is {{hl.ngap.qgrid|1}} % from the best plan, against {{hl.ngap.per_building_mpc|1}} % for per-building MPC and {{hl.ngap.status_quo|1}} % for today. Q-Grid's buildings share one campus peak allowance, and splitting it between them isn't perfect.
 
-**Central MPC beats Q-Grid with a healthy network. Why not use it? (37)**
-With a working network central control is closer ({{q3.b.rvce.central_mpc.gap_pct|1}} % vs {{q3.b.rvce.qgrid.gap_pct|1}} %). In a 3-hour network failure it loses {{q3.n.central_comms_penalty|1}} points and Q-Grid {{q3.n.qgrid_comms_penalty|1}}. One server and one network are a single point of failure.
+**Didn't you change the planner the morning of the expo?**
+Yes, one defect the full run exposed, and we re-ran every Q-Grid row with the same data and seeds. Each building got a share of the campus peak allowance that followed its own plan, so a building that planned no import in a slot got almost none there. It then paid for a private peak, and that made extra import look free at other times. On 24 February two buildings charged their batteries at the 18:00 peak (1,371 kVA). Now a building keeps what it planned plus a fixed share of the spare allowance. There's a regression test, and the old and new rows are logged in `run_info.json`.
+
+**Why not use central MPC? (37)**
+On RVCE it isn't closer even with a working network ({{q3.b.rvce.central_mpc.gap_pct|1}} % against Q-Grid's {{q3.b.rvce.qgrid.gap_pct|1}} %), and in a 3-hour network failure it loses {{q3.n.central_comms_penalty|1}} points while Q-Grid moves by {{q3.n.qgrid_comms_penalty|2}}. One server and one network are a single point of failure.
 
 **How does diesel reach buildings without a diesel set?**
 In the model, over proposed links between buildings. On campus it depends on which buildings the two diesel sets can feed, which we've asked the estate office. If they back only their own buildings, the outage gain shrinks.
@@ -171,9 +174,9 @@ If the team presents the `real-data` build, don't use these old lines:
 - **7a:** "0.76 % from the best plan; best other method 21.7 %" → {{q3.b.rvce.qgrid.gap_pct|1}} % vs {{q3.b.rvce.per_building_mpc.gap_pct|1}} % (lead made on outage days)
 - **7a:** "downtime halves, 16 to 8 minutes a day" → per outage: {{hl.sq_downtime_h|1}} h → {{hl.q_downtime_min|0}} min
 - **7b:** "closest on four of five" → {{q3.best_on_n|0}} of {{q3.n_campuses|0}}
-- **7c:** "3.5 vs 2.1 points" → {{q3.n.central_comms_penalty|1}} vs {{q3.n.qgrid_comms_penalty|1}}
+- **7c:** "3.5 vs 2.1 points" → {{q3.n.central_comms_penalty|1}} vs {{q3.n.qgrid_comms_penalty|2}}
 - **7c:** "rupee figures use a stand-in tariff" → it's the verified KERC tariff
-- **Shoumik's opening:** "within 1 % of a perfect central optimiser" and "sells noon solar cheaply" → no longer true
+- **Shoumik's opening:** "within 1 % of a perfect central optimiser" → {{q3.b.rvce.qgrid.gap_pct|1}} % from the best possible plan; "sells noon solar cheaply" → no longer true
 - **Q19 (Shoumik):** "3,974 kWp" → RVCE has 500 kWp; 3,974 was roof potential
 - **Q21 / Q26:** "NPV positive in every sample" → P(NPV > 0) = {{imp.mc.npv_net_rs.prob_positive|0}} %
 - **Q22:** "1/30 per day" → billed monthly, as the tariff says
@@ -192,10 +195,10 @@ If the team presents the old portal, the PDF's numbers match the screen. Just do
 In your own words. True version: "I led the real-data pass. I checked the BESCOM tariff against the KERC orders, re-ran the five-campus benchmark on RVCE's real assets, found and documented what changed, and I own the results and the economics."
 
 **What's the weakest part?**
-On real data Q-Grid helps in outages but costs more on normal days, partly from a defect we found. Loads are modelled and outages simulated; RVCE's own data fixes both.
+The money: over all days the bill is {{hl.all_abs_pct|1}} % {{hl.all_dir}} (diesel in outages) and the nodes don't pay back. Loads are modelled and outages simulated; RVCE's own data fixes both. And we fixed a planner defect after the full run, so the scorecard is from the re-run.
 
 **Three more months?**
-Fix the evening-peak defect and re-run; RVCE meter data and a 365-day run; the real BESCOM bill; which buildings the diesel sets feed; a pilot building in shadow mode.
+RVCE meter data and a 365-day run; the real BESCOM bill; which buildings the diesel sets feed; a pilot building in shadow mode.
 
 **How would you know if a number on your slide is wrong?**
 Every number links to the file that produced it ("clickable in Verify"), and `make verify` recomputes the headline numbers from scratch.

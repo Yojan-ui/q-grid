@@ -129,6 +129,9 @@ Licences, URLs and fetch dates: `data/SOURCES.md` · what we asked RVCE for: `do
 - **Real-data pass (branch `real-data`):** campus rescaled to the team brief (500.48 kWp on 21 roofs, 2 × 490 kVA diesel);
   BESCOM HT-2(c)(ii) tariff verified against the KERC Tariff Orders 2022 and 2023 and the KERC solar order; CEA CO₂ factor
   verified; five-campus scorecard, replays and docs regenerated from it.
+- **Planner fix (28 Nov):** Q-Grid's campus peak budgets no longer starve a building that planned no import in a slot
+  (the cause of batteries charging at the 18:00 peak); every Q-Grid row re-run with the same seeds
+  ([docs/review_real_data.md](docs/review_real_data.md)).
 - **Waiting on RVCE:** one BESCOM HT bill (contract demand, recorded maximum demand), which buildings the two diesel sets
   back, diesel logs, meter data. See [docs/rvce_data_request_email.md](docs/rvce_data_request_email.md).
 - **Proposed, not on campus today:** batteries, EV chargers, inter-building cables.
@@ -147,8 +150,10 @@ Licences, URLs and fetch dates: `data/SOURCES.md` · what we asked RVCE for: `do
 - Battery, EV chargers and inter-building cables do not exist on campus today: they are PROPOSED, and labelled so.
   Q-Grid's outage gain comes from sharing the two diesel sets' power with buildings that have none, so on campus it
   depends on which buildings those sets can actually feed (asked of the estate office).
-- On normal days Q-Grid costs more than today's practice; part of that is a defect found in the full run (batteries
-  charged at the evening peak on some days, e.g. 24 Feb 2023), described in docs/review_real_data.md.
+- No real bill saving: on normal days the bill is {{hl.normal_abs_pct|1}} % {{hl.normal_dir}} than today's practice, over
+  all days {{hl.all_abs_pct|1}} % {{hl.all_dir}} (diesel burned in outages to keep critical loads up), and the nodes do not
+  pay back on the bill. A planner defect found in the full run (batteries charged at the 18:00 peak, 24 Feb 2023) was
+  fixed and every Q-Grid row re-run (docs/review_real_data.md).
 - Tariff: RVCE's billing category (HT-2(c)(ii)) and its contract demand (1,300 kVA assumed) need one RVCE BESCOM bill to confirm.
 - Outages and network failures in the benchmark are synthetic (seeded). Cables are modelled as lossless, without AC power flow.
 - Battery wear is priced with an assumed battery cost and cycle life; real warranty data will change the rate.

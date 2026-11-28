@@ -5,41 +5,41 @@
  "variant": null,
  "battery_kwh_total": 1460.0,
  "benefit": {
-  "bill_saving_rs_per_day_mean": -1576.7959914933338,
+  "bill_saving_rs_per_day_mean": -866.9651912100536,
   "bill_saving_rs_per_day_ci95": [
-   -2673.0409384703153,
-   -709.1873719453125
+   -2262.922871744506,
+   223.57485483311066
   ],
-  "extra_throughput_kwh_per_day_mean": 585.5251466849884,
+  "extra_throughput_kwh_per_day_mean": 215.37111890761688,
   "source": "results/bench_v3/daily.csv (RVCE, Q-Grid vs status quo, same days)"
  },
  "central": {
   "hardware_rs": 792000.0,
   "om_rs_per_year": 79200.0,
-  "bill_saving_rs_per_year": -575530.5368950668,
-  "battery_wear_rs_per_year": 890486.16058342,
-  "net_rs_per_year": -1545216.6974784867,
+  "bill_saving_rs_per_year": -316442.2947916696,
+  "battery_wear_rs_per_year": 327543.5766720007,
+  "net_rs_per_year": -723185.8714636703,
   "discount_rate": 0.08,
-  "npv_gross_rs": -5185295.1969385315,
-  "npv_net_rs": -11160529.819084119,
+  "npv_gross_rs": -3446792.002916089,
+  "npv_net_rs": -5644636.064085631,
   "payback_gross_years": null,
   "payback_net_years": null,
   "wear_rs_per_kwh_throughput": 4.166666666666667,
-  "breakeven_wear_rs_per_kwh": -3.6158239835195762
+  "breakeven_wear_rs_per_kwh": -6.534418705684436
  },
  "monte_carlo": {
   "samples": 10000,
   "seed": 2026,
   "npv_gross_rs": {
-   "p5": -7485144.833289501,
-   "p50": -5105496.55352851,
-   "p95": -3255816.1317372317,
+   "p5": -6325043.414521992,
+   "p50": -3311463.8674663175,
+   "p95": -1050093.214677294,
    "prob_positive": 0.0
   },
   "npv_net_rs": {
-   "p5": -13622305.440264521,
-   "p50": -9403856.379446778,
-   "p95": -6446355.875811638,
+   "p5": -9048255.156938791,
+   "p50": -4873864.483355349,
+   "p95": -1872489.8625889337,
    "prob_positive": 0.0
   },
   "payback_gross_years": {
@@ -267,42 +267,42 @@
     {
      "dataset": "rvce",
      "label": "RVCE, Bengaluru (case study)",
-     "gap_pct": 8.367408417281434,
-     "saving_pct": -0.8592651551860595,
-     "runtime_per_decision_s": 9.091626289305472,
-     "messages_per_decision": 5763.277777777778
+     "gap_pct": 1.0637958089370878,
+     "saving_pct": -0.4334883966295994,
+     "runtime_per_decision_s": 4.6526821313898035,
+     "messages_per_decision": 2200.1666666666665
     },
     {
      "dataset": "bdg2_fox",
      "label": "BDG2 university site 'Fox' (Arizona)",
-     "gap_pct": 9.89693674163655,
-     "saving_pct": 0.0633407443434388,
-     "runtime_per_decision_s": 2.6711805749975612,
-     "messages_per_decision": 2693.541666666666
+     "gap_pct": 8.309235213269227,
+     "saving_pct": 0.6790863953529099,
+     "runtime_per_decision_s": 2.424406254037684,
+     "messages_per_decision": 2196.25
     },
     {
      "dataset": "bdg2_bull",
      "label": "BDG2 university site 'Bull' (Texas)",
-     "gap_pct": 9.793803496453354,
-     "saving_pct": 0.344470459510602,
-     "runtime_per_decision_s": 2.7750050345784985,
-     "messages_per_decision": 3395.8750000000005
+     "gap_pct": 9.745362127411113,
+     "saving_pct": 0.4903067622270241,
+     "runtime_per_decision_s": 2.6707329819438095,
+     "messages_per_decision": 2936.363888888889
     },
     {
      "dataset": "bdg2_cockatoo",
      "label": "BDG2 university site 'Cockatoo' (New York)",
-     "gap_pct": 11.815086310928134,
-     "saving_pct": 1.4414811527504836,
-     "runtime_per_decision_s": 2.327190701110845,
-     "messages_per_decision": 2744.661111111111
+     "gap_pct": 10.559183766977073,
+     "saving_pct": 1.4013485278621753,
+     "runtime_per_decision_s": 2.019051048334869,
+     "messages_per_decision": 2325.011111111111
     },
     {
      "dataset": "cubems",
      "label": "CU-BEMS office building, Bangkok (7 floors)",
-     "gap_pct": 27.656445842136673,
-     "saving_pct": 5.487477453064502,
-     "runtime_per_decision_s": 3.9593835966629234,
-     "messages_per_decision": 3001.4666666666662
+     "gap_pct": 27.17627751991132,
+     "saving_pct": 6.571458453749448,
+     "runtime_per_decision_s": 4.093652932497207,
+     "messages_per_decision": 1982.644444444444
     }
    ]
   },

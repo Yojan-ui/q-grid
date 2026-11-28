@@ -63,19 +63,19 @@ Think of each building as a neighbour with its own small brain (a node):
 
 ## What the results say
 
-**In a BESCOM outage Q-Grid cuts critical-load downtime from 2.6 h to 55 min per outage (41 L more diesel, 110 kg CO₂, to keep those loads up); on normal days the bill is 0.4% higher and the demand charge rises by Rs 16,685 a month at 1,300 kVA contract demand; with no central controller it averages 8.4% from the best possible plan against 9.2% for Per-building MPC, a lead made on the outage days (normal days: 7.4% against 0.3%).**
+**In a BESCOM outage Q-Grid cuts critical-load downtime from 2.6 h to 20 min per outage (45 L more diesel, 122 kg CO₂, to keep those loads up); on normal days the bill is 0.1% lower and the demand charge falls by Rs 5,278 a month at 1,300 kVA contract demand; with no central controller it averages 1.1% from the best possible plan against 9.2% for Per-building MPC, a lead made on the outage days (normal days: 0.6% against 0.3%).**
 
 | RVCE, mean of 30 days (3 with an outage) | Today | Q-Grid | Best possible plan |
 |---|---:|---:|---:|
-| Critical loads dark, per outage | 2.58 h | 0.92 h | 0.00 h |
-| Diesel, per outage day | 373 L | 414 L | 389 L |
-| Gap to the best possible plan, all days | 16.8 % | 8.4 % | 0 % |
-| Gap to the best possible plan, normal days | 2.4 % | 7.4 % | 0 % |
+| Critical loads dark, per outage | 2.58 h | 0.33 h | 0.00 h |
+| Diesel, per outage day | 373 L | 418 L | 389 L |
+| Gap to the best possible plan, all days | 16.8 % | 1.1 % | 0 % |
+| Gap to the best possible plan, normal days | 2.4 % | 0.6 % | 0 % |
 
-- Everyday bill: 0.4 % higher than today on normal days (0.9 % higher
+- Everyday bill: 0.1 % lower than today on normal days (0.4 % higher
   over all days). Say it as measured.
 - Network failure for 3 hours: central control loses 2.68 points of gap, Q-Grid
-  0.71.
+  0.01.
 - Lead with outages and diesel, then the gap to the best plan; report the bill exactly as it is.
 
 ## The demo (7 steps in the app)
@@ -101,6 +101,6 @@ bottom line. It runs fully offline. Click order and fallbacks: [demo_runbook.md]
 ## Honest limits (say them before you're asked)
 
 No quantum advantage. Outages are simulated. RVCE loads are modelled until meter data arrives. Batteries and cables are
-proposals, and the outage gain depends on which buildings the two diesel sets can feed. On normal days Q-Grid costs more
-than today, partly from a defect we found (batteries charged at the evening peak on some days). Contract demand is
+proposals, and the outage gain depends on which buildings the two diesel sets can feed. There is no real bill saving: on
+normal days the bill is 0.1 % lower, over all days 0.4 % higher (outage diesel). Contract demand is
 assumed until RVCE's bill arrives.

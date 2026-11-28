@@ -17,9 +17,9 @@ Fix (`qgrid/v2/mpc.py`, `V2Config.verify_fallback`, test `test_exact_master_neve
 
 Every figure of a method-day — gap to the best plan, certified gap, critical downtime, unserved energy, bill — is computed from one row of `runs.csv` (one simulated day of one method). The scorecard averages those rows; it never combines a gap from one run with a downtime from another.
 
-Q-Grid on RVCE (30 days): gap 8.37 %, critical downtime 0.09 h/day (any shortfall), 0.00 h/day counting only slots with more than 1 % of critical load unserved, critical energy unserved 0.001 kWh/day.
+Q-Grid on RVCE (30 days): gap 1.06 %, critical downtime 0.03 h/day (any shortfall), 0.01 h/day counting only slots with more than 1 % of critical load unserved, critical energy unserved 0.025 kWh/day.
 - Strict downtime counts every 15-min slot with *any* unserved critical load (> 1e-6 kW), however small. A small gap next to a non-zero strict downtime means the shortfall is tiny in energy; the >1 % measure and the unserved energy show its size.
-- At the critical value of lost load (Rs 1000/kWh) Q-Grid's mean critical shortfall is worth Rs 1 per day.
+- At the critical value of lost load (Rs 1000/kWh) Q-Grid's mean critical shortfall is worth Rs 25 per day.
 
 ## 3. Value of lost load (VoLL), and gaps with and without it
 
@@ -36,8 +36,8 @@ Q-Grid on RVCE (30 days): gap 8.37 %, critical downtime 0.09 h/day (any shortfal
 | Per-building MPC | 9.17 | 0.30 |
 | Central MPC | 1.37 | 2.88 |
 | Central MPC, comms fail | 4.06 | 3.77 |
-| Q-Grid | 8.37 | 9.62 |
-| Q-Grid, comms fail | 9.08 | 9.90 |
+| Q-Grid | 1.06 | 2.66 |
+| Q-Grid, comms fail | 1.08 | 2.37 |
 | Best possible plan (reference) | 0.00 | 1.54 |
 
 ## 4. Reference plan and certified bounds
@@ -54,5 +54,5 @@ Q-Grid on RVCE (30 days): gap 8.37 %, critical downtime 0.09 h/day (any shortfal
 |---|---:|---:|
 | Central MPC | 0.39 | 88,905 |
 | Best possible plan (reference) | 0.62 | 141,002 |
-| Q-Grid | 0.41 | 82,688 |
+| Q-Grid | 0.37 | 81,813 |
 

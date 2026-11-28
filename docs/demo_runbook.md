@@ -26,12 +26,12 @@ Rehearse twice with a timer (presenter mode shows it)._
 | 4 | → 4a–4e (tiles → qubits → circuit → histogram → decode). | "We tested a quantum circuit honestly." | If 3D stutters, keep talking; the panel carries the story. |
 | 5 | Step 4f: click **Measure the 10-qubit block**. | "Matches exact search, but saved no work, so it's not in the loop." | Live > 5 s or error: falls back to the precomputed measurement automatically (label says so). |
 | 6 | → 4g, → Step 5. Watch the rounds converge. | "Neighbours agree; no central computer." | — |
-| 7 | Step 5: click **Take mechanical labs offline**. | "3 cables dark; the others re-agree in 46 rounds; every critical load in the other buildings is still served." | The precomputed result shows (computed in 0.6 s). Click **Bring … back** to reset. |
+| 7 | Step 5: click **Take mechanical labs offline**. | "3 cables dark; the others re-agree in 46 rounds; every critical load in the other buildings is still served." | The precomputed result shows (computed in 1.2 s). Click **Bring … back** to reset. |
 | 8 | → 5b, → Step 6 (proposed battery fills before the outage). | "Batteries carry the outage." | — |
 | 9 | → Step 6b: click the chip **no DG**, then **EV charging only after 10 pm**. | "Checked, then priced. Impossible rules are refused." | Offline: only the chips are precomputed; don't type a new rule without the backend. |
 | 10 | → 7a scorecard (pause 3 s), → 7b, → 7c. | "Same days, same data. When the network fails…" | — |
 | 11 | → 7d **Is it worth it?** | "About Rs 7.9 lakh of node hardware for 9 buildings. On the electricity bill alone it does not pay back on our assumed costs. The case today is reliability: fewer dark hours for critical loads when BESCOM fails." | — |
-| 12 | → 7e bottom line. Stop. | Read the sentence on screen: "In a BESCOM outage Q-Grid cuts critical-load downtime from 2.6 h to 55 min per outage (41 L more diesel, 110 kg CO₂, to keep those loads up); on normal days the bill is 0.4% higher and the demand charge rises by Rs 16,685 a month at 1,300 kVA contract demand; with no central controller it averages 8.4% from the best possible plan against 9.2% for Per-building MPC, a lead made on the outage days (normal days: 7.4% against 0.3%)." | — |
+| 12 | → 7e bottom line. Stop. | Read the sentence on screen: "In a BESCOM outage Q-Grid cuts critical-load downtime from 2.6 h to 20 min per outage (45 L more diesel, 122 kg CO₂, to keep those loads up); on normal days the bill is 0.1% lower and the demand charge falls by Rs 5,278 a month at 1,300 kVA contract demand; with no central controller it averages 1.1% from the best possible plan against 9.2% for Per-building MPC, a lead made on the outage days (normal days: 0.6% against 0.3%)." | — |
 
 ## Recovery
 

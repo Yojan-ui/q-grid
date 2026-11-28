@@ -39,7 +39,7 @@ One idea per slide; the demo carries the detail._
 ### 5 · Decentralised coordination
 - Live: take a building offline. Its 3 cables go dark; the others re-agree in
   46 rounds; every critical load in the other buildings is still served.
-- 3-hour network failure: central control loses 2.68 points of gap, Q-Grid 0.71.
+- 3-hour network failure: central control loses 2.68 points of gap, Q-Grid 0.01.
 - Screenshot: `deck/05_agree.png` (Step 5).
 
 ### 6 · Demo (switch to the app)
@@ -49,24 +49,24 @@ One idea per slide; the demo carries the detail._
 - Screenshot: `deck/06_rules.png` (Step 6b). Backup video: `docs/media/demo_backup.webm`.
 
 ### 7 · Results
-- **In a BESCOM outage Q-Grid cuts critical-load downtime from 2.6 h to 55 min per outage (41 L more diesel, 110 kg CO₂, to keep those loads up); on normal days the bill is 0.4% higher and the demand charge rises by Rs 16,685 a month at 1,300 kVA contract demand; with no central controller it averages 8.4% from the best possible plan against 9.2% for Per-building MPC, a lead made on the outage days (normal days: 7.4% against 0.3%).**
+- **In a BESCOM outage Q-Grid cuts critical-load downtime from 2.6 h to 20 min per outage (45 L more diesel, 122 kg CO₂, to keep those loads up); on normal days the bill is 0.1% lower and the demand charge falls by Rs 5,278 a month at 1,300 kVA contract demand; with no central controller it averages 1.1% from the best possible plan against 9.2% for Per-building MPC, a lead made on the outage days (normal days: 0.6% against 0.3%).**
 - Same days, data, forecasts and constraints for every method; five campuses (RVCE + four public meter datasets).
 
 | On RVCE (30 days) | Today | Q-Grid | Best possible plan |
 |---|---:|---:|---:|
-| Critical loads dark, per outage | 2.58 h | 0.92 h | 0.00 h |
-| Diesel, per outage day | 373 L | 414 L | 389 L |
-| Gap to best plan, all days | 16.8 % | 8.4 % | 0 % |
-| Gap to best plan, normal days | 2.4 % | 7.4 % | 0 % |
+| Critical loads dark, per outage | 2.58 h | 0.33 h | 0.00 h |
+| Diesel, per outage day | 373 L | 418 L | 389 L |
+| Gap to best plan, all days | 16.8 % | 1.1 % | 0 % |
+| Gap to best plan, normal days | 2.4 % | 0.6 % | 0 % |
 
-- Closest method without a central controller on 1 of 5 campuses; on RVCE the lead
-  over per-building MPC is made on the outage days (normal days: 7.4 % vs 0.3 %).
+- Closest method without a central controller on 3 of 5 campuses; on RVCE the lead
+  over per-building MPC is made on the outage days (normal days: 0.6 % vs 0.3 %).
 - Screenshot: `deck/07_bottom_line.png` (Step 7e); backup `deck/07_scorecard.png` (Step 7a).
 
 ### 8 · Cost and impact
-- Everyday bill: 0.4 % higher on normal days, 0.9 % higher over all days.
-- Monthly demand charge at 1,300 kVA contract demand (assumed): rises by Rs 16,685
-  (1,000 kVA: Rs 41,261; 1,600 kVA: Rs 238; negative = Q-Grid pays less).
+- Everyday bill: 0.1 % lower on normal days, 0.4 % higher over all days.
+- Monthly demand charge at 1,300 kVA contract demand (assumed): falls by Rs 5,278
+  (1,000 kVA: Rs -21,882; 1,600 kVA: Rs 0; negative = Q-Grid pays less).
 - About Rs 7.9 lakh of node hardware for 9 buildings. On the electricity bill alone it does not pay back on our assumed costs. The case today is reliability: fewer dark hours for critical loads when BESCOM fails.
 - Screenshot: `deck/08_worth_it.png` (Step 7d).
 

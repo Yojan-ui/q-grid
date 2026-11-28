@@ -1,6 +1,6 @@
 # Q-Grid scorecard
 
-**Q-Grid lands 8.4% from the best possible plan on average; the closest alternative without a central controller, Per-building MPC (MILP), lands 9.2%; day by day, Per-building MPC (MILP) is closer on 27 of 30 days, and Q-Grid's lower mean comes from a few days with large differences (paired Wilcoxon p = 0.002).** Among methods that work without a central controller, Q-Grid is closest to the best possible plan on 1 of 5 campuses; elsewhere (BDG2 university site 'Fox' (Arizona); BDG2 university site 'Bull' (Texas); BDG2 university site 'Cockatoo' (New York); CU-BEMS office building, Bangkok (7 floors)) another method is closer.
+**Q-Grid lands 1.1% from the best possible plan on average; the closest alternative without a central controller, Per-building MPC (MILP), lands 9.2%; day by day, Q-Grid is closer on 18 of 30 days (paired Wilcoxon p = 0.070).** Among methods that work without a central controller, Q-Grid is closest to the best possible plan on 3 of 5 campuses; elsewhere (BDG2 university site 'Bull' (Texas); BDG2 university site 'Cockatoo' (New York)) another method is closer.
 
 _All figures: mean over evaluation days, from `results/bench_v3/summary.csv`. Tariff BESCOM HT-2(c)(ii), KERC Tariff Orders 2022 / 2023; synthetic outages._
 
@@ -13,14 +13,14 @@ _All figures: mean over evaluation days, from `results/bench_v3/summary.csv`. Ta
 | Per-building MPC (MILP) | 9.17 | 9.17 | 175,232 | 1.3 | 0.26 | 1,014 | ✓ |
 | Central MPC with forecasts | 1.37 | 1.38 | 179,408 | -0.9 | 0.00 | 1,038 | ✗ |
 | Central MPC when communication fails | 4.06 | 4.06 | 179,555 | -1.0 | 0.12 | 1,031 | ✗ |
-| **Q-Grid** | 8.37 | 8.37 | 179,271 | -0.9 | 0.09 | 1,101 | ✓ |
-| Q-Grid when communication fails | 9.08 | 9.08 | 179,273 | -0.9 | 0.21 | 1,104 | ✓ |
+| **Q-Grid** | 1.06 | 1.07 | 178,561 | -0.4 | 0.03 | 1,019 | ✓ |
+| Q-Grid when communication fails | 1.08 | 1.08 | 178,624 | -0.5 | 0.13 | 1,015 | ✓ |
 | Best possible plan (central MILP, perfect information) | 0.00 | 0.00 | 178,144 | -0.2 | 0.00 | 1,014 | — |
 
 | Dataset | Q-Grid gap % | best alternative without a central controller | its gap % |
 |---|---:|---|---:|
-| RVCE, Bengaluru (case study) | 8.37 | Per-building MPC (MILP) | 9.17 |
-| BDG2 university site 'Fox' (Arizona) | 9.90 | Per-building MPC (MILP) | 8.69 |
-| BDG2 university site 'Bull' (Texas) | 9.79 | Per-building MPC (MILP) | 9.61 |
-| BDG2 university site 'Cockatoo' (New York) | 11.82 | Per-building MPC (MILP) | 10.28 |
-| CU-BEMS office building, Bangkok (7 floors) | 27.66 | Particle swarm optimisation | 27.48 |
+| RVCE, Bengaluru (case study) | 1.06 | Per-building MPC (MILP) | 9.17 |
+| BDG2 university site 'Fox' (Arizona) | 8.31 | Per-building MPC (MILP) | 8.69 |
+| BDG2 university site 'Bull' (Texas) | 9.75 | Per-building MPC (MILP) | 9.61 |
+| BDG2 university site 'Cockatoo' (New York) | 10.56 | Per-building MPC (MILP) | 10.28 |
+| CU-BEMS office building, Bangkok (7 floors) | 27.18 | Particle swarm optimisation | 27.48 |

@@ -104,3 +104,29 @@ def test_feasibility_audit_allows_dg_run_cut_by_grid_return():
     s2.dg_kw[:] = 0.0
     s2.dg_kw[i, 72] = campus.buildings[i].dg.p_min                                       # one slot of a 4-slot outage
     assert [v for v in check_feasibility(campus, s2, dd2)["violations"] if "min on-time" in v]
+
+
+# ---------------------------------------------------------------- Q-Grid peak budgets (full scorecard, 28 Nov 2026)
+# Cause: Q-Grid split the campus peak allowance in proportion to each building's planned import, slot by slot, so a
+# building that planned no import at some slot got a near-zero budget there and priced a private peak; once paid, that
+# headroom let it import freely at every other slot. On RVCE 2023-02-24 two buildings charged their batteries at the
+# 18:00 tariff peak and set a 1,371 kVA month peak (above the 1,300 kVA contract demand). Now a building keeps its
+# planned import plus its static share of the headroom while the campus is under the allowance.
+def test_peak_budgets_never_starve_a_building_with_campus_headroom():
+    import numpy as np
+    from qgrid.ablation.engine import _budgets
+    pf, cap = 0.95, 1105.0
+    w = np.array([0.5, 0.3, 0.2])
+    imp = np.array([[400.0, 300.0, 0.0],          # kW per building and slot
+                    [300.0, 0.0, 200.0],
+                    [0.0, 100.0, 100.0]])
+    b = _budgets(imp, w, cap, pf)
+    assert np.allclose(b.sum(axis=0), cap)                        # the budgets add up to the campus allowance
+    assert np.all(b >= imp / pf - 1e-9)                           # nobody gets less than it planned (headroom here)
+    assert np.all(b[imp == 0] > 0)                                # a zero-import slot still has its share of headroom
+    over = np.array([[900.0], [300.0], [0.0]])                    # campus above the allowance at this slot
+    bo = _budgets(over, w, cap, pf)
+    assert np.isclose(bo.sum(), cap) and np.isclose(bo[0, 0] / bo[1, 0], 3.0) and bo[2, 0] == 0.0
+    bz = _budgets(np.zeros((3, 1)), w, cap, pf)                   # nothing planned: the static shares
+    assert np.allclose(bz[:, 0], w * cap)
+    assert np.allclose(_budgets(imp, w, 0.0, pf), 0.0)            # no allowance (no contract demand, start of day)
